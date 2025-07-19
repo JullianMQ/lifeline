@@ -14,7 +14,7 @@
 - Shared codebase for different platforms only for UI. Features such as cameras, microphones, and other sensors are handled through "Native Modules", which means that they need to be implemented individually for each platform.
 
 ## Environment Support
-- Supports markup tags like <view>, <text>, <image> that map to native components
+- Supports markup tags like \<view>, \<text>, \<image> that map to native components
 - True CSS support for animations, gradients, selectors, transitions
 - Deployment is done through Rspeedy (rust-based) for fast bundling and hot-reload
 
