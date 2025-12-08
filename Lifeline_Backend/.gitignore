@@ -1,0 +1,4 @@
+# deps
+.env
+.env.production
+node_modules/
