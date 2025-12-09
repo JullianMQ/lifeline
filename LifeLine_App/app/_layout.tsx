@@ -1,21 +1,50 @@
-// app/_layout.tsx
-import { Drawer } from "expo-router/drawer";
+import { Stack, useRouter, useSegments } from 'expo-router';
+import React, { useEffect, useState, type PropsWithChildren } from 'react';
+import { isAuthenticated } from './storage/session';
 import "./globals.css";
-import CustomDrawer from "./navigation/custom_drawer";
+
+function AuthChecker({ children }: PropsWithChildren) {
+  const router = useRouter();
+  const segments = useSegments();
+  const [isAppReady, setIsAppReady] = useState(false);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const sessionExists = await isAuthenticated();
+
+      // Screens that should be accessible during onboarding
+      const onboardingScreens = ['(auth)', 'select_role', 'child_info', 'parent_info'];
+      const currentSegment = segments[0];
+
+      if (!sessionExists && !onboardingScreens.includes(currentSegment)) {
+        // Not logged in, trying to access main app → go to login
+        router.replace('/(auth)/login');
+      } else if (sessionExists && currentSegment === '(auth)' && !onboardingScreens.includes(currentSegment)) {
+        // Logged in, trying to go back to login/signup → go to landing/home
+        router.replace('/landing');
+      }
+
+      setIsAppReady(true);
+    };
+
+    checkSession();
+  }, [segments]);
+
+  if (!isAppReady) return null;
+
+  return <>{children}</>;
+}
+
 
 export default function RootLayout() {
   return (
-    <Drawer
-      drawerContent={(props) => <CustomDrawer {...props} />}
-      initialRouteName="landing"
-      screenOptions={{
-        headerShown: false,
-        drawerPosition: "right",
-      }}
-    >
-
-      <Drawer.Screen name="landing" options={{ drawerItemStyle: { display: "none" } }} />
-      <Drawer.Screen name="(main)" options={{ drawerItemStyle: { display: "none" } }} />
-    </Drawer>
+    <AuthChecker>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(main)" />
+        <Stack.Screen name="landing" />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+    </AuthChecker>
   );
 }

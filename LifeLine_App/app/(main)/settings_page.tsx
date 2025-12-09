@@ -1,11 +1,13 @@
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-
+import ScreenWrapper from '../components/screen_wrapper'
 const SettingsPage = () => {
     return (
-        <View>
-            <Text>settings_page</Text>
-        </View>
+        <ScreenWrapper>
+            <View>
+                <Text>settings_page</Text>
+            </View>
+        </ScreenWrapper>
     )
 }
 

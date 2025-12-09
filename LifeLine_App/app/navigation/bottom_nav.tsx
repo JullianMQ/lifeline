@@ -8,8 +8,8 @@ import { TouchableOpacity, View } from "react-native";
 type RouteHref = "/home_page" | "/contact_page" | "/faqs_page" | "/menu_page";
 
 const navItems: { name: string; href: RouteHref; icon: string }[] = [
-    { name: "Home", href: "/home_page", icon: "home-outline" },
     { name: "Contacts", href: "/contact_page", icon: "people-outline" },
+    { name: "Home", href: "/home_page", icon: "home-outline" },
     { name: "FAQs", href: "/faqs_page", icon: "information-circle-outline" },
 ];
 
@@ -22,7 +22,7 @@ const BottomNav = () => {
     const inactiveColor = "black";
 
     return (
-        <View className="absolute bottom-5 left-5 right-5 h-20 bg-white flex-row justify-around items-center rounded-2xl shadow-lg elevation-10 shadow-black/50">
+        <View className="absolute bottom-5 left-5 right-5 h-20 bg-white flex-row justify-around items-center rounded-2xl shadow-lg elevation-10 shadow-black/100">
             {navItems.map((item) => (
                 <Link key={item.href} href={item.href} asChild>
                     <TouchableOpacity>

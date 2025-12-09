@@ -1,14 +1,16 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-
+import ScreenWrapper from '../components/screen_wrapper';
 const FaqsPage = () => {
     return (
-        <View>
+        <ScreenWrapper>
+            <View>
 
 
-            <Text>faqs_page</Text>
+                <Text>faqs_page</Text>
 
-        </View>
+            </View>
+        </ScreenWrapper>
     )
 }
 

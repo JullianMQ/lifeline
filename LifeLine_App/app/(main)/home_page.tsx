@@ -1,13 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import ScreenWrapper from '../components/screen_wrapper';
 
 const HomePage = () => {
     return (
-        <View>
+        <ScreenWrapper>
+            <View>
 
-            <Text>home_page</Text>
+                <Text>home_pages</Text>
 
-        </View>
+            </View>
+        </ScreenWrapper>
+
     )
 }
 

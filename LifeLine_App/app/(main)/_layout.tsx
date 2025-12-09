@@ -1,16 +1,30 @@
-import { Stack } from "expo-router";
 import React from "react";
+import { View } from "react-native";
+import { Drawer } from "expo-router/drawer";
 import BottomNav from "../navigation/bottom_nav";
-import TopNav from "../navigation/top_nav";
+import CustomDrawer from "../navigation/custom_drawer";
 
-export default function MainLayout() {
+const MainLayout: React.FC = () => {
     return (
-        <>
-            <TopNav />
-            <Stack screenOptions={{ headerShown: false }}>
+        <View className="flex-1">
+            <Drawer
+                drawerContent={(props) => <CustomDrawer {...props} />}
+                screenOptions={{
+                    headerShown: false,
+                    drawerPosition: "right",
+                }}
+            >
 
-            </Stack>
-            <BottomNav />
-        </>
+                <Drawer.Screen name="home_page" />
+                <Drawer.Screen name="contact_page" />
+                <Drawer.Screen name="faqs_page" />
+                <BottomNav />
+            </Drawer>
+
+
+
+        </View>
     );
-}
+};
+
+export default MainLayout;
