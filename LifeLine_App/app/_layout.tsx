@@ -12,15 +12,15 @@ function AuthChecker({ children }: PropsWithChildren) {
     const checkSession = async () => {
       const sessionExists = await isAuthenticated();
 
-      // Screens that should be accessible during onboarding
+
       const onboardingScreens = ['(auth)', 'select_role', 'child_info', 'parent_info'];
       const currentSegment = segments[0];
 
       if (!sessionExists && !onboardingScreens.includes(currentSegment)) {
-        // Not logged in, trying to access main app → go to login
+
         router.replace('/(auth)/login');
       } else if (sessionExists && currentSegment === '(auth)' && !onboardingScreens.includes(currentSegment)) {
-        // Logged in, trying to go back to login/signup → go to landing/home
+
         router.replace('/landing');
       }
 
