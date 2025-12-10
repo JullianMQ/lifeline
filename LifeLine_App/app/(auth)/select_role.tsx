@@ -42,34 +42,37 @@ const SelectRole: React.FC = () => {
     };
 
     return (
-        <View className="flex-1 bg-gray-200 items-center pt-20">
+        <View className="flex-1 items-center pt-20">
             <View className="items-center mb-10">
                 <Image
                     source={require("../../assets/images/LifelineLogo.png")}
                     className="w-28 h-28"
                     resizeMode="contain"
                 />
-                <Text className="text-3xl font-extrabold text-black mt-2">SIGN UP</Text>
+                <Text className="text-3xl font-extrabold text-gray-700 mt-2">SIGNUP</Text>
             </View>
 
             <Text className="text-2xl mb-6">Are you a?</Text>
 
-            <View className="flex-row mb-8 justify-center space-x-12">
+            <View className="flex-row justify-center mb-8 gap-x-8">
+
+                {/* Child */}
                 <Pressable onPress={() => handlePress("child")}>
                     <Animated.View style={{ transform: [{ scale: childScale }], alignItems: "center" }}>
                         <View>
                             <SvgChild width={128} height={128} />
                         </View>
-                        <Text className="text-lg mt-2 font-medium text-center">Child</Text>
+                        <Text className="text-lg mt-2 font-extrabold text-center text-gray-700">Child</Text>
                     </Animated.View>
                 </Pressable>
 
+                {/* Parent */}
                 <Pressable onPress={() => handlePress("parent")}>
                     <Animated.View style={{ transform: [{ scale: parentScale }], alignItems: "center" }}>
                         <View>
                             <SvgParent width={128} height={128} />
                         </View>
-                        <Text className="text-lg mt-2 font-medium text-center">Parent</Text>
+                        <Text className="text-lg mt-2 font-extrabold text-center text-gray-700">Parent</Text>
                     </Animated.View>
                 </Pressable>
             </View>

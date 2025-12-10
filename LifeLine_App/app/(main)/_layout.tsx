@@ -1,7 +1,6 @@
 import React from "react";
 import { View } from "react-native";
 import { Drawer } from "expo-router/drawer";
-import BottomNav from "../navigation/bottom_nav";
 import CustomDrawer from "../navigation/custom_drawer";
 
 const MainLayout: React.FC = () => {
@@ -18,7 +17,7 @@ const MainLayout: React.FC = () => {
                 <Drawer.Screen name="home_page" />
                 <Drawer.Screen name="contact_page" />
                 <Drawer.Screen name="faqs_page" />
-                <BottomNav />
+
             </Drawer>
 
 

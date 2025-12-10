@@ -2,8 +2,8 @@ import { View, Text, TextInput, TouchableOpacity, Image } from "react-native";
 import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { login } from "../api/auth";
-import { saveToken } from "../storage/session";
+import { login } from "../../lib/api/auth";
+import { saveToken } from "../../lib/api/storage/session";
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -45,26 +45,29 @@ const Login = () => {
                         className="w-28 h-28"
                         resizeMode="contain"
                     />
-                    <Text className="text-3xl font-extrabold text-black">LOGIN</Text>
+                    <Text className="text-3xl font-extrabold text-gray-700">LOGIN</Text>
                 </View>
 
+                {/* Email */}
                 <TextInput
                     placeholder="Email"
                     value={email}
                     onChangeText={setEmail}
-                    className="border border-black rounded-full px-4 py-3 mt-16 mb-6 h-16"
+                    className="border-2 border-black rounded-full px-4 py-3 mt-16 mb-6 h-16"
                     keyboardType="email-address"
                     autoCapitalize="none"
                 />
 
+                {/* Password */}
                 <TextInput
                     placeholder="Password"
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry
-                    className="border border-black rounded-full px-4 py-3 mb-6 h-16"
+                    className="border-2 border-black rounded-full px-4 py-3 mb-6 h-16"
                 />
 
+                {/* Login */}
                 <TouchableOpacity
                     onPress={handleLogin}
                     className="bg-lifelineRed py-4 rounded-full mb-4"
@@ -74,9 +77,11 @@ const Login = () => {
                     </Text>
                 </TouchableOpacity>
 
+
+                {/* Continue with google */}
                 <TouchableOpacity
                     onPress={handleGoogle}
-                    className="border border-black py-4 mt-8 rounded-full mb-6 flex-row justify-center items-center"
+                    className="border-2 border-black py-4 mt-8 rounded-full mb-6 flex-row justify-center items-center"
                 >
                     <Ionicons name="logo-google" size={24} />
                     <Text className="text-center text-gray-700 font-semibold ml-2">

@@ -1,50 +1,48 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
-import React, { useEffect, useState, type PropsWithChildren } from 'react';
-import { isAuthenticated } from './storage/session';
+import { Stack } from "expo-router";
+import React, { useEffect, useState, type PropsWithChildren } from "react";
+import { isAuthenticated } from "../lib/api/storage/session";
 import "./globals.css";
 
 function AuthChecker({ children }: PropsWithChildren) {
-  const router = useRouter();
-  const segments = useSegments();
   const [isAppReady, setIsAppReady] = useState(false);
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
       const sessionExists = await isAuthenticated();
-
-
-      const onboardingScreens = ['(auth)', 'select_role', 'child_info', 'parent_info'];
-      const currentSegment = segments[0];
-
-      if (!sessionExists && !onboardingScreens.includes(currentSegment)) {
-
-        router.replace('/(auth)/login');
-      } else if (sessionExists && currentSegment === '(auth)' && !onboardingScreens.includes(currentSegment)) {
-
-        router.replace('/landing');
-      }
-
+      setLoggedIn(sessionExists);
       setIsAppReady(true);
     };
-
     checkSession();
-  }, [segments]);
+  }, []);
 
   if (!isAppReady) return null;
-
   return <>{children}</>;
 }
 
-
 export default function RootLayout() {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const logged = await isAuthenticated();
+      setIsLoggedIn(logged);
+    };
+    checkSession();
+  }, []);
+
+  if (isLoggedIn === null) return null;
+
   return (
-    <AuthChecker>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(main)" />
+    <Stack screenOptions={{ headerShown: false }}>
+      {isLoggedIn ? (
+        // User is logged in → show landing first
         <Stack.Screen name="landing" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-    </AuthChecker>
+      ) : (
+        // User not logged in → show login first
+        <Stack.Screen name="(auth)/login" />
+      )}
+      <Stack.Screen name="+not-found" />
+    </Stack>
   );
 }

@@ -2,8 +2,8 @@ import { View, Text, TextInput, TouchableOpacity, Image, Alert } from "react-nat
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
-import { API_BASE_URL } from "../api/config";
-import { saveToken } from "../storage/session";
+import { API_BASE_URL } from "../../lib/api/config";
+import { saveToken } from "../../lib/api/storage/session";
 
 
 interface SignupForm {
@@ -24,7 +24,7 @@ const Signup: React.FC = () => {
         confirmPassword: "",
     });
 
-    const inputClass = "border border-black rounded-full px-4 py-3 mb-4 h-16";
+    const inputClass = "border-2 border-black rounded-full px-4 py-3 mb-4 h-16";
 
     const updateField = (field: keyof SignupForm, value: string) =>
         setForm({ ...form, [field]: value });
@@ -111,7 +111,7 @@ const Signup: React.FC = () => {
                         className="w-28 h-28"
                         resizeMode="contain"
                     />
-                    <Text className="text-3xl font-extrabold text-black">SIGN UP</Text>
+                    <Text className="text-3xl font-extrabold text-gray-700">SIGNUP</Text>
                 </View>
 
                 {/* STEP 1 */}
@@ -138,7 +138,7 @@ const Signup: React.FC = () => {
 
                         <TouchableOpacity
                             onPress={() => console.log("Google Signup pressed")}
-                            className="border border-black py-4 mt-4 rounded-full mb-6 flex-row justify-center items-center"
+                            className="border-2 border-black py-4 mt-8 rounded-full mb-6 flex-row justify-center items-center"
                         >
                             <Ionicons name="logo-google" size={24} className="mr-2" />
                             <Text className="text-center text-gray-700 font-semibold">
@@ -175,7 +175,7 @@ const Signup: React.FC = () => {
                     </>
                 )}
 
-                <Text className="text-center text-gray-600 mt-4">
+                <Text className="text-center text-gray-600">
                     Already have an account?
                     <Link href="/(auth)/login" className="text-blue-600 font-semibold"> Log In</Link>
                 </Text>

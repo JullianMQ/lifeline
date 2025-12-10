@@ -3,8 +3,8 @@ import { DrawerContentComponentProps, DrawerContentScrollView } from "@react-nav
 import { useRouter } from "expo-router";
 import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
-import { removeToken } from "../storage/session";
-import { logout } from "../api/auth";
+import { removeToken } from "../../lib/api/storage/session";
+import { logout } from "../../lib/api/auth";
 
 
 const CustomDrawer: React.FC<DrawerContentComponentProps> = (props) => {
