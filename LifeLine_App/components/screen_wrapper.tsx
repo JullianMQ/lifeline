@@ -8,7 +8,7 @@ const BOTTOM_NAV_PADDING = 100;
 interface ScreenWrapperProps {
     showBottomNav?: boolean;
     topNavProps?: { backButtonOnly?: boolean; onBackPress?: () => void };
-    scrollable?: boolean; // new prop
+    scrollable?: boolean;
 }
 
 const ScreenWrapper: React.FC<PropsWithChildren<ScreenWrapperProps>> = ({

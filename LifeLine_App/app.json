@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "mobile_movie_app",
-    "slug": "mobile_movie_app",
+    "name": "Lifeline",
+    "slug": "Lifeline_App",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/LifelineLogo.png",
     "scheme": "movies",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

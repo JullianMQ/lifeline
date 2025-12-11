@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useDrawerStatus } from "@react-navigation/drawer"; // <-- add this
+import { useDrawerStatus } from "@react-navigation/drawer";
 import { useNavigation } from "@react-navigation/native";
 import { Link, usePathname } from "expo-router";
 import React from "react";
