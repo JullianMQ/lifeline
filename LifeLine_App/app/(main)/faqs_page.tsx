@@ -1,12 +1,11 @@
 import React, { useState } from "react";
-import { Text, ScrollView, TouchableOpacity } from "react-native";
-import ScreenWrapper from "../components/screen_wrapper";
+import { Text, ScrollView, TouchableOpacity, View } from "react-native";
+import ScreenWrapper from "../../components/screen_wrapper";
 
 const faqs = [
     {
         question: "Lorem ipsum dolor sit amet?",
-        answer:
-            "Morbi sollicitudin pretium eleifend. Maecenas ornare nisl nec.",
+        answer: "Morbi sollicitudin pretium eleifend. Maecenas ornare nisl nec.",
     },
     {
         question: "Consectetur adipiscing elit?",
@@ -14,8 +13,7 @@ const faqs = [
     },
     {
         question: "Lorem ipsum dolor sit amet?",
-        answer:
-            "Morbi sollicitudin pretium eleifend. Maecenas sit amet urna.",
+        answer: "Morbi sollicitudin pretium eleifend. Maecenas sit amet urna.",
     },
     {
         question: "Consectetur adipiscing elit?",
@@ -24,9 +22,7 @@ const faqs = [
 ];
 
 const FaqsPage = () => {
-    const [openStates, setOpenStates] = useState(
-        Array(faqs.length).fill(false)
-    );
+    const [openStates, setOpenStates] = useState(Array(faqs.length).fill(false));
 
     const toggleItem = (index: number) => {
         const newState = [...openStates];
@@ -41,27 +37,28 @@ const FaqsPage = () => {
                     const isOpen = openStates[index];
 
                     return (
-                        <TouchableOpacity
-                            key={index}
-                            activeOpacity={0.7}
-                            onPress={() => toggleItem(index)}
-                            className={`rounded-xl p-4 mb-4 bg-white border 
-                ${isOpen ? "border-lifelineRed" : "border-gray-300"}`}
-                        >
-                            <Text
-                                className={`text-lg font-semibold mb-2 ${isOpen ? "text-lifelineRed" : "text-black"
-                                    }`}
+                        <View key={index} className="mb-4">
+                            {/* Question */}
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => toggleItem(index)}
+                                className={`rounded-2xl p-4 border ${isOpen ? "border-lifelineRed" : "border-gray-300"
+                                    } bg-white`}
                             >
-                                {item.question}
-                            </Text>
+                                <Text
+                                    className="text-gray-700 font-semibold text-lg"
+                                >
+                                    {item.question}
+                                </Text>
+                            </TouchableOpacity>
 
                             {/* Answer */}
                             {isOpen && (
-                                <Text className="text-gray-700">
-                                    {item.answer}
-                                </Text>
+                                <View className="rounded-b-xl border border-gray-300 border-t-0 bg-white p-4">
+                                    <Text className="text-gray-700">{item.answer}</Text>
+                                </View>
                             )}
-                        </TouchableOpacity>
+                        </View>
                     );
                 })}
             </ScrollView>

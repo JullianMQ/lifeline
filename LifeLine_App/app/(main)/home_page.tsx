@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
-import ScreenWrapper from "../components/screen_wrapper";
+import ScreenWrapper from "../../components/screen_wrapper";
 import { Ionicons } from "@expo/vector-icons";
 
 const HomePage = () => {
