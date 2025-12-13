@@ -1,4 +1,18 @@
-create table "user" ("id" text not null primary key, "name" text not null, "email" text not null unique, "emailVerified" boolean not null, "image" text, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz default CURRENT_TIMESTAMP not null);
+CREATE TYPE role_enum AS ENUM ('mutual', 'dependent');
+
+CREATE TABLE "user" (
+    "id" TEXT PRIMARY KEY NOT NULL,
+    "first_name" TEXT NOT NULL,
+    "last_name" TEXT NOT NULL,
+    "email" TEXT NOT NULL UNIQUE,
+    "emailVerified" BOOLEAN NOT NULL,
+    "image" TEXT,
+    "role" role_enum NOT NULL,
+    "phone_no" TEXT NOT NULL,
+    "emergency_contacts" INTEGER REFERENCES "contacts"(id) ON DELETE SET NULL,
+    "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
 
 create table "session" ("id" text not null primary key, "expiresAt" timestamptz not null, "token" text not null unique, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz not null, "ipAddress" text, "userAgent" text, "userId" text not null references "user" ("id") on delete cascade);
 

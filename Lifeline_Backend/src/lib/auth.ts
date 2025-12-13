@@ -1,18 +1,30 @@
 import { betterAuth } from "better-auth";
-import { openAPI } from "better-auth/plugins";
 import { Pool } from "pg";
+import { openAPI } from "better-auth/plugins";
 
 export const auth = betterAuth({
     database: new Pool({
-        connectionString: "postgres://lifeline:lifeline@localhost:5432/lifeline?options=-c search_path=auth",
+        connectionString: process.env.DATABASE_URL,
     }),
-    trustedOrigins: ['*'], // TODO: CHANGE PATH TO ONLY THE FRONTEND
+    trustedOrigins: ["*"],
     emailAndPassword: {
         enabled: true
     },
+    user: {
+        additionalFields: {
+            role: {
+                type: "string",
+                required: true,
+            },
+            phone_no: {
+                type: "string",
+                required: true,
+            }
+        }
+    },
     plugins: [
-        openAPI(),
-    ],
+        openAPI()
+    ]
 });
 
 export type AuthType = {
