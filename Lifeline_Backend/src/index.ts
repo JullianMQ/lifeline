@@ -1,19 +1,16 @@
-import { Hono } from "hono";
-import type { AuthType } from "./lib/auth"
-import auth from "./routes/auth";
+import { Hono } from 'hono'
+import { AuthType } from './lib/auth'
+import auth from './routes/auth'
+import contacts from './routes/contacts'
 
 const app = new Hono<{ Variables: AuthType }>({
     strict: false,
-}).basePath('/api');
+})
 
-app.get('/', (c) => {
-    return c.text('Hello World!');
-});
-
-const routes = [auth] as const;
+const routes = [auth, contacts] as const;
 
 routes.forEach((route) => {
-    app.route("/", route);
+    app.basePath("/api").route("/", route);
 });
 
-export default app;
+export default app
