@@ -9,7 +9,7 @@ CREATE TABLE "user" (
     "image" TEXT,
     "role" role_enum NOT NULL,
     "phone_no" TEXT NOT NULL,
-    "emergency_contacts" INTEGER REFERENCES "contacts"(id) ON DELETE SET NULL,
+    "emergency_contacts" INTEGER,
     "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
