@@ -2,13 +2,11 @@ CREATE TYPE role_enum AS ENUM ('mutual', 'dependent');
 
 CREATE TABLE "user" (
     "id" TEXT PRIMARY KEY NOT NULL,
-    "first_name" TEXT NOT NULL,
-    "last_name" TEXT NOT NULL,
     "email" TEXT NOT NULL UNIQUE,
     "emailVerified" BOOLEAN NOT NULL,
     "image" TEXT,
     "role" role_enum NOT NULL,
-    "phone_no" TEXT NOT NULL,
+    "phone_no" TEXT NOT NULL UNIQUE,
     "emergency_contact" INTEGER,
     "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL

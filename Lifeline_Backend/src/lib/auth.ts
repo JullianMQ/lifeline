@@ -29,15 +29,19 @@ export const auth = betterAuth({
                 validator: {
                     input: z.enum(["mutual", "dependent"]),
                 },
+                input: true
             },
             phone_no: {
                 type: "string",
                 required: true,
                 defaultValue: "09123456789",
+                input: true,
+                unique: true
             },
             emergency_contact: {
                 type: "number",
                 required: false,
+                input: false
             }
         }
     },

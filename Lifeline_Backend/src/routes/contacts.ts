@@ -39,6 +39,19 @@ router.get("/contacts", async (c) => {
     return c.json(result.rows[0]);
 });
 
+router.get("/contacts/:phone", async (c) => {
+    const phone = c.req.param("phone");
+    const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+    });
+    const result = await pool.query('SELECT * FROM "user" WHERE phone_no = $1', [phone]);
+    await pool.end();
+    if (result.rows.length === 0) {
+        return c.json({ error: "Contacts not found" }, 404);
+    }
+    return c.json(result.rows[0]);
+});
+
 const updateContactsHandler = async (c: any) => {
     const user = c.get("user");
     const body = await c.req.json();
@@ -49,6 +62,25 @@ const updateContactsHandler = async (c: any) => {
     const pool = new Pool({
         connectionString: process.env.DATABASE_URL,
     });
+    // Check if emergency contacts are registered users
+    const contactsToCheck = [
+        parsed.data.emergency_contact_1,
+        parsed.data.emergency_contact_2,
+        parsed.data.emergency_contact_3,
+        parsed.data.emergency_contact_4,
+        parsed.data.emergency_contact_5,
+    ].filter(contact => contact && contact !== "");
+    for (const contact of contactsToCheck) {
+        if (contact === user.phone_no) {
+            await pool.end();
+            return c.json({ error: "You cannot add your own phone number as an emergency contact." }, 400);
+        }
+        const result = await pool.query('SELECT id FROM "user" WHERE phone_no = $1', [contact]);
+        if (result.rows.length === 0) {
+            await pool.end();
+            return c.json({ error: `Emergency contact ${contact} is not a registered user.` }, 400);
+        }
+    }
     const updateFields = [];
     const values = [];
     let index = 1;
