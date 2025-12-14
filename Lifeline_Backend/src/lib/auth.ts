@@ -8,15 +8,24 @@ export const auth = betterAuth({
     database: new Pool({
         connectionString: process.env.DATABASE_URL,
     }),
+    baseURL: process.env.BETTER_AUTH_URL,
     trustedOrigins: ["*"],
     emailAndPassword: {
         enabled: true
+    },
+    socialProviders: {
+        google: {
+            prompt: "select_account",
+            clientId: process.env.GOOGLE_CLIENT_ID! as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET! as string,
+        },
     },
     user: {
         additionalFields: {
             role: {
                 type: "string",
                 required: true,
+                defaultValue: "mutual",
                 validator: {
                     input: z.enum(["mutual", "dependent"]),
                 },
@@ -24,11 +33,20 @@ export const auth = betterAuth({
             phone_no: {
                 type: "string",
                 required: true,
+                defaultValue: "09123456789",
             },
             emergency_contact: {
                 type: "number",
                 required: false,
             }
+        }
+    },
+    account: {
+        storeAccountCookie: true,
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ["google", "facebook"],
+            allowDifferentEmails: false
         }
     },
     plugins: [
