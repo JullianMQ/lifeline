@@ -15,7 +15,7 @@ routes.forEach((route) => {
 
 app.get("/api/auth/google/callback/success", (c) => {
     return c.text("Success");
-});
+})
 
 app.get("/api/auth/google/callback/error", (c) => {
     return c.text("Error, logging in please try again");

@@ -1,6 +1,6 @@
 CREATE TABLE "contacts" (
     "id" SERIAL PRIMARY KEY,
-    "user_id" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    "user_id" TEXT NOT NULL REFERENCES "user" (id) ON DELETE CASCADE,
     "emergency_contact_1" TEXT,
     "emergency_contact_2" TEXT,
     "emergency_contact_3" TEXT,
