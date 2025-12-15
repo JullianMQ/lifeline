@@ -79,21 +79,20 @@ export const auth = betterAuth({
     plugins: [
         openAPI()
     ],
-    hooks: {
-        after: createAuthMiddleware(async (ctx) => {
-            if (ctx.path.startsWith("/sign-up")) {
-                const newSession = ctx.context.newSession;
-                if (newSession) {
+    databaseHooks: {
+        user: {
+            create: {
+                after: async (user) => {
                     const pool = new Pool({
                         connectionString: process.env.DATABASE_URL,
                     });
-                    const result = await pool.query('INSERT INTO contacts (user_id) VALUES ($1) RETURNING id', [newSession.user.id]);
+                    const result = await pool.query('INSERT INTO contacts (user_id) VALUES ($1) RETURNING id', [user.id]);
                     const contactId = result.rows[0].id;
-                    await pool.query('UPDATE "user" SET emergency_contact = $1 WHERE id = $2', [contactId, newSession.user.id]);
+                    await pool.query('UPDATE "user" SET emergency_contact = $1 WHERE id = $2', [contactId, user.id]);
                     await pool.end();
                 }
             }
-        })
+        }
     }
 });
 
