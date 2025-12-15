@@ -5,13 +5,20 @@ import { openAPI } from "better-auth/plugins";
 import { z } from "zod";
 
 export const auth = betterAuth({
+    appName: "Lifeline",
     database: new Pool({
         connectionString: process.env.DATABASE_URL,
     }),
     baseURL: process.env.BETTER_AUTH_URL,
     trustedOrigins: ["*"],
     emailAndPassword: {
-        enabled: true
+        enabled: true,
+        autoSignIn: false,
+        requireEmailVerification: false,
+        revokeSessionsOnPasswordReset: true,
+        // TODO: ADDING PASSWORD RESET WHEN DOMAIN IS READY
+        // sendResetPassword
+        // onPasswordReset
     },
     socialProviders: {
         google: {
@@ -45,12 +52,28 @@ export const auth = betterAuth({
             }
         }
     },
+    session: {
+        cookieCache: {
+            enabled: true,
+            strategy: "jwe",
+        }
+    },
     account: {
         storeAccountCookie: true,
         accountLinking: {
             enabled: true,
             trustedProviders: ["google", "facebook"],
             allowDifferentEmails: false
+        }
+    },
+    advanced: {
+        ipAddress: {
+            ipAddressHeaders: ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"],
+            disableIpTracking: false
+        },
+        defaultCookieAttributes: {
+            httpOnly: true,
+            secure: true
         }
     },
     plugins: [
