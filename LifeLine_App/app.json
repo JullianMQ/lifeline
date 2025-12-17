@@ -20,7 +20,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.lifeline.lifeline"
+      "package": "com.lifeline.lifeline",
+      "launchMode": "singleTask"
     },
     "web": {
       "output": "static",

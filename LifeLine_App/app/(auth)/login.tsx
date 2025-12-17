@@ -3,6 +3,8 @@ import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { login } from "../../lib/api/auth";
+import { saveUser } from "@/lib/api/storage/user";
+
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -19,9 +21,14 @@ const Login = () => {
         try {
             console.log("Login pressed", email, password);
 
-            await login(email, password);
+            const data = await login(email, password);
 
-            router.replace("../landing");
+            // ✅ store user info
+            await saveUser(data.user);
+
+            // go to main app
+            router.replace("/(main)/landing");
+
 
             setEmailError(false);
             setPasswordError(false);

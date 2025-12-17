@@ -1,19 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Image, Text, TouchableOpacity, View, Switch, Alert } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { logout } from "../../lib/api/auth";
+import { getUser, clearUser } from "../../lib/api/storage/user";
 
 const MenuPage = () => {
     const router = useRouter();
     const [darkMode, setDarkMode] = useState(false);
+    const [user, setUser] = useState<any>(null);
+
+    useEffect(() => {
+        const loadUser = async () => {
+            const storedUser = await getUser();
+            setUser(storedUser);
+        };
+
+        loadUser();
+    }, []);
 
     const handleLogout = async () => {
         try {
             await logout();
+            await clearUser();
             router.replace("/(auth)/login");
-
         } catch (err) {
             console.error("Logout failed:", err);
             Alert.alert("Logout failed", "Please try again.");
@@ -22,14 +33,24 @@ const MenuPage = () => {
 
     return (
         <ScreenWrapper>
-
             {/* User Info */}
             <View className="flex-row items-center px-6 py-4 border-b border-gray-200">
                 <Image
                     source={require("../../assets/images/user_placeholder.png")}
                     className="w-12 h-12 rounded-full"
                 />
-                <Text className="ml-4 text-base font-semibold">Chuchu Tan</Text>
+                <View className="ml-4">
+                    <Text className="text-base font-semibold">
+                        {user?.name ?? "User"}
+                    </Text>
+
+                    {/* Email if gusto isama */}
+                    {/* {user?.email && (
+                        <Text className="text-sm text-gray-500">
+                            {user.email}
+                        </Text>
+                    )} */}
+                </View>
             </View>
 
             {/* Menu Items */}
