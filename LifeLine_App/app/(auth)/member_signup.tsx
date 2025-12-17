@@ -14,7 +14,6 @@ interface SignupForm {
 
 export default function MemberSignup() {
     const { role } = useLocalSearchParams<{ role: string }>();
-
     const [form, setForm] = useState<SignupForm>({
         firstName: "",
         lastName: "",
@@ -32,37 +31,31 @@ export default function MemberSignup() {
     const handleSignup = async () => {
         const { firstName, lastName, email, phone_no, password, confirmPassword } = form;
 
-        // Basic validation
+        // Basic validations
         if (!firstName || !lastName || !email || !phone_no || !password || !confirmPassword) {
             Alert.alert("Error", "Please fill in all fields");
             return;
         }
-
         if (!/\S+@\S+\.\S+/.test(email)) {
             Alert.alert("Error", "Invalid email");
             return;
         }
-
         if (!/^09\d{9}$/.test(phone_no) && !/^\+639\d{9}$/.test(phone_no)) {
             Alert.alert("Error", "Invalid Philippine phone number");
             return;
         }
-
         if (password !== confirmPassword) {
             Alert.alert("Error", "Passwords do not match");
             return;
         }
-
         try {
-
             await signUp({
-                name: `${form.firstName} ${form.lastName}`,
-                email: form.email,
-                phone_no: form.phone_no,
-                password: form.password,
+                name: `${firstName} ${lastName}`,
+                email,
+                phone_no,
+                password,
                 role,
             } as any);
-
 
             Alert.alert("Success", "Family member added");
             router.replace("/(auth)/login");
@@ -75,7 +68,6 @@ export default function MemberSignup() {
     return (
         <View className="flex-1 bg-white items-center pt-32">
             <View className="w-3/4">
-
                 {/* Header */}
                 <View className="items-center mb-8">
                     <Image
@@ -87,29 +79,57 @@ export default function MemberSignup() {
                 </View>
 
                 {/* Form */}
-                {(["firstName", "lastName", "email", "phone_no", "password", "confirmPassword"] as (keyof SignupForm)[]).map((field) => (
-                    <TextInput
-                        key={field}
-                        placeholder={field
-                            .replace(/([A-Z])/g, " $1")
-                            .replace(/^./, (str) => str.toUpperCase())}
-                        value={form[field]}
-                        onChangeText={(t) => updateField(field, t)}
-                        secureTextEntry={field.includes("password")}
-                        autoCapitalize={field === "email" ? "none" : "words"}
-                        keyboardType={field === "email" ? "email-address" : field === "phone_no" ? "phone-pad" : "default"}
-                        className={inputClass}
-                    />
-                ))}
+                <TextInput
+                    placeholder="First Name"
+                    value={form.firstName}
+                    onChangeText={(t) => updateField("firstName", t)}
+                    className={inputClass}
+                />
+                <TextInput
+                    placeholder="Last Name"
+                    value={form.lastName}
+                    onChangeText={(t) => updateField("lastName", t)}
+                    className={inputClass}
+                />
+                <TextInput
+                    placeholder="Email"
+                    value={form.email}
+                    onChangeText={(t) => updateField("email", t)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    className={inputClass}
+                />
+                <TextInput
+                    placeholder="Phone Number"
+                    value={form.phone_no}
+                    onChangeText={(t) => updateField("phone_no", t)}
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    className={inputClass}
+                />
 
-                {/* Save Button */}
+                {/* Password Fields with asterisks */}
+                <TextInput
+                    placeholder="Password"
+                    value={form.password}
+                    onChangeText={(t) => updateField("password", t)}
+                    secureTextEntry
+                    className={inputClass}
+                />
+                <TextInput
+                    placeholder="Confirm Password"
+                    value={form.confirmPassword}
+                    onChangeText={(t) => updateField("confirmPassword", t)}
+                    secureTextEntry
+                    className={inputClass}
+                />
+
                 <TouchableOpacity
                     onPress={handleSignup}
                     className="bg-lifelineRed py-4 rounded-full mt-4"
                 >
-                    <Text className="text-white text-center font-semibold text-lg">Save</Text>
+                    <Text className="text-center text-white font-semibold text-lg">Save</Text>
                 </TouchableOpacity>
-
             </View>
         </View>
     );

@@ -3,7 +3,7 @@ export const SCREEN_TITLES: Record<string, string> = {
     "/contact_page": "Contacts",
     "/faqs_page": "FAQs",
     "/menu_page": "Menu",
-    "/profile_page": "Profile",
+    "/profile_page": "Edit Profile",
     "/notif_page": "Notifications",
     "/manual_page": "Manual",
     "/settings_page": "Settings",

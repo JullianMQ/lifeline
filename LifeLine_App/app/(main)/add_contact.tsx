@@ -1,11 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, Image } from "react-native";
 import { useRouter } from "expo-router";
 import ScreenWrapper from "../../components/screen_wrapper";
 import { saveContacts, getContacts } from "@/lib/api/contact";
 
 const AddContact = ({ onSaved }: { onSaved?: () => void }) => {
     const router = useRouter();
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
     const [phone, setPhone] = useState("");
 
     const handleSave = async () => {
@@ -16,7 +18,6 @@ const AddContact = ({ onSaved }: { onSaved?: () => void }) => {
         }
 
         try {
-
             const existingContacts = await getContacts();
             let fieldToUpdate = "";
             for (let i = 1; i <= 5; i++) {
@@ -32,12 +33,15 @@ const AddContact = ({ onSaved }: { onSaved?: () => void }) => {
                 return;
             }
 
+            // phone number lang ma add since eto lang nasa backend
             const payload = { [fieldToUpdate]: trimmedPhone };
 
             const result = await saveContacts(payload);
 
             if (result.success) {
                 Alert.alert("Contact Added!");
+                setFirstName("");
+                setLastName("");
                 setPhone("");
                 if (onSaved) onSaved();
                 router.back();
@@ -49,37 +53,61 @@ const AddContact = ({ onSaved }: { onSaved?: () => void }) => {
             Alert.alert("Failed to add contact");
         }
     };
+
     return (
         <ScreenWrapper
             showBottomNav={false}
-            topNavProps={{
-                backButtonOnly: true,
-                onBackPress: () => router.back(),
-            }}
+            topNavProps={{ backButtonOnly: true, onBackPress: () => router.back() }}
+            scrollable={false}
         >
-            <View className="flex-1 pt-12 items-center relative">
+            <View className="flex-1 pt-12 items-center">
+                {/* Avatar */}
+                <View className="w-28 h-28 rounded-full bg-gray-200 items-center justify-center mb-6">
+                    <Image
+                        source={require("../../assets/images/user_placeholder.png")}
+                        className="w-28 h-28 rounded-full"
+                    />
+                </View>
 
-                {/* Input */}
-                <View className="w-3/4 mt-10">
-                    <Text className="mb-2 text-lg font-semibold">Phone Number</Text>
+                {/* Inputs */}
+                <View className="w-3/4">
                     <TextInput
-                        placeholder="Enter phone number"
-                        keyboardType="numeric"
+                        placeholder="First name"
+                        value={firstName}
+                        onChangeText={setFirstName}
+                        className="border-2 border-black rounded-full px-4 py-3 mb-4"
+                    />
+                    <TextInput
+                        placeholder="Last name"
+                        value={lastName}
+                        onChangeText={setLastName}
+                        className="border-2 border-black rounded-full px-4 py-3 mb-4"
+                    />
+                    <TextInput
+                        placeholder="Phone number"
                         value={phone}
                         onChangeText={setPhone}
+                        keyboardType="phone-pad"
                         className="border-2 border-black rounded-full px-4 py-3 mb-4"
                     />
                 </View>
 
-                {/* Save Button */}
-                <TouchableOpacity
-                    onPress={handleSave}
-                    className="bg-lifelineRed py-4 rounded-full w-3/4 absolute bottom-6 self-center"
-                >
-                    <Text className="text-center text-white font-semibold text-lg">
-                        Save
-                    </Text>
-                </TouchableOpacity>
+                {/* Buttons */}
+                <View className="flex-1 justify-end w-3/4 mb-10">
+                    <TouchableOpacity
+                        onPress={handleSave}
+                        className="py-4 rounded-full items-center bg-lifelineRed"
+                    >
+                        <Text className="text-white text-lg font-semibold">Save</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        className="bg-white border border-black py-4 rounded-full items-center mt-6"
+                    >
+                        <Text className="text-black text-lg font-semibold">Back</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </ScreenWrapper>
     );

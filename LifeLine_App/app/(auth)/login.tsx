@@ -67,7 +67,6 @@ const Login = () => {
                         keyboardType="email-address"
                         autoCapitalize="none"
                     />
-
                     {/* Password */}
                     <TextInput
                         placeholder="Password"

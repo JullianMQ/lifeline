@@ -55,7 +55,10 @@ const MenuPage = () => {
 
             {/* Menu Items */}
             <View className="px-6 py-4 flex-1">
-                <TouchableOpacity className="py-3 border-b border-gray-200">
+                <TouchableOpacity
+                    className="py-3 border-b border-gray-200"
+                    onPress={() => router.push("/(main)/settings_page")}
+                >
                     <Text className="text-base">Settings</Text>
                 </TouchableOpacity>
 

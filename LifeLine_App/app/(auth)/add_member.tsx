@@ -1,8 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
-import { TextInput, TouchableOpacity, Image } from "react-native";
-import { Link, router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { TouchableOpacity, Image } from "react-native";
+import { router } from "expo-router";
 const AddMember = () => {
     return (
         <View className="flex-1 bg-white items-center pt-32">

@@ -50,7 +50,6 @@ const Signup: React.FC = () => {
 
         setStep(2);
     };
-
     const handleSignup = async () => {
         const { password, confirmPassword, firstName, lastName, email, phone_no } = form;
 
@@ -58,31 +57,25 @@ const Signup: React.FC = () => {
             Alert.alert("Error", "Please enter your password and confirm it");
             return;
         }
-
         if (password !== confirmPassword) {
             Alert.alert("Error", "Passwords do not match");
             return;
         }
-
         try {
             await signUp({
                 name: `${firstName} ${lastName}`,
                 email,
                 phone_no,
                 password,
+
             });
-
             Alert.alert("Success", "Account created successfully");
-
-            // session cookie is already set here ✅
             router.replace("/(auth)/add_member");
-
         } catch (err: any) {
             console.error("Signup error:", err);
             Alert.alert("Error", err.message || "Signup failed. Please try again.");
         }
     };
-
 
     const step1Fields = [
         { placeholder: "First Name", key: "firstName" },

@@ -18,7 +18,6 @@ const ContactPage = () => {
         setLoading(false);
     };
 
-    // Fetch on page focus
     useFocusEffect(
         useCallback(() => {
             fetchContacts();
@@ -41,13 +40,13 @@ const ContactPage = () => {
 
     const renderHeader = () => (
         <View className="flex-row items-center mb-4 px-5 pt-6">
-            <View className="flex-1 flex-row items-center bg-white px-3 py-.5 rounded-full border-2 mr-3">
+            <View className="flex-1 flex-row items-center px-3 py-.5 rounded-full border-2 mr-3">
                 <Ionicons name="search" size={20} color="black" />
                 <TextInput
                     placeholder="Search"
                     value={search}
                     onChangeText={setSearch}
-                    className="flex-1 ml-2"
+                    className="flex-1 ml-2 text-xl"
                 />
             </View>
 
@@ -72,10 +71,17 @@ const ContactPage = () => {
                     ListHeaderComponent={renderHeader}
                     contentContainerStyle={{ paddingBottom: 20 }}
                     ListEmptyComponent={
-                        <Text className="text-center mt-10 text-gray-500">
-                            No contacts found.
-                        </Text>
+                        <View className="items-center mt-10">
+                            <Text className="text-gray-500 text-center">
+                                No contacts found.
+                            </Text>
+
+                            <Text className="text-yellow-1000 mt-2">
+                                Add now!
+                            </Text>
+                        </View>
                     }
+
                 />
             )}
         </ScreenWrapper>
