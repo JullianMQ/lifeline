@@ -22,8 +22,6 @@ const Login = () => {
             console.log("Login pressed", email, password);
 
             const data = await login(email, password);
-
-            // ✅ store user info
             await saveUser(data.user);
 
             // go to main app
