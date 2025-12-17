@@ -1,7 +1,7 @@
 import React, { PropsWithChildren } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import TopNav from '../app/navigation/top_nav';
-import BottomNav from '../app/navigation/bottom_nav';
+import TopNav from './navigation/top_nav';
+import BottomNav from './navigation/bottom_nav';
 
 const BOTTOM_NAV_PADDING = 100;
 

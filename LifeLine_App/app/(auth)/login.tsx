@@ -3,7 +3,6 @@ import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { login } from "../../lib/api/auth";
-import { saveToken } from "../../lib/api/storage/session";
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -20,26 +19,19 @@ const Login = () => {
         try {
             console.log("Login pressed", email, password);
 
-            const result = await login(email, password);
-            console.log("API response:", result);
-
-            if (!result.token) throw new Error("Wrong email or password");
-
-            await saveToken(result.token);
+            await login(email, password);
 
             router.replace("../landing");
 
-            // Clear errors on successful login
             setEmailError(false);
             setPasswordError(false);
         } catch (err: any) {
             console.log("LOGIN ERROR:", err);
 
-            // Set errors when login fails
-            if (err.message.includes("email")) setEmailError(true);
-            if (err.message.includes("password")) setPasswordError(true);
+            setEmailError(true);
+            setPasswordError(true);
 
-            alert("Login failed: " + err.message);
+            alert("Login failed");
         }
     };
 
