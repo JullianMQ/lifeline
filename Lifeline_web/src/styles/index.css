@@ -1,0 +1,67 @@
+.landing h1{font-size: 90px;letter-spacing: 2px;}
+.landing h2{font-size: 48px;}
+.landing h3{font-size: 40px;letter-spacing: 2px;}
+strong{
+  font-weight: 800px;
+  color: var(--muted-grey);
+  text-transform: uppercase;
+}
+.landing{
+  background: var(--red-landing);
+  display: flex;
+  justify-content: center;
+}
+.content{
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  padding: 0 var(--space-md);
+  gap: var(--space-md);
+  max-width: 1440px;
+}
+.left{
+  width: 33vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.right{
+  width: 66vw;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+.mobile{
+  height: 812px;
+  width: 375px;
+  border: 8px var(--text-black) solid;
+  border-radius: 50px;
+  padding:var(--space-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: var(--base-white);
+}
+ .logo{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-top: var(--space-lg);
+}
+.landing .lifeline-logo{
+  padding: 0 var(--space-lg);
+  aspect-ratio: 2/1.4;
+  height: 160px;
+}
+.lifeline-text{
+  color: var(--muted-grey);
+}
+.landing p{
+  width: 75%;
+}
+.landing button{
+  max-width: 350px ;
+}

@@ -1,0 +1,9 @@
+.form.submitted input:invalid {
+  border: 3px solid var(--lifeline-red);
+}
+
+.error {
+  color: var(--lifeline-red);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}

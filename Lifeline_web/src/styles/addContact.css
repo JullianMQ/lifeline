@@ -1,0 +1,47 @@
+.addContact h3, .addContact h2{
+    font-weight: 600;
+}
+.role-options h3{
+    font-weight: 700;
+}
+.addContact .card{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    align-items: center;
+}
+
+.connect{
+    aspect-ratio: 1/1;
+    width: 220px;
+}
+
+.role-options{
+    display: flex;
+    gap: var(--space-lg);
+}
+
+.role-img{
+    aspect-ratio: 1/1;
+    width: 220px;
+}
+
+.role-choice img:hover{
+    transform: scale(1.1);
+}
+
+.roles{
+    pointer-events: none;
+    display: none;
+}
+
+.role-choice:hover > h3{
+    color: var(--lifeline-red);
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+
+.role-choice:active > h3{
+    color: var(--lifeline-red);
+
+}
