@@ -1,27 +1,34 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Image, FlatList } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useState, useCallback } from "react";
+import { View, Text, TextInput, TouchableOpacity, Image, FlatList, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ScreenWrapper from "../../components/screen_wrapper";
 import { router } from "expo-router";
-
-const dummyContacts = [
-    { id: 1, name: "Renell Constantino" },
-    { id: 2, name: "Chester Lance Cruz" },
-    { id: 3, name: "Jullian Quiambao" },
-    { id: 4, name: "Frances Tumampos" },
-    { id: 5, name: "Uly Raymundo" },
-];
+import { getContacts, Contact } from "@/lib/api/contact";
 
 const ContactPage = () => {
     const [search, setSearch] = useState("");
+    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Filtered contacts
-    const filteredContacts = dummyContacts.filter((c) =>
+    const fetchContacts = async () => {
+        setLoading(true);
+        const data = await getContacts();
+        setContacts(data);
+        setLoading(false);
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchContacts();
+        }, [])
+    );
+
+    const filteredContacts = contacts.filter((c) =>
         c.name.toLowerCase().includes(search.toLowerCase())
     );
 
-    // Render each contact
-    const renderItem = ({ item }: { item: typeof dummyContacts[0] }) => (
+    const renderItem = ({ item }: { item: Contact }) => (
         <View className="flex-row items-center mb-4 px-5">
             <Image
                 source={require("../../assets/images/user_placeholder.png")}
@@ -31,22 +38,18 @@ const ContactPage = () => {
         </View>
     );
 
-
-    // Header component 
     const renderHeader = () => (
         <View className="flex-row items-center mb-4 px-5 pt-6">
-            {/* Search Bar */}
-            <View className="flex-1 flex-row items-center bg-white px-3 py-.5 rounded-full border-2 mr-3">
+            <View className="flex-1 flex-row items-center px-3 py-.5 rounded-full border-2 mr-3">
                 <Ionicons name="search" size={20} color="black" />
                 <TextInput
                     placeholder="Search"
                     value={search}
                     onChangeText={setSearch}
-                    className="flex-1 ml-2"
+                    className="flex-1 ml-2 text-xl"
                 />
             </View>
 
-            {/* Add Button */}
             <TouchableOpacity
                 onPress={() => router.push("/add_contact")}
                 className="w-14 h-14 items-center justify-center"
@@ -58,14 +61,29 @@ const ContactPage = () => {
 
     return (
         <ScreenWrapper scrollable={false}>
-            <FlatList
-                data={filteredContacts}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={renderItem}
-                ListHeaderComponent={renderHeader}
-                contentContainerStyle={{ paddingBottom: 20 }}
-            />
+            {loading ? (
+                <ActivityIndicator size="large" color="#ff0000" className="mt-20" />
+            ) : (
+                <FlatList
+                    data={filteredContacts}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={renderItem}
+                    ListHeaderComponent={renderHeader}
+                    contentContainerStyle={{ paddingBottom: 20 }}
+                    ListEmptyComponent={
+                        <View className="items-center mt-10">
+                            <Text className="text-gray-500 text-center">
+                                No contacts found.
+                            </Text>
 
+                            <Text className="text-yellow-1000 mt-2">
+                                Add now!
+                            </Text>
+                        </View>
+                    }
+
+                />
+            )}
         </ScreenWrapper>
     );
 };

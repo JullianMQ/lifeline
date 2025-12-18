@@ -19,6 +19,7 @@ const router = new Hono<{ Variables: { user: User } }>({
 
 router.use("*", async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    console.log(session);
     if (!session) {
         return c.json({ error: "Unauthorized" }, 401);
     }

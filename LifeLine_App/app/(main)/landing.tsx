@@ -7,7 +7,7 @@ const Landing = () => {
   return (
     <View className="flex-1 justify-center items-center">
       <Image
-        source={require("../assets/images/lifeline_logo.png")}
+        source={require("../../assets/images/lifeline_logo.png")}
         className="w-50 h-50 mb-4"
         resizeMode="contain"
       />
