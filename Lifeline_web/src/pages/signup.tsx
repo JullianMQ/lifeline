@@ -1,6 +1,6 @@
 import "../styles/login.css";
 import { Link } from "react-router-dom";
-import { useSignup } from "../script/useSignup";
+import { useSignup } from "../components/useSignup.tsx";
 
 function Signup() {
   const {

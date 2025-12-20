@@ -7,17 +7,7 @@ function Dashboard() {
 
   return (
     <main className='dashboard'>
-    <header>
-
-    </header>
-    
-    <body>
-        
-    </body>
-
-    <footer>
-
-    </footer>
+    <section></section>
     </main>
   )
 }

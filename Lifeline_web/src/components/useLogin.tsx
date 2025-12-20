@@ -26,13 +26,12 @@ export function useLogin() {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/sign-in/email`, {
+      const res = await fetch("/api/auth/sign-in/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
         credentials: "include",
       });
-
 
       const data = await res.json();
 
@@ -40,10 +39,12 @@ export function useLogin() {
         setError(
           data.code === "INVALID_EMAIL_OR_PASSWORD"
             ? "Please check your email and password"
-            : data.message || "Login failed"
+            : "Failed to connect. Please try again later."
         );
         return null;
       }
+
+      localStorage.setItem("lifeline_user", JSON.stringify({ email }));
 
       return data; 
     } catch (err: any) {
