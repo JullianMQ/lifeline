@@ -53,6 +53,14 @@ function Signup() {
                   onChange={handleChange}
                   className={invalidFields.includes("email") ? "invalid" : ""}
                 />
+                <input
+                  type="tel"
+                  name="phoneNo"
+                  placeholder="Phone Number"
+                  value={formData.phoneNo}
+                  onChange={handleChange}
+                  className={invalidFields.includes("phoneNo") ? "invalid" : ""}
+                />
                 <button type="submit" className="pos-btn">
                   Next
                 </button>

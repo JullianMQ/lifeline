@@ -5,8 +5,10 @@ type FormData = {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNo: string;
   password: string;
   confirmPassword: string;
+  role: "mutual" | "dependent";
 };
 
 export function useSignup() {
@@ -20,8 +22,10 @@ export function useSignup() {
     firstName: "",
     lastName: "",
     email: "",
+    phoneNo: "",
     password: "",
     confirmPassword: "",
+    role: "mutual", 
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,14 +40,13 @@ export function useSignup() {
     if (!formData.firstName) errors.push("firstName");
     if (!formData.lastName) errors.push("lastName");
     if (!formData.email) errors.push("email");
+    if (!formData.phoneNo) errors.push("phoneNo");
     return errors;
   };
 
   const validateStep2 = () => {
     const errors: string[] = [];
-    
     if (!formData.password) errors.push("password");
-
     if (!formData.confirmPassword || formData.password !== formData.confirmPassword) {
       errors.push("confirmPassword");
       setError(
@@ -52,7 +55,6 @@ export function useSignup() {
           : "Passwords do not match"
       );
     }
-
     return errors;
   };
 
@@ -84,9 +86,11 @@ export function useSignup() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: `${formData.firstName} ${formData.lastName}`,
           email: formData.email,
           password: formData.password,
-          name: `${formData.firstName} ${formData.lastName}`,
+          phone_no: formData.phoneNo,
+          role: formData.role,
         }),
       });
 
@@ -103,11 +107,24 @@ export function useSignup() {
           setLoading(false);
           return;
         }
-        
+
+        if (data.details?.detail?.includes("phone_no")) {
+          setStep(1);
+          setInvalidFields(["phoneNo"]);
+          setError("Phone number already exists. Please use another one.");
+          setLoading(false);
+          return;
+        }
+
         setError(data.message || "Signup failed");
         setLoading(false);
         return;
       }
+
+      localStorage.setItem(
+        "lifeline_user",
+        JSON.stringify({ email: formData.email, role: formData.role })
+      );
 
       navigate("/addContact");
     } catch (err: any) {
