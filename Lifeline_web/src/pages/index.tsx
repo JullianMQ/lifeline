@@ -26,10 +26,10 @@ function Index() {
         </section>
         <section className='right'>
           <h1>LIFELINE</h1>
-          <article className='context'>
+          <div className='context'>
             <h2>Download our mobile app now!</h2>
             <p>Your <strong>Lifeline</strong> in moments of uncertainty, ensuring help is ready the moment you feel unsafe.</p>
-          </article>
+          </div>
           <button className='pos-btn'>
             Install Now
           </button>
