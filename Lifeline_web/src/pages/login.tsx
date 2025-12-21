@@ -25,7 +25,7 @@ function Login() {
 
           <div className="login-logo">
             <img src="src/assets/LifelineLogo.png" alt="Lifeline" className='lifeline-logo-mini'/>
-            <h2 className='lifeline-text'>LOGIN</h2>
+            <h1 className='lifeline-text'>LOGIN</h1>
           </div>
 
           <form className="form" onSubmit={handleLogin}>
