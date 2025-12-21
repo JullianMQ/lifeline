@@ -76,10 +76,10 @@ const updateContactsHandler = async (c: any) => {
             await pool.end();
             return c.json({ error: "You cannot add your own phone number as an emergency contact." }, 400);
         }
-        const result = await pool.query('SELECT id FROM "user" WHERE phone_no = $1', [contact]);
+        const result = await pool.query('SELECT id FROM "user" WHERE phone_no = $1 AND role = $2', [contact, "mutual"]);
         if (result.rows.length === 0) {
             await pool.end();
-            return c.json({ error: `Emergency contact ${contact} is not a registered user.` }, 400);
+            return c.json({ error: `Emergency contact ${contact} is not a registered user or is a dependent user.` }, 400);
         }
     }
     const updateFields = [];
