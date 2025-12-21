@@ -40,10 +40,11 @@ function AddContact() {
                       type="radio"
                       name="role"
                       value="mutual"
+                      className="roles"
                       checked={selectedRole === "mutual"}
                       onChange={() => setSelectedRole("mutual")}
                     />
-                    <img src="src/assets/mutual-role.svg" alt="mutual" />
+                    <img src="src/assets/mutual-role.svg" alt="mutual" className="role-img"/>
                     <h3>Mutual</h3>
                   </label>
 
@@ -52,10 +53,11 @@ function AddContact() {
                       type="radio"
                       name="role"
                       value="dependent"
+                      className="roles"
                       checked={selectedRole === "dependent"}
                       onChange={() => setSelectedRole("dependent")}
                     />
-                    <img src="src/assets/dependent-role.svg" alt="dependent" />
+                    <img src="src/assets/dependent-role.svg" alt="dependent" className="role-img"/>
                     <h3>Dependent</h3>
                   </label>
                 </div>

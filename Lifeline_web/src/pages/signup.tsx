@@ -6,6 +6,7 @@ function Signup() {
   const {
     step,
     formData,
+    setStep,
     invalidFields,
     error,
     loading,
@@ -23,7 +24,7 @@ function Signup() {
               alt="Lifeline"
               className="lifeline-logo-mini"
             />
-            <h2 className="lifeline-text">SIGNUP</h2>
+            <h1 className="lifeline-text">SIGNUP</h1>
           </div>
 
           <form className="form" onSubmit={handleSubmit}>
@@ -50,9 +51,36 @@ function Signup() {
                   name="email"
                   placeholder="Email"
                   value={formData.email}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    console.log("Email input changed:", e.target.value); // DEBUG
+                    handleChange(e);
+                  }}
                   className={invalidFields.includes("email") ? "invalid" : ""}
                 />
+                {step === 1 && error && <p className="error">{error}</p>}
+                <button type="submit" className="pos-btn" disabled={loading}>
+                  {loading ? "Checking..." : "Next"}
+                </button>
+
+                <div className="line">
+                  <hr />
+                  <img src="src/assets/location.svg" alt="Location" />
+                  <hr />
+                </div>
+
+                <button type="button" className="neg-btn">
+                  <img
+                    src="src/assets/google.svg"
+                    alt="Google-Logo"
+                    className="google-logo"
+                  />
+                  <p>Signup with Google</p>
+                </button>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
                 <input
                   type="tel"
                   name="phoneNo"
@@ -61,14 +89,6 @@ function Signup() {
                   onChange={handleChange}
                   className={invalidFields.includes("phoneNo") ? "invalid" : ""}
                 />
-                <button type="submit" className="pos-btn">
-                  Next
-                </button>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
                 <input
                   type="password"
                   name="password"
@@ -85,29 +105,17 @@ function Signup() {
                   onChange={handleChange}
                   className={invalidFields.includes("confirmPassword") ? "invalid" : ""}
                 />
-                {error && <p className="error-text">{error}</p>}
+                {error && <p className="error">{error}</p>}
                 <button type="submit" className="pos-btn" disabled={loading}>
                   {loading ? "Signing up..." : "Signup"}
+                </button>    
+                <button type="button" className="neg-btn" onClick={() => setStep(1)} disabled={loading}>
+                  <p>Back</p>
                 </button>
               </>
             )}
 
-            <div className="line">
-              <hr />
-              <img src="src/assets/location.svg" alt="Location" />
-              <hr />
-            </div>
-
-            <div className="google">
-              <button type="button" className="neg-btn">
-                <img
-                  src="src/assets/google.svg"
-                  alt="Google-Logo"
-                  className="google-logo"
-                />
-                <p>Signup with Google</p>
-              </button>
-            </div>
+            
           </form>
         </div>
 

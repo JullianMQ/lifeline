@@ -25,13 +25,13 @@ export function useSignup() {
     phoneNo: "",
     password: "",
     confirmPassword: "",
-    role: "mutual", 
+    role: "mutual",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setInvalidFields((prev) => prev.filter((f) => f !== name));
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setInvalidFields(prev => prev.filter(f => f !== name));
     setError(null);
   };
 
@@ -40,12 +40,23 @@ export function useSignup() {
     if (!formData.firstName) errors.push("firstName");
     if (!formData.lastName) errors.push("lastName");
     if (!formData.email) errors.push("email");
-    if (!formData.phoneNo) errors.push("phoneNo");
+
     return errors;
   };
 
   const validateStep2 = () => {
     const errors: string[] = [];
+    
+    const phoneRegex = /^09\d{9}$/;
+    if (!formData.phoneNo || !phoneRegex.test(formData.phoneNo)) {
+      errors.push("phoneNo");
+      setError(
+        !formData.phoneNo
+          ? "Phone number is required"
+          : "Invalid phone number. Must start with 09 and be 11 digits."
+      );
+    }
+    
     if (!formData.password) errors.push("password");
     if (!formData.confirmPassword || formData.password !== formData.confirmPassword) {
       errors.push("confirmPassword");
@@ -58,6 +69,35 @@ export function useSignup() {
     return errors;
   };
 
+  const checkEmail = async () => {
+    if (!formData.email) return;
+
+    try {
+      const res = await fetch("/api/check/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email }),
+      });
+
+      const data = await res.json();
+      console.log("Email check response:", data);
+
+      if (!res.ok || data.error) {
+        setInvalidFields((prev) => [...prev, "email"]);
+        setError(data.error || "Email already in use");
+        return false;
+      } else {
+        setInvalidFields((prev) => prev.filter((f) => f !== "email"));
+        setError(null);
+        return true;
+      }
+    } catch (err: any) {
+      console.error("Email validation error:", err);
+      setError(err.message || "Failed to validate email");
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -68,6 +108,10 @@ export function useSignup() {
         setInvalidFields(errors);
         return;
       }
+
+      const emailValid = await checkEmail();
+      if (!emailValid) return;
+
       setStep(2);
       return;
     }
@@ -79,7 +123,6 @@ export function useSignup() {
     }
 
     setLoading(true);
-
     try {
       const res = await fetch("/api/auth/sign-up/email", {
         method: "POST",
@@ -93,39 +136,22 @@ export function useSignup() {
           role: formData.role,
         }),
       });
-
       const data = await res.json();
 
       if (!res.ok) {
-        if (
-          data.code === "USER_ALREADY_EXISTS" ||
-          data.message?.toLowerCase().includes("already")
-        ) {
-          setStep(1);
+        if (data.code === "USER_ALREADY_EXISTS" || data.message?.toLowerCase().includes("already")) {
           setInvalidFields(["email"]);
           setError("User already exists. Please log in.");
-          setLoading(false);
-          return;
-        }
-
-        if (data.details?.detail?.includes("phone_no")) {
-          setStep(1);
+        } else if (data.details?.detail?.includes("phone_no")) {
           setInvalidFields(["phoneNo"]);
-          setError("Phone number already exists. Please use another one.");
-          setLoading(false);
-          return;
+          setError("Phone number already exists.");
+        } else {
+          setError(data.message || "Signup failed");
         }
-
-        setError(data.message || "Signup failed");
-        setLoading(false);
         return;
       }
 
-      localStorage.setItem(
-        "lifeline_user",
-        JSON.stringify({ email: formData.email, role: formData.role })
-      );
-
+      localStorage.setItem("lifeline_user", JSON.stringify({ email: formData.email, role: formData.role }));
       navigate("/addContact");
     } catch (err: any) {
       setError(err.message || "Signup failed");
@@ -134,5 +160,15 @@ export function useSignup() {
     }
   };
 
-  return { step, formData, invalidFields, error, loading, handleChange, handleSubmit };
+  return {
+    step,
+    setStep,
+    formData,
+    invalidFields,
+    error,
+    loading,
+    handleChange,
+    handleSubmit,
+    checkEmail
+  };
 }

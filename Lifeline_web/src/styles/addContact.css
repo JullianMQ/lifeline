@@ -17,13 +17,16 @@
 }
 
 .role-options{
-    display: flex;
+    display: grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap: var(--space-md);
+    width: 100%;
     gap: var(--space-lg);
 }
 
 .role-img{
     aspect-ratio: 1/1;
-    width: 220px;
+    width: 100%;
 }
 
 .role-choice img:hover{
