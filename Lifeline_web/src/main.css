@@ -1,41 +1,44 @@
 @font-face {
   font-family: "Krub";
-  src: url("../assets/fonts/Krub-Regular.woff2") format("woff2");
+  src: url("/fonts/Krub-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
-  font-family: "Krub";
-  src: url("../assets/fonts/Krub-Bold.woff2") format("woff2");
+  font-family: "Krub-bold";
+  src: url("/fonts/Krub-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
 }
 
 @font-face {
   font-family: "Inter";
-  src: url("../assets/fonts/Inter-Regular.woff2") format("woff2");
+  src: url("/fonts/Inter-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
-  font-family: "Inter";
-  src: url("../assets/fonts/Inter-Bold.woff2") format("woff2");
+  font-family: "Inter-bold";
+  src: url("/fonts/Inter-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
 }
 
 @font-face {
-  font-family: "Inter";
-  src: url("../assets/fonts/Inter-ExtraBold.woff2") format("woff2");
+  font-family: "Inter-Extrabold";
+  src: url("/fonts/Inter-ExtraBold.ttf") format("truetype");
   font-weight: 800;
   font-style: normal;
 }
 
 :root {
-  --font-inter: "Inter", system-ui, sans-serif;
-  --font-krub: "Krub", system-ui, sans-serif;
+  --inter-reg: "Inter", system-ui, sans-serif;
+  --inter-bold: "Inter-bold", system-ui, sans-serif;
+  --inter-xbold: "Inter-Extrabold", system-ui, sans-serif;
+  --krub-reg: "Krub", system-ui, sans-serif;
+  --krub-bold: "Krub-bold", system-ui, sans-serif;
 
   --space-xxs: 5px;
   --space-xs: 10px;
@@ -54,7 +57,7 @@
   --base-dark: #121212;
   --soft-dark: #36393F;
 
-  --red-landing: linear-gradient(0deg,rgb(255, 0, 0) 0%,rgb(255, 128, 126) 33%,rgb(255, 191, 189) 58%,rgb(255, 255, 252) 82%);
+  --red-landing: linear-gradient(180deg, rgb(255,0,0) 0%, rgb(255,128,126) 33%, rgb(255,191,189) 58%, rgb(255,255,252) 82%);
   --red-background: linear-gradient(0deg,rgba(159, 39, 24),rgba(173, 90, 90));
 }
 
@@ -65,35 +68,35 @@
 }
 
 body {
-  font-family: var(--font-krub);
+  font-family: var(--krub-reg);
   font-size: 20px;
   line-height: 1.5;
 }
 
 h1 {
-  font-family: var(--font-inter);
+  font-family: var(--inter-xbold);
   font-size: 64px;
-  font-weight: 900;
+  font-weight: 800;
   color: var(--muted-grey);
   line-height: 95%;
 }
 
 h2 {
-  font-family: var(--font-inter);
+  font-family: var(--inter-bold);
   font-size: 32px;
   font-weight: 800;
   line-height: 95%;
 }
 
 h3 {
-  font-family: var(--font-inter);
+  font-family: var(--inter-reg);
   font-size: 24px;
   font-weight: 800;
   line-height: 95%;
 }
 
 p , button{
-  font-family: var(--font-krub);
+  font-family: var(--krub-reg);
   font-size: 20px;
   font-weight: 400;
   line-height: 105%;
@@ -113,7 +116,6 @@ button{
   border-radius: var(--space-sm);
   padding: 15px 20px;
   letter-spacing: 2px;
-  /* max-width: 300px; */
 }
 .pos-btn{
   background-color: var(--lifeline-red);
@@ -129,12 +131,12 @@ button{
 }
 
 .login, .signup, .addContact{
-    background: var(--red-background);
-    height: 100vh;
-    width: 100vw;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  background: var(--red-background);
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 .card {
   text-align: center;
