@@ -42,6 +42,9 @@ export const auth = betterAuth({
                 type: "string",
                 required: true,
                 defaultValue: "09123456789",
+                validator: {
+                    input: z.string().refine(val => val === "" || /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Phone number must be valid (09XXXXXXXXX or +639XXXXXXXXX)")
+                },
                 input: true,
                 unique: true
             },
