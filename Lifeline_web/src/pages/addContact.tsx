@@ -10,8 +10,10 @@ function AddContact() {
     setStep,
     formData,
     invalidFields,
+    error,
+    loading,
     handleChange,
-    nextFromStep2,
+    handleSubmit,
   } = useAddContact();
 
   return (
@@ -31,7 +33,7 @@ function AddContact() {
             <>
               <h2>Fill up member details</h2>
 
-              <form className="form">
+              <form className="form" onSubmit={handleSubmit}>
                 <input
                   type="text"
                   name="firstName"
@@ -40,7 +42,6 @@ function AddContact() {
                   onChange={handleChange}
                   className={invalidFields.includes("firstName") ? "invalid" : ""}
                 />
-
                 <input
                   type="text"
                   name="lastName"
@@ -49,7 +50,6 @@ function AddContact() {
                   onChange={handleChange}
                   className={invalidFields.includes("lastName") ? "invalid" : ""}
                 />
-
                 <input
                   type="email"
                   name="email"
@@ -58,6 +58,31 @@ function AddContact() {
                   onChange={handleChange}
                   className={invalidFields.includes("email") ? "invalid" : ""}
                 />
+                <input
+                  type="tel"
+                  name="phoneNo"
+                  placeholder="Phone Number"
+                  value={formData.phoneNo}
+                  onChange={handleChange}
+                  className={invalidFields.includes("phoneNo") ? "invalid" : ""}
+                />
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={invalidFields.includes("password") ? "invalid" : ""}
+                />
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm Password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={invalidFields.includes("confirmPassword") ? "invalid" : ""}
+                />
+                 {error && <p className="error">{error}</p>}
               </form>
             </>
           )}
@@ -81,14 +106,16 @@ function AddContact() {
 
           {step === 2 && (
             <>
-              <button className="pos-btn" onClick={nextFromStep2}>Next</button>
+              <button className="pos-btn" onClick={handleSubmit}>Next</button>
               <button className="neg-btn" onClick={() => setStep(1)}>Back</button>
             </>
           )}
 
           {step === 3 && (
             <>
-              <button className="pos-btn" onClick={() => navigate("/dashboard")}>Finish</button>
+              <button type="submit" className="pos-btn" disabled={loading}>
+                {loading ? "Creating Account..." : "Finish"}
+              </button>
               <button className="neg-btn" onClick={() => setStep(2)}>Back</button>
             </>
           )}
