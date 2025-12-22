@@ -8,12 +8,12 @@ function AddContact() {
   const {
     step,
     setStep,
-    selectedRole,
-    setSelectedRole,
     formData,
     invalidFields,
+    error,
+    loading,
     handleChange,
-    nextFromStep3,
+    handleSubmit,
   } = useAddContact();
 
   return (
@@ -31,45 +31,9 @@ function AddContact() {
 
           {step === 2 && (
             <>
-              <h2>Select a role for the member</h2>
-
-              <form className="role-form">
-                <div className="role-options">
-                  <label className={`role-choice ${selectedRole === "mutual" ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="role"
-                      value="mutual"
-                      className="roles"
-                      checked={selectedRole === "mutual"}
-                      onChange={() => setSelectedRole("mutual")}
-                    />
-                    <img src="src/assets/mutual-role.svg" alt="mutual" className="role-img"/>
-                    <h3>Mutual</h3>
-                  </label>
-
-                  <label className={`role-choice ${selectedRole === "dependent" ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="role"
-                      value="dependent"
-                      className="roles"
-                      checked={selectedRole === "dependent"}
-                      onChange={() => setSelectedRole("dependent")}
-                    />
-                    <img src="src/assets/dependent-role.svg" alt="dependent" className="role-img"/>
-                    <h3>Dependent</h3>
-                  </label>
-                </div>
-              </form>
-            </>
-          )}
-
-          {step === 3 && (
-            <>
               <h2>Fill up member details</h2>
 
-              <form className="form">
+              <form className="form" onSubmit={handleSubmit}>
                 <input
                   type="text"
                   name="firstName"
@@ -78,7 +42,6 @@ function AddContact() {
                   onChange={handleChange}
                   className={invalidFields.includes("firstName") ? "invalid" : ""}
                 />
-
                 <input
                   type="text"
                   name="lastName"
@@ -87,7 +50,6 @@ function AddContact() {
                   onChange={handleChange}
                   className={invalidFields.includes("lastName") ? "invalid" : ""}
                 />
-
                 <input
                   type="email"
                   name="email"
@@ -96,11 +58,36 @@ function AddContact() {
                   onChange={handleChange}
                   className={invalidFields.includes("email") ? "invalid" : ""}
                 />
+                <input
+                  type="tel"
+                  name="phoneNo"
+                  placeholder="Phone Number"
+                  value={formData.phoneNo}
+                  onChange={handleChange}
+                  className={invalidFields.includes("phoneNo") ? "invalid" : ""}
+                />
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={invalidFields.includes("password") ? "invalid" : ""}
+                />
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm Password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={invalidFields.includes("confirmPassword") ? "invalid" : ""}
+                />
+                 {error && <p className="error">{error}</p>}
               </form>
             </>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <>
               <h2>Show QR</h2>
               {/* QR component or image goes here later */}
@@ -119,22 +106,17 @@ function AddContact() {
 
           {step === 2 && (
             <>
-              <button className="pos-btn" onClick={() => setStep(3)}>Next</button>
+              <button className="pos-btn" onClick={handleSubmit}>Next</button>
               <button className="neg-btn" onClick={() => setStep(1)}>Back</button>
             </>
           )}
 
           {step === 3 && (
             <>
-              <button className="pos-btn" onClick={nextFromStep3}>Next</button>
+              <button type="submit" className="pos-btn" disabled={loading}>
+                {loading ? "Creating Account..." : "Finish"}
+              </button>
               <button className="neg-btn" onClick={() => setStep(2)}>Back</button>
-            </>
-          )}
-
-          {step === 4 && (
-            <>
-              <button className="pos-btn" onClick={() => navigate("/dashboard")}>Finish</button>
-              <button className="neg-btn" onClick={() => setStep(3)}>Back</button>
             </>
           )}
         </div>

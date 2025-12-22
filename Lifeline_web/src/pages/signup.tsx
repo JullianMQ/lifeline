@@ -18,16 +18,19 @@ function Signup() {
     <main className="signup">
       <section className="login-card">
         <div className="card">
-          <div className="login-logo">
-            <img
-              src="src/assets/LifelineLogo.png"
-              alt="Lifeline"
-              className="lifeline-logo-mini"
-            />
-            <h1 className="lifeline-text">SIGNUP</h1>
-          </div>
 
-          <form className="form" onSubmit={handleSubmit}>
+          {(step === 1 || step === 3) && (
+            <div className="login-logo">
+              <img
+                src="src/assets/LifelineLogo.png"
+                alt="Lifeline"
+                className="lifeline-logo-mini"
+              />
+              <h1 className="lifeline-text">SIGNUP</h1>
+            </div>
+          )}
+
+          <form className={`form ${step === 2 ? "full" : ""}`} onSubmit={handleSubmit}>
             {step === 1 && (
               <>
                 <input
@@ -58,6 +61,7 @@ function Signup() {
                   className={invalidFields.includes("email") ? "invalid" : ""}
                 />
                 {step === 1 && error && <p className="error">{error}</p>}
+
                 <button type="submit" className="pos-btn" disabled={loading}>
                   {loading ? "Checking..." : "Next"}
                 </button>
@@ -80,6 +84,40 @@ function Signup() {
             )}
 
             {step === 2 && (
+              <>
+                <section className="role-form">
+                <h2>Select a role for the member</h2>
+                  <div className="role-options">
+                    <label className={`role-choice ${formData.role === "mutual" ? "selected" : ""}`}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value="mutual"
+                        className="roles"
+                        checked={formData.role === "mutual"}
+                        onChange={handleChange}
+                      />
+                      <img src="src/assets/mutual-role.svg" alt="mutual" className="role-img"/>
+                      <h3>Mutual</h3>
+                    </label>
+
+                    <label className={`role-choice ${formData.role === "dependent" ? "selected" : ""}`}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value="dependent"
+                        className="roles"
+                        checked={formData.role  === "dependent"}
+                        onChange={handleChange}
+                      />
+                      <img src="src/assets/dependent-role.svg" alt="dependent" className="role-img"/>
+                      <h3>Dependent</h3>
+                    </label>
+                  </div>
+                </section>
+              </>
+            )}
+            {step === 3 && (
               <>
                 <input
                   type="tel"
@@ -106,24 +144,38 @@ function Signup() {
                   className={invalidFields.includes("confirmPassword") ? "invalid" : ""}
                 />
                 {error && <p className="error">{error}</p>}
-                <button type="submit" className="pos-btn" disabled={loading}>
-                  {loading ? "Signing up..." : "Signup"}
-                </button>    
-                <button type="button" className="neg-btn" onClick={() => setStep(1)} disabled={loading}>
-                  <p>Back</p>
-                </button>
               </>
-            )}
+            )}  
 
-            
+            {/* Buttons */}
+
+            <div className="btn">
+              {(step === 2) && (
+                  <button type="button" className="pos-btn" onClick={() => {setStep((prev) => prev + 1);}} disabled={loading || !formData.role}>
+                    Next
+                  </button>   
+              )}
+              {(step === 3) && (
+                  <button type="submit" className="pos-btn" disabled={loading}>
+                    {loading ? "Signing up..." : "Signup"}
+                  </button>   
+              )}
+              {(step === 2 || step === 3) && (
+                  <button type="button" className="neg-btn" onClick={() => setStep((prev) => prev - 1)} disabled={loading}>
+                    Back
+                  </button>
+              )}
+            </div>
+
           </form>
         </div>
-
-        <div className="switch">
-          <p>
-            Already have an account? <Link to="/login">Login</Link>
-          </p>
-        </div>
+        {(step === 1 || step === 3) && (
+          <div className="switch">
+            <p>
+              Already have an account? <Link to="/login">Login</Link>
+            </p>
+          </div>
+        )}
       </section>
     </main>
   );
