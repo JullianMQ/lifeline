@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { signUp } from "@/lib/api/auth";
+import { checkEmail } from "@/lib/api/auth";
 
 
 interface SignupForm {
@@ -30,7 +31,7 @@ const Signup: React.FC = () => {
     const updateField = (field: keyof SignupForm, value: string) =>
         setForm({ ...form, [field]: value });
 
-    const handleNext = () => {
+    const handleNext = async () => {
         const { firstName, lastName, email, phone_no } = form;
 
         if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone_no.trim()) {
@@ -48,8 +49,21 @@ const Signup: React.FC = () => {
             return;
         }
 
-        setStep(2);
+        try {
+            await checkEmail(email);
+
+
+            setStep(2);
+
+        } catch (err: any) {
+            Alert.alert(
+                "Email Error",
+                err.message || "Unable to verify email"
+            );
+        }
+
     };
+
     const handleSignup = async () => {
         const { password, confirmPassword, firstName, lastName, email, phone_no } = form;
 

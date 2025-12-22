@@ -72,6 +72,28 @@ export async function logout() {
     return await res.json();
 }
 
+// Check if email already exists
+export async function checkEmail(email: string) {
+    const res = await fetch(`${API_BASE_URL}/api/check/email`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(data.error || "Email check failed");
+    }
+
+    return data;
+}
+
+
+
+
 // Check session
 export async function checkSession() {
     try {

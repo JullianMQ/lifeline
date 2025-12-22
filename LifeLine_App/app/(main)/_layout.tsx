@@ -1,14 +1,17 @@
-import React from "react";
-import { View } from "react-native";
-import { Slot } from "expo-router";
+import { Slot, useRouter } from "expo-router";
+import { useEffect } from "react";
+import { checkSession } from "../../lib/api/auth";
 
-const MainLayout: React.FC = () => {
-    return (
-        <View className="flex-1">
-            {/* Slot renders the child pages inside this folder */}
-            <Slot />
-        </View>
-    );
-};
+export default function MainLayout() {
+    const router = useRouter();
 
-export default MainLayout;
+    useEffect(() => {
+        checkSession().then(session => {
+            if (!session) {
+                router.replace("/(auth)/login");
+            }
+        });
+    }, []);
+
+    return <Slot />;
+}
