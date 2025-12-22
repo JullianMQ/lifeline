@@ -1,4 +1,47 @@
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { API_BASE_URL } from "./config";
+
+
+export async function signInWithGoogle() {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    await GoogleSignin.signOut();
+
+    //Trigger Google Sign-In
+    const userInfo = await GoogleSignin.signIn();
+
+    //Get tokens explicitly
+    const tokens = await GoogleSignin.getTokens();
+
+    if (!tokens.idToken) {
+        throw new Error("No Google ID token found");
+    }
+
+    console.log("Google ID Token:", tokens.idToken);
+
+    //Send ID token to backend
+    const res = await fetch(`${API_BASE_URL}/api/auth/sign-in/social`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Origin": API_BASE_URL,
+        },
+        body: JSON.stringify({
+            provider: "google",
+            idToken: {
+                token: tokens.idToken,
+            },
+        }),
+        credentials: "include",
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(data.message || "Google login failed");
+    }
+
+    return data;
+}
 
 
 // Sign in
@@ -25,7 +68,6 @@ export async function login(email: string, password: string) {
 
 
 // Sign up
-
 interface SignUpPayload {
     name: string;
     email: string;
@@ -90,8 +132,6 @@ export async function checkEmail(email: string) {
 
     return data;
 }
-
-
 
 
 // Check session

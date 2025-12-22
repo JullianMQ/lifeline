@@ -45,3 +45,28 @@
    bun dev
    ```
 
+## CHANGELOG
+
+### 2025-11-30
+- Initial design of the app
+- Implemented navigation between screens
+
+### 2025-12-09
+- Implemented authentication
+
+### 2025-12-10
+- Configured routing
+- Added Home and FAQs frontend
+
+### 2025-12-11
+- Added documentation on how to run the app
+- Added frontend for Contacts, Add Contacts, and Notifications
+
+### 2025-12-13
+- Fixed login
+- Stored logged-in user in SecureStore and displayed name in Menu page
+- Configured contacts (session-based)
+- Configured styling for login
+
+### 2025-12-22
+- Updated signup flow to validate email on Step 1 before moving to Step 2
