@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
+import { upgradeWebSocket, websocket } from 'hono/bun'
 import { AuthType } from './lib/auth'
 import { auth as authInstance } from './lib/auth'
 import auth from './routes/auth'
 import contacts from './routes/contacts'
+import webSocket from './routes/websocket'
 
 const app = new Hono<{ Variables: AuthType }>({
     strict: false,
@@ -34,7 +36,7 @@ app.post("/api/check/email", async (c) => {
     }
 });
 
-const routes = [auth, contacts] as const;
+const routes = [auth, contacts, webSocket] as const;
 
 routes.forEach((route) => {
     app.basePath("/api").route("/", route);
@@ -48,4 +50,7 @@ app.get("/api/auth/google/callback/error", (c) => {
     return c.text("Error, logging in please try again");
 });
 
-export default app
+export default {
+    fetch: app.fetch,
+    websocket
+}
