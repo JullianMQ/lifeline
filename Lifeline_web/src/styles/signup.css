@@ -7,3 +7,39 @@
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
 }
+
+.role-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.role-choice.selected img{
+    transform: scale(1.1);
+}
+
+.role-choice.selected > h3{
+    color: var(--lifeline-red);
+}
+
+.roles{
+    pointer-events: none;
+    display: none;
+}
+
+.role-options{
+    display: grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap: var(--space-md);
+    width: 100%;
+    gap: var(--space-lg);
+}
+
+.role-img{
+    aspect-ratio: 1/1;
+    width: 100%;
+}
+
+.role-options h3{
+    font-weight: 700;
+}
