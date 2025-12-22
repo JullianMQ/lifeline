@@ -27,11 +27,55 @@ router.use("*", async (c, next) => {
     return next();
 });
 
+router.get("/contacts/users", async (c) => {
+    const user = c.get("user");
+    const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+    });
+    const result = await pool.query(`
+        SELECT 
+            c.id, c.user_id,
+            u1.name as contact1_name, u1.email as contact1_email, u1.phone_no as contact1_phone,
+            u2.name as contact2_name, u2.email as contact2_email, u2.phone_no as contact2_phone,
+            u3.name as contact3_name, u3.email as contact3_email, u3.phone_no as contact3_phone,
+            u4.name as contact4_name, u4.email as contact4_email, u4.phone_no as contact4_phone,
+            u5.name as contact5_name, u5.email as contact5_email, u5.phone_no as contact5_phone
+        FROM contacts c
+        LEFT JOIN "user" u1 ON c.emergency_contact_1 = u1.phone_no
+        LEFT JOIN "user" u2 ON c.emergency_contact_2 = u2.phone_no
+        LEFT JOIN "user" u3 ON c.emergency_contact_3 = u3.phone_no
+        LEFT JOIN "user" u4 ON c.emergency_contact_4 = u4.phone_no
+        LEFT JOIN "user" u5 ON c.emergency_contact_5 = u5.phone_no
+        WHERE c.user_id = $1
+    `, [user.id]);
+    await pool.end();
+    if (result.rows.length === 0) {
+        return c.json({ error: "Contacts not found" }, 404);
+    }
+    return c.json(result.rows[0]);
+});
+
 router.get("/contacts", async (c) => {
     const user = c.get("user");
     const pool = new Pool({
         connectionString: process.env.DATABASE_URL,
     });
+    // const result = await pool.query(`
+    //     SELECT 
+    //         c.id, c.user_id,
+    //         u1.name as contact1_name, u1.email as contact1_email, u1.phone_no as contact1_phone,
+    //         u2.name as contact2_name, u2.email as contact2_email, u2.phone_no as contact2_phone,
+    //         u3.name as contact3_name, u3.email as contact3_email, u3.phone_no as contact3_phone,
+    //         u4.name as contact4_name, u4.email as contact4_email, u4.phone_no as contact4_phone,
+    //         u5.name as contact5_name, u5.email as contact5_email, u5.phone_no as contact5_phone
+    //     FROM contacts c
+    //     LEFT JOIN "user" u1 ON c.emergency_contact_1 = u1.phone_no
+    //     LEFT JOIN "user" u2 ON c.emergency_contact_2 = u2.phone_no
+    //     LEFT JOIN "user" u3 ON c.emergency_contact_3 = u3.phone_no
+    //     LEFT JOIN "user" u4 ON c.emergency_contact_4 = u4.phone_no
+    //     LEFT JOIN "user" u5 ON c.emergency_contact_5 = u5.phone_no
+    //     WHERE c.user_id = $1
+    // `, [user.id]);
     const result = await pool.query('SELECT * FROM contacts WHERE user_id = $1', [user.id]);
     await pool.end();
     if (result.rows.length === 0) {
@@ -76,10 +120,10 @@ const updateContactsHandler = async (c: any) => {
             await pool.end();
             return c.json({ error: "You cannot add your own phone number as an emergency contact." }, 400);
         }
-        const result = await pool.query('SELECT id FROM "user" WHERE phone_no = $1', [contact]);
+        const result = await pool.query('SELECT id FROM "user" WHERE phone_no = $1 AND role = $2', [contact, "mutual"]);
         if (result.rows.length === 0) {
             await pool.end();
-            return c.json({ error: `Emergency contact ${contact} is not a registered user.` }, 400);
+            return c.json({ error: `Emergency contact ${contact} is not a registered user or is a dependent user.` }, 400);
         }
     }
     const updateFields = [];
