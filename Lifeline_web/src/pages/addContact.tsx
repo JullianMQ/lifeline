@@ -8,12 +8,10 @@ function AddContact() {
   const {
     step,
     setStep,
-    selectedRole,
-    setSelectedRole,
     formData,
     invalidFields,
     handleChange,
-    nextFromStep3,
+    nextFromStep2,
   } = useAddContact();
 
   return (
@@ -30,42 +28,6 @@ function AddContact() {
           )}
 
           {step === 2 && (
-            <>
-              <h2>Select a role for the member</h2>
-
-              <form className="role-form">
-                <div className="role-options">
-                  <label className={`role-choice ${selectedRole === "mutual" ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="role"
-                      value="mutual"
-                      className="roles"
-                      checked={selectedRole === "mutual"}
-                      onChange={() => setSelectedRole("mutual")}
-                    />
-                    <img src="src/assets/mutual-role.svg" alt="mutual" className="role-img"/>
-                    <h3>Mutual</h3>
-                  </label>
-
-                  <label className={`role-choice ${selectedRole === "dependent" ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="role"
-                      value="dependent"
-                      className="roles"
-                      checked={selectedRole === "dependent"}
-                      onChange={() => setSelectedRole("dependent")}
-                    />
-                    <img src="src/assets/dependent-role.svg" alt="dependent" className="role-img"/>
-                    <h3>Dependent</h3>
-                  </label>
-                </div>
-              </form>
-            </>
-          )}
-
-          {step === 3 && (
             <>
               <h2>Fill up member details</h2>
 
@@ -100,7 +62,7 @@ function AddContact() {
             </>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <>
               <h2>Show QR</h2>
               {/* QR component or image goes here later */}
@@ -119,22 +81,15 @@ function AddContact() {
 
           {step === 2 && (
             <>
-              <button className="pos-btn" onClick={() => setStep(3)}>Next</button>
+              <button className="pos-btn" onClick={nextFromStep2}>Next</button>
               <button className="neg-btn" onClick={() => setStep(1)}>Back</button>
             </>
           )}
 
           {step === 3 && (
             <>
-              <button className="pos-btn" onClick={nextFromStep3}>Next</button>
-              <button className="neg-btn" onClick={() => setStep(2)}>Back</button>
-            </>
-          )}
-
-          {step === 4 && (
-            <>
               <button className="pos-btn" onClick={() => navigate("/dashboard")}>Finish</button>
-              <button className="neg-btn" onClick={() => setStep(3)}>Back</button>
+              <button className="neg-btn" onClick={() => setStep(2)}>Back</button>
             </>
           )}
         </div>

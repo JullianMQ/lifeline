@@ -7,8 +7,7 @@ type MemberForm = {
 };
 
 export function useAddContact() {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedRole, setSelectedRole] = useState<"mutual" | "dependent">("mutual");
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
   const [formData, setFormData] = useState<MemberForm>({
     firstName: "",
@@ -22,7 +21,7 @@ export function useAddContact() {
     setInvalidFields(prev => prev.filter(f => f !== name));
   };
 
-  const validateStep3 = () => {
+  const validateStep2 = () => {
     const errors: string[] = [];
     if (!formData.firstName) errors.push("firstName");
     if (!formData.lastName) errors.push("lastName");
@@ -30,23 +29,21 @@ export function useAddContact() {
     return errors;
   };
 
-  const nextFromStep3 = () => {
-    const errors = validateStep3();
+  const nextFromStep2 = () => {
+    const errors = validateStep2();
     if (errors.length) {
       setInvalidFields(errors);
       return;
     }
-    setStep(4);
+    setStep(3);
   };
 
   return {
     step,
     setStep,
-    selectedRole,
-    setSelectedRole,
     formData,
     invalidFields,
     handleChange,
-    nextFromStep3,
+    nextFromStep2,
   };
 }

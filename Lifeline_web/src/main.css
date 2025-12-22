@@ -102,6 +102,9 @@ p , button{
   line-height: 105%;
 }
 
+.full{
+  height: 100%;
+}
 .btn, form{
   display: flex;
   flex-direction: column;
@@ -140,11 +143,14 @@ button{
 }
 .card {
   text-align: center;
+  height: 100%;
 }
 
 form{
+  display: flex;
   gap: var(--space-sm);
   width: 100%;
+  justify-content: space-between;
 }
 
 input{
