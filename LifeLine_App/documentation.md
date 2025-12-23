@@ -70,3 +70,8 @@
 
 ### 2025-12-22
 - Updated signup flow to validate email on Step 1 before moving to Step 2
+
+### 2025-12-23
+- Implemented native Google Sign-In for Android using Google ID token flow
+- Integrated Google authentication with backend (Better Auth)
+- Fixed OAuth redirect and localhost issues on Android

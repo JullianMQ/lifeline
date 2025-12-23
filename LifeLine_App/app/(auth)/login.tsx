@@ -42,12 +42,9 @@ const Login = () => {
         setLoading(true);
         try {
             console.log("Starting Google OAuth login...");
-
             const data = await signInWithGoogle();
-
             await saveUser(data.user);
             router.replace("/(main)/landing");
-
         } catch (err: any) {
             console.error("Google login error:", err);
             alert(err.message || "Google login failed");
@@ -55,6 +52,7 @@ const Login = () => {
             setLoading(false);
         }
     };
+
 
 
 

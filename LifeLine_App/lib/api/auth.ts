@@ -1,47 +1,62 @@
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { API_BASE_URL } from "./config";
 
-
 export async function signInWithGoogle() {
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    await GoogleSignin.signOut();
+    try {
+        // device has Google Play Services 
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-    //Trigger Google Sign-In
-    const userInfo = await GoogleSignin.signIn();
+        // sign out previous session to force fresh token
+        try {
+            await GoogleSignin.signOut();
+        } catch (err) {
+            console.warn("Google signOut failed, continuing...", err);
+        }
+        const userInfo = await GoogleSignin.signIn();
 
-    //Get tokens explicitly
-    const tokens = await GoogleSignin.getTokens();
+        // Get fresh tokens
+        const tokens = await GoogleSignin.getTokens();
 
-    if (!tokens.idToken) {
-        throw new Error("No Google ID token found");
-    }
+        if (!tokens.idToken) {
+            throw new Error("No Google ID token found");
+        }
 
-    console.log("Google ID Token:", tokens.idToken);
+        console.log("Fresh Google ID Token:", tokens.idToken);
 
-    //Send ID token to backend
-    const res = await fetch(`${API_BASE_URL}/api/auth/sign-in/social`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Origin": API_BASE_URL,
-        },
-        body: JSON.stringify({
-            provider: "google",
-            idToken: {
-                token: tokens.idToken,
+        // Send the ID token to backend
+        const res = await fetch(`${API_BASE_URL}/api/auth/sign-in/social`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Origin": API_BASE_URL,
             },
-        }),
-        credentials: "include",
-    });
+            body: JSON.stringify({
+                provider: "google",
+                idToken: { token: tokens.idToken },
+            }),
+            credentials: "include",
+        });
 
-    const data = await res.json();
+        const data = await res.json();
 
-    if (!res.ok) {
-        throw new Error(data.message || "Google login failed");
+        if (!res.ok) {
+            throw new Error(data.message || "Google login failed");
+        }
+
+        return data;
+
+    } catch (err: any) {
+        console.error("signInWithGoogle error:", err);
+        if (err.code === "TOKEN_EXPIRED") {
+            throw new Error("Google token expired. Please try logging in again.");
+        }
+        if (err.code === "INTERNAL_ERROR") {
+            throw new Error("Google sign-in failed. Check your device or network.");
+        }
+        throw new Error(err.message || "Google login failed");
     }
-
-    return data;
 }
+
 
 
 // Sign in
