@@ -5,7 +5,6 @@ export async function signInWithGoogle() {
     try {
         // device has Google Play Services 
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
         // sign out previous session to force fresh token
         try {
             await GoogleSignin.signOut();

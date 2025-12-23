@@ -1,52 +1,51 @@
-let socket: WebSocket | null = null;
+let timeSocket: WebSocket | null = null;
+let messageSocket: WebSocket | null = null;
 
 const WS_BASE_URL = "ws://192.168.100.185:3000";
 
-export function connectMessageSocket(
-    onMessage: (data: string) => void
-) {
-    socket = new WebSocket(`${WS_BASE_URL}/ws/message`);
+export function connectTimeSocket(onTime: (time: string) => void) {
+    if (timeSocket) return timeSocket;
 
-    socket.onopen = () => {
-        console.log("Message WS connected");
-    };
+    timeSocket = new WebSocket(`${WS_BASE_URL}/api/ws/time`);
 
-    socket.onmessage = (event) => {
-        onMessage(event.data);
-    };
-
-    socket.onerror = (e) => {
-        console.log("WS error", e);
-    };
-
-    socket.onclose = () => {
-        console.log("Message WS closed");
-    };
-
-    return socket;
-}
-
-export function connectTimeSocket(
-    onTime: (time: string) => void
-) {
-    socket = new WebSocket(`${WS_BASE_URL}/ws/time`);
-
-    socket.onopen = () => {
-        console.log("Time WS connected");
-    };
-
-    socket.onmessage = (event) => {
-        onTime(event.data);
-    };
-
-    socket.onclose = () => {
+    timeSocket.onopen = () => console.log("Time WS connected");
+    timeSocket.onmessage = (e) => onTime(e.data);
+    timeSocket.onerror = (e) => console.log("Time WS error", e);
+    timeSocket.onclose = () => {
         console.log("Time WS closed");
+        timeSocket = null;
     };
 
-    return socket;
+    return timeSocket;
+};
+
+export function disconnectTimeSocket() {
+    timeSocket?.close();
+    timeSocket = null;
 }
 
-export function disconnectSocket() {
-    socket?.close();
-    socket = null;
+export function connectMessageSocket(onMessage: (data: string) => void) {
+    if (messageSocket) return messageSocket;
+
+    messageSocket = new WebSocket(`${WS_BASE_URL}/api/ws/message`);
+
+    messageSocket.onopen = () => console.log("Message WS connected");
+    messageSocket.onmessage = (e) => onMessage(e.data);
+    messageSocket.onerror = (e) => console.log("Message WS error", e);
+    messageSocket.onclose = () => {
+        console.log("Message WS closed");
+        messageSocket = null;
+    };
+
+    return messageSocket;
+};
+
+export function disconnectMessageSocket() {
+    messageSocket?.close();
+    messageSocket = null;
+}
+
+export function disconnectAllSockets() {
+    disconnectTimeSocket();
+    disconnectMessageSocket();
 }

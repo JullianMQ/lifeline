@@ -53,10 +53,6 @@ const Login = () => {
         }
     };
 
-
-
-
-
     return (
         <View className="flex-1 bg-white items-center pt-32">
             <View className="w-3/4 flex-1 justify-between">
@@ -141,7 +137,6 @@ const Login = () => {
                         </Link>
                     </Text>
                 </View>
-
             </View>
         </View>
     );
