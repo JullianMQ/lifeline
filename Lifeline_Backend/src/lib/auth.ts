@@ -40,8 +40,7 @@ export const auth = betterAuth({
             },
             phone_no: {
                 type: "string",
-                required: true,
-                defaultValue: "09123456789",
+                required: false,
                 validator: {
                     input: z.string().refine(val => val === "" || /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Phone number must be valid (09XXXXXXXXX or +639XXXXXXXXX)")
                 },
@@ -77,6 +76,7 @@ export const auth = betterAuth({
         defaultCookieAttributes: {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
+            sameSite: "lax"
         }
     },
     plugins: [
