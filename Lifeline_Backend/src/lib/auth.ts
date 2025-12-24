@@ -1,5 +1,4 @@
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
 import { Pool } from "pg";
 import { openAPI } from "better-auth/plugins";
 import { z } from "zod";
@@ -10,7 +9,7 @@ export const auth = betterAuth({
         connectionString: process.env.DATABASE_URL,
     }),
     baseURL: process.env.BETTER_AUTH_URL,
-    trustedOrigins: ["*"],
+    trustedOrigins: ["http://localhost:*", "https://*"],
     emailAndPassword: {
         enabled: true,
         autoSignIn: false,
@@ -74,7 +73,7 @@ export const auth = betterAuth({
             disableIpTracking: false
         },
         defaultCookieAttributes: {
-            httpOnly: true,
+            httpOnly: false,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax"
         }
