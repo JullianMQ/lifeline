@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { authClient } from "./auth-client";
+import Login from "../pages/login";
 
 type LoginForm = {
   email: string;
@@ -26,29 +28,19 @@ export function useLogin() {
     }
 
     try {
-      const res = await fetch("/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
+      const data = await authClient.signIn.email({
+        email: email,
+        password: password,
+        callbackURL: "/dashboard",
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(
-          data.code === "INVALID_EMAIL_OR_PASSWORD"
-            ? "Please check your email and password"
-            : "Failed to connect. Please try again later."
-        );
-        return null;
-      }
-
-      localStorage.setItem("lifeline_user", JSON.stringify({ email }));
-
-      return data; 
+      localStorage.setItem("lifeline_user", JSON.stringify(data.data.token));
+      
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      if (err.code === "INVALID_EMAIL_OR_PASSWORD") {
+        setError("Please check your email and password");
+      } else {
+        setError(err.message || "Failed to connect. Please try again later.");
+      }
       return null;
     } finally {
       setLoading(false);

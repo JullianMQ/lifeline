@@ -2,11 +2,13 @@ import { useState } from 'react';
 import '../styles/login.css';
 import { Link } from "react-router-dom";
 import { useLogin } from '../components/useLogin.tsx';
+import { googleAuth } from "../components/googleAuth.tsx";
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, loading, error, invalidFields } = useLogin();
+  const {handleGoogleLogin} = googleAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,9 +59,9 @@ function Login() {
             </div>
 
             <div className="google">
-              <button className='neg-btn' type="button">
+              <button className='neg-btn' type="button" onClick={handleGoogleLogin}>
                 <img src="src/assets/google.svg" alt="Google-Logo" className='google-logo' />
-                <p>Login with Google</p>
+                Login with Google
               </button>
             </div>
 

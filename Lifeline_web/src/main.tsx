@@ -10,6 +10,7 @@ import Dashboard from "./pages/dashboard.tsx";
 import AddContact from "./pages/addContact.tsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx"
 
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>

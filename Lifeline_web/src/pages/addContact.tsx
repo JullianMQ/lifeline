@@ -14,6 +14,8 @@ function AddContact() {
     loading,
     handleChange,
     handleSubmit,
+    selectedRole,
+    setSelectedRole,
   } = useAddContact();
 
   return (
@@ -28,14 +30,33 @@ function AddContact() {
               <h3>Connect with your emergency contacts now</h3>
             </>
           )}
+            {step === 2 && (
+              <section className="role-form">
+                <h2>Select a role for the member</h2>
+                
+                <div className="role-options">
 
-          {step === 2 && (
-            <>
-              <h2>Fill up member details</h2>
+                  <label className={`role-choice ${formData.role === "mutual" ? "selected" : ""}`}>
+                    <input type="radio" name="role" value="mutual" className="roles" checked={formData.role === "mutual"} onChange={handleChange} />
+                    <img src="src/assets/mutual-role.svg" alt="mutual" className="role-img"/>
+                    <h3>Mutual</h3>
+                  </label>
 
-              <form className="form" onSubmit={handleSubmit}>
-                <input
-                  type="text"
+                  <label className={`role-choice ${formData.role === "dependent" ? "selected" : ""}`}>
+                    <input type="radio" name="role" value="dependent" className="roles" checked={formData.role  === "dependent"} onChange={handleChange}/>
+                    <img src="src/assets/dependent-role.svg" alt="dependent" className="role-img"/>
+                    <h3>Dependent</h3>
+                  </label>
+                
+                </div>
+              </section>
+            )}
+            {step === 3 && (
+                <form className="form" onSubmit={handleSubmit}>
+              <>
+                <h2>Fill up member details</h2>
+                
+                <input type="text"
                   name="firstName"
                   placeholder="First Name"
                   value={formData.firstName}
@@ -49,7 +70,7 @@ function AddContact() {
                   value={formData.lastName}
                   onChange={handleChange}
                   className={invalidFields.includes("lastName") ? "invalid" : ""}
-                />
+                  />
                 <input
                   type="email"
                   name="email"
@@ -57,15 +78,15 @@ function AddContact() {
                   value={formData.email}
                   onChange={handleChange}
                   className={invalidFields.includes("email") ? "invalid" : ""}
-                />
+                  />
                 <input
                   type="tel"
-                  name="phoneNo"
+                  name="phoneo"
                   placeholder="Phone Number"
                   value={formData.phoneNo}
                   onChange={handleChange}
                   className={invalidFields.includes("phoneNo") ? "invalid" : ""}
-                />
+                  />
                 <input
                   type="password"
                   name="password"
@@ -73,7 +94,7 @@ function AddContact() {
                   value={formData.password}
                   onChange={handleChange}
                   className={invalidFields.includes("password") ? "invalid" : ""}
-                />
+                  />
                 <input
                   type="password"
                   name="confirmPassword"
@@ -82,12 +103,12 @@ function AddContact() {
                   onChange={handleChange}
                   className={invalidFields.includes("confirmPassword") ? "invalid" : ""}
                 />
-                 {error && <p className="error">{error}</p>}
-              </form>
-            </>
+                {error && <p className="error">{error}</p>}
+              </>
+          </form>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <>
               <h2>Show QR</h2>
               {/* QR component or image goes here later */}
@@ -97,30 +118,35 @@ function AddContact() {
         </div>
 
         <div className="btn">
-          {step === 1 && (
-            <>
-              <button className="pos-btn" onClick={() => setStep(2)}>Next</button>
-              <button className="neg-btn" onClick={() => navigate("/dashboard")}>Skip</button>
-            </>
+
+          {/* Red Buttons */}
+          {step <= 2 && (   //step 1-2
+            <button className="pos-btn" onClick={() => setStep(prev => prev + 1)} disabled={step === 2 && (loading || !formData.role)}>
+              Next
+            </button>
+          )}
+          {(step === 3) && (  //step 3
+            <button className="pos-btn" disabled={loading} onClick={handleSubmit}>
+              {loading ? "Creating Account..." : "Submit"}
+            </button>   
+          )}
+          {(step === 4) && (  //step 4
+            <button className="pos-btn">
+              Scan
+            </button>   
           )}
 
-          {step === 2 && (
-            <>
-              <button className="pos-btn" onClick={handleSubmit}>Next</button>
-              <button className="neg-btn" onClick={() => setStep(1)}>Back</button>
-            </>
+          {/* Black Buttons */}
+          {step === 1 && (  //step 1 
+            <button className="neg-btn" onClick={() => navigate("/dashboard")}>
+              Skip
+            </button>
+          )}
+          {step > 1 && (    //step 2-4
+            <button className="neg-btn" onClick={() => setStep(prev => prev - 1)}>Back</button>
           )}
 
-          {step === 3 && (
-            <>
-              <button type="submit" className="pos-btn" disabled={loading}>
-                {loading ? "Creating Account..." : "Finish"}
-              </button>
-              <button className="neg-btn" onClick={() => setStep(2)}>Back</button>
-            </>
-          )}
         </div>
-
       </section>
     </main>
   );

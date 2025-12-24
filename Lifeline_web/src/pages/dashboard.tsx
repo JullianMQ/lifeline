@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import '../styles/dashboard.css'
-import { Link } from "react-router-dom";
+import { useDashboard } from "../components/useDashboard.tsx";
+
 
 function Dashboard() {
   const [count, setCount] = useState(0)
-
+  const { handleLogout } = useDashboard()
   return (
     <main className='dashboard'>
-    <section></section>
+    <section>
+      <h1>Dashboard</h1>
+      <button onClick={handleLogout}>
+        logout
+      </button>
+    </section>
     </main>
   )
 }

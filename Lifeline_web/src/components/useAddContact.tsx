@@ -8,16 +8,18 @@ type MemberForm = {
   phoneNo: string;
   password: string;
   confirmPassword: string;
-  role: "mutual";
+  role: "" | "mutual" | "dependent";
 };
 
 export function useAddContact() {
   const navigate = useNavigate();
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<number>(1);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<"mutual" | "dependent">();
+
 
   const [formData, setFormData] = useState<MemberForm>({
     firstName: "",
@@ -26,12 +28,13 @@ export function useAddContact() {
     phoneNo: "",
     password: "",
     confirmPassword: "",
-    role: "mutual",
+    role: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    console.log(name, value);
     setInvalidFields(prev => prev.filter(f => f !== name));
     setError(null);
   };
@@ -45,7 +48,7 @@ export function useAddContact() {
     if (!formData.email) errors.push("email");
 
     if (!formData.phoneNo || !phoneRegex.test(formData.phoneNo)) {
-      errors.push("phoneNo");
+      errors.push("phone_no");
       setError(
         !formData.phoneNo
           ? "Phone number is required"
@@ -94,11 +97,10 @@ export function useAddContact() {
       });
 
       const data = await res.json();
-      console.log("Add contact signup:", data);
 
       if (!res.ok) {
         if (data.details?.detail?.includes("phone_no")) {
-          setInvalidFields(["phoneNo"]);
+          setInvalidFields(["phone_no"]);
           setError("Phone number already exists.");
         } else if (data.message?.toLowerCase().includes("email")) {
           setInvalidFields(["email"]);
@@ -109,7 +111,7 @@ export function useAddContact() {
         setLoading(false);
         return;
       }
-      setStep(3);
+      setStep(4);
       // navigate("/dashboard");
 
     } catch (err) {
@@ -129,5 +131,7 @@ export function useAddContact() {
     loading,
     handleChange,
     handleSubmit,
+    selectedRole,
+    setSelectedRole,
   };
 }
