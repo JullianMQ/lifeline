@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
-import { upgradeWebSocket, websocket } from 'hono/bun'
+import { websocket } from 'hono/bun'
 import { AuthType } from './lib/auth'
-import { auth as authInstance } from './lib/auth'
 import auth from './routes/auth'
 import contacts from './routes/contacts'
 import webSocket from './routes/websocket'
+import { magicLinkToken, magicLinkUrl } from './lib/auth'
 
 const app = new Hono<{ Variables: AuthType }>({
     strict: false,
@@ -35,6 +35,26 @@ app.post("/api/check/email", async (c) => {
         return c.json({ error: "Failed to check email" }, 500);
     }
 });
+
+app.post("/api/auth/magic-link/qr", async (c) => {
+    const reqBody = await c.req.json();
+    const res = await fetch("http://localhost:3000/api/auth/sign-in/magic-link", {
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        body: JSON.stringify({
+            email: reqBody.email,
+            "name": reqBody.name || "",
+            "callbackURL": reqBody.callbackURL || "http://localhost:3000",
+            "newUserCallbackURL": reqBody.newUserCallbackURL || "",
+            "errorCallbackURL": reqBody.errorCallbackURL || "",
+        })
+    })
+
+    return c.json({
+        url: magicLinkUrl,
+        token: magicLinkToken
+    })
+})
 
 const routes = [auth, contacts, webSocket] as const;
 

@@ -1,8 +1,11 @@
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
-import { openAPI } from "better-auth/plugins";
+import { createAuthMiddleware, magicLink, openAPI } from "better-auth/plugins";
 import { z } from "zod";
+import { sendVerifyEmail, sendMagicLinkEmail } from "./email";
 
+let magicLinkUrl: string;
+let magicLinkToken: string;
 export const auth = betterAuth({
     appName: "Lifeline",
     database: new Pool({
@@ -18,6 +21,20 @@ export const auth = betterAuth({
         // TODO: ADDING PASSWORD RESET WHEN DOMAIN IS READY
         // sendResetPassword
         // onPasswordReset
+    },
+    emailVerification: {
+        sendOnSignUp: true,
+        sendVerificationEmail: async ({ user, url, token }, request) => {
+            // console.log("request", request)
+            // console.log("token", token)
+            sendVerifyEmail(user.email, url)
+                // .then(res => {
+                //     console.log(res)
+                // })
+                .catch(err => {
+                    console.log(err)
+                })
+        }
     },
     socialProviders: {
         google: {
@@ -79,8 +96,33 @@ export const auth = betterAuth({
         }
     },
     plugins: [
-        openAPI()
+        openAPI(),
+        magicLink({
+            expiresIn: 900, // 15 minutes
+            storeToken: "plain",
+            sendMagicLink: async ({ email, url, token }, ctx) => {
+                magicLinkUrl = url
+                magicLinkToken = token
+                sendMagicLinkEmail(email, url, token).catch(err => {
+                    console.error('Error sending magic link email:', err)
+                })
+            }
+        })
     ],
+    // hooks: {
+    //     after: createAuthMiddleware(async (ctx) => {
+    //         if (ctx.path === "/sign-in/magic-link") {
+    //             console.log("Path is true")
+    //             console.log("ctx.body:", ctx.body)
+    //             console.log("ctx.context:", ctx.context)
+    //             return ctx.json({
+    //                 status: true,
+    //                 url: ctx.context.url,
+    //                 token: ctx.context.token
+    //             })
+    //         }
+    //     })
+    // },
     databaseHooks: {
         user: {
             create: {
@@ -97,6 +139,8 @@ export const auth = betterAuth({
         }
     }
 });
+
+export { magicLinkUrl, magicLinkToken }
 
 export type Auth = typeof auth;
 
