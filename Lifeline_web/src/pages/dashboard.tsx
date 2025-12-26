@@ -5,7 +5,9 @@ import { useDashboard } from "../components/useDashboard.tsx";
 
 function Dashboard() {
   const [count, setCount] = useState(0)
-  const { handleLogout } = useDashboard()
+  const { 
+    handleLogout, 
+  } = useDashboard();
   return (
     <main className='dashboard'>
     <section>
