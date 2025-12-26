@@ -81,7 +81,7 @@ function AddContact() {
                   />
                 <input
                   type="tel"
-                  name="phoneo"
+                  name="phoneNo"
                   placeholder="Phone Number"
                   value={formData.phoneNo}
                   onChange={handleChange}
