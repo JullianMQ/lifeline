@@ -129,7 +129,7 @@ export function useSignup() {
         phone_no: formData.phoneNo,
         role: formData.role,
       });
-      redirect("/addContact");
+      navigate("/login");
       } catch (err: any) {
       if (err.code === "USER_ALREADY_EXISTS") {
         setInvalidFields(["email"]);
