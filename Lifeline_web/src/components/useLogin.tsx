@@ -33,8 +33,6 @@ export function useLogin() {
         password: password,
         callbackURL: "/dashboard",
       });
-      localStorage.setItem("lifeline_user", JSON.stringify(data.data.token));
-      
     } catch (err: any) {
       if (err.code === "INVALID_EMAIL_OR_PASSWORD") {
         setError("Please check your email and password");

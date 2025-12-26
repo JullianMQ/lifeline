@@ -1,12 +1,11 @@
 import { authClient } from "./auth-client";
-
+import { useState } from "react";
 export function googleAuth() {
 
     const handleGoogleLogin = async () => {
         try {
             const data = await signInWithGoogle();
-            localStorage.setItem("lifeline_user",JSON.stringify({token: data.session.token,}));
-            } catch (err: any) {
+        } catch (err: any) {
                 console.error("Google login failed:", err.message);
         }
     };
