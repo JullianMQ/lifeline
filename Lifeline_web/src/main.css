@@ -82,29 +82,39 @@ h1 {
 }
 
 h2 {
-  font-family: var(--inter-bold);
+  font-family: var(--inter-xbold);
   font-size: 32px;
   font-weight: 800;
   line-height: 95%;
 }
 
 h3 {
-  font-family: var(--inter-reg);
+  font-family: var(--inter-xbold);
   font-size: 24px;
-  font-weight: 800;
+  font-weight: bold;
   line-height: 95%;
 }
 
 p , button{
   font-family: var(--krub-reg);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 400;
   line-height: 105%;
+}
+
+.lifeline-text, .head-title{
+  color: var(--muted-grey);
+}
+
+.head-title{
+  letter-spacing: 2px;
+  text-transform: uppercase;
 }
 
 .full{
   height: 100%;
 }
+
 .btn, form{
   display: flex;
   flex-direction: column;
@@ -120,6 +130,7 @@ button{
   padding: 15px 20px;
   letter-spacing: 2px;
 }
+
 .pos-btn{
   background-color: var(--lifeline-red);
   font-weight: 600;
@@ -141,6 +152,7 @@ button{
   justify-content: center;
   align-items: center;
 }
+
 .card {
   text-align: center;
   height: 100%;

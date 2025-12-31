@@ -12,7 +12,7 @@ function Index() {
           <article className='mobile'>
             <div className='logo'>
               <img src="src\assets\LifelineLogo.png" alt="Lifeline" className='lifeline-logo'/>
-              <h3 className='lifeline-text'>LIFELINE</h3>
+              <h3 className='lifeline-text head-title'>LIFELINE</h3>
             </div>
             <div className='btn'>
               <Link to="/login">

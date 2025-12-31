@@ -1,6 +1,6 @@
-.landing h1{font-size: 90px;letter-spacing: 2px; color: var(--soft-white);}
+.landing h1{font-size: 90px; color: var(--soft-white);}
 .landing h2{font-size: 48px;}
-.landing h3{font-size: 40px;letter-spacing: 2px;}
+.landing h3{font-size: 40px;}
 strong{
   font-weight: 800px;
   color: var(--muted-grey);
@@ -55,9 +55,6 @@ strong{
   padding: 0 var(--space-lg);
   aspect-ratio: 2/1.3;
   height: 150px;
-}
-.lifeline-text{
-  color: var(--muted-grey);
 }
 .landing p{
   width: 70%;
