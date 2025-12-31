@@ -38,6 +38,7 @@ hr{
 .google-logo{
     aspect-ratio: 1/1;
     height: 24px;
+    margin-right: var(--space-xs);
 }
 .switch{
     padding: var(--space-xxs);

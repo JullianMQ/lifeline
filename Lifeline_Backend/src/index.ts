@@ -5,10 +5,22 @@ import auth from './routes/auth'
 import contacts from './routes/contacts'
 import webSocket from './routes/websocket'
 import { magicLinkToken, magicLinkUrl } from './lib/auth'
+import { cors } from 'hono/cors'
 
 const app = new Hono<{ Variables: AuthType }>({
     strict: false,
 })
+
+app.use( 
+    cors({
+        origin:['http://localhost:*', 'http://localhost:5173' ],
+        allowHeaders: ['Content-Type','X-Custom-Header', 'Upgrade-Insecure-Request'],
+        allowMethods: ['POST', 'GET', 'OPTIONS'],
+        exposeHeaders: ['Content-length', 'X-Kuma-Revision'],
+        maxAge: 600,
+        credentials: true,
+    })
+)
 
 app.post("/api/check/email", async (c) => {
     const { email } = await c.req.json();

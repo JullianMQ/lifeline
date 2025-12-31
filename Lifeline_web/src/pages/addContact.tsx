@@ -8,7 +8,7 @@ function AddContact() {
   const {
     step,
     setStep,
-    formData,
+    memberForm,
     invalidFields,
     error,
     loading,
@@ -36,14 +36,14 @@ function AddContact() {
                 
                 <div className="role-options">
 
-                  <label className={`role-choice ${formData.role === "mutual" ? "selected" : ""}`}>
-                    <input type="radio" name="role" value="mutual" className="roles" checked={formData.role === "mutual"} onChange={handleChange} />
+                  <label className={`role-choice ${memberForm.role === "mutual" ? "selected" : ""}`}>
+                    <input type="radio" name="role" value="mutual" className="roles" checked={memberForm.role === "mutual"} onChange={handleChange} />
                     <img src="src/assets/mutual-role.svg" alt="mutual" className="role-img"/>
                     <h3>Mutual</h3>
                   </label>
 
-                  <label className={`role-choice ${formData.role === "dependent" ? "selected" : ""}`}>
-                    <input type="radio" name="role" value="dependent" className="roles" checked={formData.role  === "dependent"} onChange={handleChange}/>
+                  <label className={`role-choice ${memberForm.role === "dependent" ? "selected" : ""}`}>
+                    <input type="radio" name="role" value="dependent" className="roles" checked={memberForm.role  === "dependent"} onChange={handleChange}/>
                     <img src="src/assets/dependent-role.svg" alt="dependent" className="role-img"/>
                     <h3>Dependent</h3>
                   </label>
@@ -59,7 +59,7 @@ function AddContact() {
                 <input type="text"
                   name="firstName"
                   placeholder="First Name"
-                  value={formData.firstName}
+                  value={memberForm.firstName}
                   onChange={handleChange}
                   className={invalidFields.includes("firstName") ? "invalid" : ""}
                 />
@@ -67,7 +67,7 @@ function AddContact() {
                   type="text"
                   name="lastName"
                   placeholder="Last Name"
-                  value={formData.lastName}
+                  value={memberForm.lastName}
                   onChange={handleChange}
                   className={invalidFields.includes("lastName") ? "invalid" : ""}
                   />
@@ -75,15 +75,15 @@ function AddContact() {
                   type="email"
                   name="email"
                   placeholder="Email"
-                  value={formData.email}
+                  value={memberForm.email}
                   onChange={handleChange}
                   className={invalidFields.includes("email") ? "invalid" : ""}
                   />
                 <input
                   type="tel"
-                  name="phoneo"
+                  name="phoneNo"
                   placeholder="Phone Number"
-                  value={formData.phoneNo}
+                  value={memberForm.phoneNo}
                   onChange={handleChange}
                   className={invalidFields.includes("phoneNo") ? "invalid" : ""}
                   />
@@ -91,7 +91,7 @@ function AddContact() {
                   type="password"
                   name="password"
                   placeholder="Password"
-                  value={formData.password}
+                  value={memberForm.password}
                   onChange={handleChange}
                   className={invalidFields.includes("password") ? "invalid" : ""}
                   />
@@ -99,7 +99,7 @@ function AddContact() {
                   type="password"
                   name="confirmPassword"
                   placeholder="Confirm Password"
-                  value={formData.confirmPassword}
+                  value={memberForm.confirmPassword}
                   onChange={handleChange}
                   className={invalidFields.includes("confirmPassword") ? "invalid" : ""}
                 />
@@ -121,7 +121,7 @@ function AddContact() {
 
           {/* Red Buttons */}
           {step <= 2 && (   //step 1-2
-            <button className="pos-btn" onClick={() => setStep(prev => prev + 1)} disabled={step === 2 && (loading || !formData.role)}>
+            <button className="pos-btn" onClick={() => setStep(prev => prev + 1)} disabled={step === 2 && (loading || !memberForm.role)}>
               Next
             </button>
           )}

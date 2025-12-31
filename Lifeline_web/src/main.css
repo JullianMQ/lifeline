@@ -129,6 +129,7 @@ button{
   border-radius: var(--space-sm);
   padding: 15px 20px;
   letter-spacing: 2px;
+  align-items: center;
 }
 
 .pos-btn{

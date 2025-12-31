@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authClient } from "./auth-client";
 
-type MemberForm = {
+type memberForm = {
   firstName: string;
   lastName: string;
   email: string;
@@ -21,7 +22,7 @@ export function useAddContact() {
   const [selectedRole, setSelectedRole] = useState<"mutual" | "dependent">();
 
 
-  const [formData, setFormData] = useState<MemberForm>({
+  const [memberForm, setmemberForm] = useState<memberForm>({
     firstName: "",
     lastName: "",
     email: "",
@@ -33,8 +34,7 @@ export function useAddContact() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    console.log(name, value);
+    setmemberForm(prev => ({ ...prev, [name]: value }));
     setInvalidFields(prev => prev.filter(f => f !== name));
     setError(null);
   };
@@ -43,25 +43,25 @@ export function useAddContact() {
     const errors: string[] = [];
     const phoneRegex = /^09\d{9}$/;
 
-    if (!formData.firstName) errors.push("firstName");
-    if (!formData.lastName) errors.push("lastName");
-    if (!formData.email) errors.push("email");
+    if (!memberForm.firstName) errors.push("firstName");
+    if (!memberForm.lastName) errors.push("lastName");
+    if (!memberForm.email) errors.push("email");
 
-    if (!formData.phoneNo || !phoneRegex.test(formData.phoneNo)) {
+    if (!memberForm.phoneNo || !phoneRegex.test(memberForm.phoneNo)) {
       errors.push("phone_no");
       setError(
-        !formData.phoneNo
+        !memberForm.phoneNo
           ? "Phone number is required"
           : "Invalid phone number. Must start with 09 and be 11 digits."
       );
     }
 
-    if (!formData.password) errors.push("password");
+    if (!memberForm.password) errors.push("password");
 
-    if (!formData.confirmPassword || formData.password !== formData.confirmPassword) {
+    if (!memberForm.confirmPassword || memberForm.password !== memberForm.confirmPassword) {
       errors.push("confirmPassword");
       setError(
-        !formData.confirmPassword
+        !memberForm.confirmPassword
           ? "Please confirm your password"
           : "Passwords do not match"
       );
@@ -83,49 +83,45 @@ export function useAddContact() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/sign-up/email", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: `${formData.firstName} ${formData.lastName}`,
-          email: formData.email,
-          password: formData.password,
-          phone_no: formData.phoneNo,
-          role: "mutual",
-        }),
+      const { data, error } = await authClient.signUp.email({
+        name: `${memberForm.firstName} ${memberForm.lastName}`,
+        email: memberForm.email,
+        password: memberForm.password,
+        phone_no: memberForm.phoneNo,
+        role: memberForm.role,
       });
 
-      const data = await res.json();
+      if (error) {
+        const message = error.message?.toLowerCase() || "";
 
-      if (!res.ok) {
-        if (data.details?.detail?.includes("phone_no")) {
+        if (message.includes("phone")) {
           setInvalidFields(["phone_no"]);
           setError("Phone number already exists.");
-        } else if (data.message?.toLowerCase().includes("email")) {
+        } else if (message.includes("email")) {
           setInvalidFields(["email"]);
           setError("Email already exists.");
         } else {
-          setError(data.message || "Failed to add contact");
+          setError(error.message || "Failed to sign up");
         }
-        setLoading(false);
         return;
       }
+
       setStep(4);
       // navigate("/dashboard");
 
     } catch (err) {
       console.error("Signup failed:", err);
-      setError("Failed to add contact");
+      setError("Failed to sign up");
     } finally {
       setLoading(false);
     }
   };
 
+
   return {
     step,
     setStep,
-    formData,
+    memberForm,
     invalidFields,
     error,
     loading,

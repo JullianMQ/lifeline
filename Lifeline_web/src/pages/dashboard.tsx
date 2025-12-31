@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import '../styles/dashboard.css'
-import { useDashboard } from "../components/useDashboard.tsx";
+import { useDashboard } from "../components/useDashboard";
 
 
 function Dashboard() {
-  const [count, setCount] = useState(0)
-  const { handleLogout } = useDashboard()
+  const { 
+    handleLogout,
+    handleSOS,
+    message,
+    time,
+  } = useDashboard();
   return (
     <main className='dashboard'>
       <header>
