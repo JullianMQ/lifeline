@@ -131,18 +131,18 @@ function AddContact() {
             </button>   
           )}
           {(step === 4) && (  //step 4
-            <button className="pos-btn">
-              Scan
+            <button className="pos-btn" onClick={() => navigate("/addContact")}>
+              Add another
             </button>   
           )}
 
           {/* Black Buttons */}
-          {step === 1 && (  //step 1 
+          {(step === 1 || step === 4) && (  //step 1 & 4
             <button className="neg-btn" onClick={() => navigate("/dashboard")}>
               Skip
             </button>
           )}
-          {step > 1 && (    //step 2-4
+          {(step === 2 || step === 3) && (    //step 2 & 3
             <button className="neg-btn" onClick={() => setStep(prev => prev - 1)}>Back</button>
           )}
 

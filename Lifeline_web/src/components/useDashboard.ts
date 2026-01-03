@@ -3,10 +3,20 @@ import { authClient } from "./auth-client";
 import { connectTime, connectMessage, disconnectTWS } from "./useWebSocket";
 import { useState, useEffect } from 'react'
 
+type Contact = {
+  name: string;
+  email?: string | null;
+  phone: string;
+  image?: string;
+};
+
 export function useDashboard() {
   const navigate = useNavigate();
   const [time, setTime] = useState("")
   const [message, setMessage] = useState("")
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const wsTime = connectTime(setTime);
@@ -39,10 +49,52 @@ export function useDashboard() {
     }
   };
 
+  const displayContact = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("http://localhost:3000/api/contacts/users", {
+        credentials: "include",
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to load contacts");
+      }
+
+      const formatted: Contact[] = [];
+
+      for (let i = 1; i <= 5; i++) {
+        const name = data[`contact${i}_name`];
+        const email = data[`contact${i}_email`];
+        const phone = data[`contact${i}_phone`];
+
+        if (name && phone) {
+          formatted.push({ name, email, phone });
+        }
+      }
+
+      setContacts(formatted);
+    } catch (err: any) {
+      setError(err.message || "Failed to load contacts");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    displayContact();
+  }, []);
+
   return {
     handleLogout,
     handleSOS,
     message,
     time,
+    contacts,
+    loading,
+    error,
+    displayContact,
   };
 }

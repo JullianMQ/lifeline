@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react'
 import '../styles/dashboard.css'
 import { useDashboard } from "../components/useDashboard";
+import { useNavigate } from "react-router-dom";
 
 
 function Dashboard() {
+  const navigate = useNavigate();
   const { 
     handleLogout,
     handleSOS,
     message,
     time,
+    contacts, 
+    loading, 
+    error
   } = useDashboard();
   return (
     <main className='dashboard'>
@@ -31,17 +36,15 @@ function Dashboard() {
 
           <div className='dashboard-contacts'>
             <ul>
-              <li className='dashboard-card'>
-                <img src="src\assets\user-example.svg" alt="" />
-                <h3>John Doe</h3>
-              </li>
-              <li className='dashboard-card'>
-                <img src="src\assets\user-example.svg" alt="" />
-                <h3>John Doe</h3>
-              </li>
-              <li className='dashboard-card'>
-                <img src="src\assets\user-example.svg" alt="" />
-                <h3>John Doe</h3>
+              {contacts.map((contact, index) => (
+                <li key={index} className="dashboard-card">
+                  <img src={contact.image ? contact.image : "src/assets/user-example.svg"} alt="Contact"/>
+                  <h3>{contact.name}</h3>
+                </li>
+              ))}
+              <li className="dashboard-card" onClick={() => navigate("/addContact")}>
+                <img src="src/assets/add.svg" alt="Add contact"/>
+                <h3>Add Contact</h3>
               </li>
             </ul>
           </div>

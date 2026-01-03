@@ -70,6 +70,30 @@ export function useAddContact() {
     return errors;
   };
 
+  const addEmContact = async (emergency_contact: string) => {
+  for (let count = 1; count <= 5; count++) {
+    const res = await fetch("http://localhost:3000/api/contacts", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        [`emergency_contact_${count}`]: emergency_contact,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      return data;
+    }
+
+    if (count === 5) {
+      throw new Error(data.message || "Failed to add emergency contact");
+    }
+  }
+};
+
+
   const handleSubmit = async () => {
     setError(null);
     setInvalidFields([]);
@@ -106,6 +130,9 @@ export function useAddContact() {
         return;
       }
 
+      if (memberForm.role === "mutual") {
+        addEmContact(memberForm.phoneNo);
+      }
       setStep(4);
       // navigate("/dashboard");
 
