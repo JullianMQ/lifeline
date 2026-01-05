@@ -1,8 +1,8 @@
 import "../styles/login.css";
 import "../styles/signup.css";
 import { Link } from "react-router-dom";
-import { useSignup } from "../components/useSignup.tsx";
-import { googleAuth } from "../components/googleAuth.tsx";
+import { useSignup } from "../scripts/useSignup";
+import { googleAuth } from "../scripts/googleAuth";
 
 function Signup() {
   const {

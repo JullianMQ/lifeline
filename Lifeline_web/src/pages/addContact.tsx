@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import "../styles/addContact.css";
-import { useAddContact } from "../components/useAddContact";
+import { useAddContact } from "../scripts/useAddContact";
 
 function AddContact() {
   const navigate = useNavigate();

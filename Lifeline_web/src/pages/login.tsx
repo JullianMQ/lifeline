@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import '../styles/login.css';
 import { Link } from "react-router-dom";
-import { useLogin } from '../components/useLogin.tsx';
-import { googleAuth } from "../components/googleAuth.tsx";
+import { useLogin } from '../scripts/useLogin';
+import { googleAuth } from "../scripts/googleAuth";
 
 function Login() {
   const [email, setEmail] = useState('');
