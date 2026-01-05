@@ -3,6 +3,15 @@ import { authClient } from "./auth-client";
 import { connectTime, connectMessage, disconnectTWS } from "./useWebSocket";
 import { useState, useEffect } from 'react'
 
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  image?: string;
+  role: string;
+  phone_no: string;
+};
+
 type Contact = {
   name: string;
   email?: string | null;
@@ -14,6 +23,7 @@ export function useDashboard() {
   const navigate = useNavigate();
   const [time, setTime] = useState("")
   const [message, setMessage] = useState("")
+  const [user, setUser] = useState<User | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +33,29 @@ export function useDashboard() {
     return () => disconnectTWS();
   }, []);
 
+  const getUserInfo = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/api/auth/get-session", {
+        credentials: "include",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.user) {
+        throw new Error("Not authenticated");
+      }
+
+      const firstName = data.user.name?.split(" ")[0] || "User";
+
+      setUser({
+        ...data.user,
+        name: firstName,
+      });
+    } catch (err) {
+      console.error("Failed to get user info:", err);
+      navigate("/login");
+    }
+  };
   const handleSOS = () => {
     const wsMsg = connectMessage(setMessage);
 
@@ -84,10 +117,12 @@ export function useDashboard() {
   };
 
   useEffect(() => {
+    getUserInfo();
     displayContact();
   }, []);
 
   return {
+    user,
     handleLogout,
     handleSOS,
     message,

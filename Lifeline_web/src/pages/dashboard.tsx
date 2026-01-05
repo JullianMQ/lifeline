@@ -1,64 +1,53 @@
-import { useState, useEffect } from 'react'
-import '../styles/dashboard.css'
+import { useState } from "react";
+import "../styles/dashboard.css";
 import { useDashboard } from "../scripts/useDashboard";
 import { useNavigate } from "react-router-dom";
-
+import DashboardMap from "../components/DashboardMap";
+import DashboardUser from "../components/DashboardUser";
+import DashboardContact from "../components/DashboardContact";
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { 
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+
+  const {
+    user,
     handleLogout,
-    handleSOS,
-    message,
-    time,
-    contacts, 
-    loading, 
-    error
+    contacts,
   } = useDashboard();
+
   return (
-    <main className='dashboard'>
+    <main className="dashboard">
       <header>
-        <h2 className='head-title'>Lifeline</h2>
-        <button className='logout-btn'  onClick={handleLogout}>
+        <h2 className="head-title">Lifeline</h2>
+        <button className="logout-btn" onClick={handleLogout}>
           LOGOUT
         </button>
       </header>
-      
-      <section className='dashboard-body'>
-        <div className='dashboard-content'>
-          <div className='dashboard-user'>
-            <img src="src\assets\user-example.svg" alt="" />
-            <div className="dashboard-user-info">
-              <p>Hey there,</p>
-              <h1>John Doe</h1>
-            </div>
-          </div>
 
-          <div className='dashboard-contacts'>
-            <ul>
-              {contacts.map((contact, index) => (
-                <li key={index} className="dashboard-card">
-                  <img src={contact.image ? contact.image : "src/assets/user-example.svg"} alt="Contact"/>
-                  <h3>{contact.name}</h3>
-                </li>
-              ))}
-              <li className="dashboard-card" onClick={() => navigate("/addContact")}>
-                <img src="src/assets/add.svg" alt="Add contact"/>
-                <h3>Add Contact</h3>
-              </li>
-            </ul>
-          </div>
+      <section className="dashboard-body">
+        <div className="dashboard-content">
+          {!selectedContact ? (
+            <DashboardUser
+              user={user}
+              contacts={contacts}
+              onSelectContact={setSelectedContact}
+              onAddContact={() => navigate("/addContact")}
+            />
+          ) : (
+            <DashboardContact
+              contact={selectedContact}
+              onBack={() => setSelectedContact(null)}
+            />
+          )}
         </div>
-        <div className="map">
 
+        <div className="map">
+          <DashboardMap />
         </div>
       </section>
-      
-      <footer>
-        
-      </footer>
     </main>
-  )
+  );
 }
 
-export default Dashboard
+export default Dashboard;
