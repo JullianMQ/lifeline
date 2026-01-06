@@ -4,13 +4,17 @@ import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { login, signInWithGoogle } from "../../lib/api/auth";
 import { saveUser } from "@/lib/api/storage/user";
+import QRScanner from "@/components/QRScanner";
 
 const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [emailError, setEmailError] = useState(false);
     const [passwordError, setPasswordError] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [loginLoading, setLoginLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+
+    const [showScanner, setShowScanner] = useState(false); // NEW: toggle QR scanner
 
     useEffect(() => {
         setEmail("");
@@ -19,46 +23,59 @@ const Login = () => {
 
     // Standard email/password login
     const handleLogin = async () => {
-        setLoading(true);
+        setLoginLoading(true);
         try {
-            console.log("Attempting login with email:", email);
             const data = await login(email, password);
             await saveUser(data.user);
             router.replace("/(main)/landing");
             setEmailError(false);
             setPasswordError(false);
         } catch (err: any) {
-            console.log("LOGIN ERROR:", err);
             setEmailError(true);
             setPasswordError(true);
             alert("Login failed");
         } finally {
-            setLoading(false);
+            setLoginLoading(false);
         }
     };
 
     // Google login
     const handleGoogleLogin = async () => {
-        setLoading(true);
+        setGoogleLoading(true);
         try {
-            console.log("Starting Google OAuth login...");
             const data = await signInWithGoogle();
+            if (!data) return;
             await saveUser(data.user);
             router.replace("/(main)/landing");
         } catch (err: any) {
-            console.error("Google login error:", err);
             alert(err.message || "Google login failed");
         } finally {
-            setLoading(false);
+            setGoogleLoading(false);
         }
     };
+
+    // QR Scanner success
+    const handleQRScan = async (data: string) => {
+        setShowScanner(false);
+        try {
+            const qrData = JSON.parse(data); // assuming QR contains { email, token } or similar
+            const response = await login(qrData.email, qrData.token);
+            await saveUser(response.user);
+            router.replace("/(main)/landing");
+        } catch (err) {
+            alert("Invalid QR code or login failed");
+        }
+    };
+
+    if (showScanner) {
+        return <QRScanner onScanSuccess={handleQRScan} />;
+    }
 
     return (
         <View className="flex-1 bg-white items-center pt-32">
             <View className="w-3/4 flex-1 justify-between">
-
-                {/* Top Content */}
                 <View>
+                    {/* Top Content */}
                     <View className="items-center mb-8">
                         <Image
                             source={require("../../assets/images/LifelineLogo.png")}
@@ -91,10 +108,10 @@ const Login = () => {
                     <TouchableOpacity
                         onPress={handleLogin}
                         className="bg-lifelineRed py-4 rounded-full mb-4"
-                        disabled={loading}
+                        disabled={loginLoading || googleLoading}
                     >
                         <Text className="text-center text-white font-semibold text-lg">
-                            {loading ? "Logging in..." : "Login"}
+                            {loginLoading ? "Logging in..." : "Login"}
                         </Text>
                     </TouchableOpacity>
 
@@ -109,17 +126,18 @@ const Login = () => {
                     <TouchableOpacity
                         className="border-2 border-black py-4 mt-4 rounded-full flex-row justify-center items-center"
                         onPress={handleGoogleLogin}
-                        disabled={loading}
+                        disabled={googleLoading || loginLoading}
                     >
                         <Ionicons name="logo-google" size={24} />
                         <Text className="text-gray-700 font-semibold ml-2">
-                            {loading ? "Opening Google..." : "Login with Google"}
+                            {googleLoading ? "Opening Google..." : "Login with Google"}
                         </Text>
                     </TouchableOpacity>
 
                     {/* QR Code Button */}
                     <TouchableOpacity
                         className="border-2 border-black py-4 mt-6 rounded-full flex-row justify-center items-center"
+                        onPress={() => setShowScanner(true)} // OPEN scanner
                     >
                         <Ionicons name="qr-code-outline" size={24} />
                         <Text className="text-gray-700 font-semibold ml-2">

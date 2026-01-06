@@ -119,6 +119,7 @@ const HomePage = () => {
                             longitudeDelta: 0.01,
                         }}
                         showsUserLocation
+                        provider="google" // Use Google Maps provider
                     >
                         <Marker coordinate={location} title="You are here" />
                     </MapView>

@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { signUp } from "@/lib/api/auth";
 import { checkEmail } from "@/lib/api/auth";
+import { API_BASE_URL } from "@/lib/api/config";
 
 
 interface SignupForm {
@@ -75,21 +76,31 @@ const Signup: React.FC = () => {
             Alert.alert("Error", "Passwords do not match");
             return;
         }
+
         try {
+
             await signUp({
                 name: `${firstName} ${lastName}`,
                 email,
                 phone_no,
                 password,
-
             });
-            Alert.alert("Success", "Account created successfully");
-            router.replace("/(auth)/add_member");
+
+            Alert.alert(
+                "Verify Your Email",
+                "We've sent a verification email. Please check your inbox to activate your account."
+            );
+
+
+            router.replace("/(auth)/verify-email");
+
         } catch (err: any) {
             console.error("Signup error:", err);
             Alert.alert("Error", err.message || "Signup failed. Please try again.");
         }
     };
+
+
 
     const step1Fields = [
         { placeholder: "First Name", key: "firstName" },
