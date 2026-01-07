@@ -6,7 +6,6 @@ import contacts from './routes/contacts'
 import webSocket from './routes/websocket'
 import { magicLinkToken, magicLinkUrl } from './lib/auth'
 import { cors } from 'hono/cors'
-import { dbPool } from './lib/db'
 
 const app = new Hono<{ Variables: AuthType }>({
     strict: false,
