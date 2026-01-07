@@ -109,6 +109,8 @@ export function useAddContact() {
         name: `${memberForm.firstName} ${memberForm.lastName}`,
         email: memberForm.email,
         password: memberForm.password,
+        phone_no: memberForm.phoneNo,
+        role: memberForm.role,
       });
 
       if (error) {

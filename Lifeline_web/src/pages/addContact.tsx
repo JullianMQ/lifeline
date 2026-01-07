@@ -140,7 +140,7 @@ function AddContact() {
             </button>   
           )}
           {(step === 4) && (  //step 4
-            <button className="pos-btn" onClick={() => navigate("/addContact")}>
+            <button className="pos-btn" onClick={() => window.location.reload()}>
               Add another
             </button>   
           )}

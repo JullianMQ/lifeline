@@ -126,6 +126,8 @@ export function useSignup() {
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         password: formData.password,
+        phone_no: formData.phoneNo,
+        role: formData.role,
       });
       navigate("/login");
       } catch (err: any) {
