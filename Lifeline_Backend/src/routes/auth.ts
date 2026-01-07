@@ -28,6 +28,26 @@ router.post("/check/email", async (c) => {
     }
 });
 
+router.post("/check/phone", async (c) => {
+    const { phone } = await c.req.json();
+
+    if (!phone) {
+        return c.json({ error: "Phone no is required" }, 400);
+    }
+
+    try {
+        const result = await dbPool.query('SELECT id FROM "user" WHERE phone_no = $1 LIMIT 1', [phone]);
+
+        if (result.rows.length > 0) {
+            return c.json({ error: "Phone already in use" }, 422);
+        }
+
+        return c.json({ message: "Phone is available" }, 200);
+    } catch (error) {
+        return c.json({ error: "Failed to check phone" }, 500);
+    }
+});
+
 // TODO: Change hardcoded url to env variable
 router.post("/auth/magic-link/qr", async (c) => {
     const reqBody = await c.req.json();
