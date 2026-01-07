@@ -134,8 +134,6 @@ export const auth = betterAuth({
     }
 });
 
-export { magicLinkUrl, magicLinkToken }
-
 export type Auth = typeof auth;
 
 export type AuthType = {

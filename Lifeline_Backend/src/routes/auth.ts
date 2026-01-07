@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { auth } from "../lib/auth";
 import type { AuthType } from "../lib/auth";
-import { magicLinkToken, magicLinkUrl } from '../lib/auth'
 import { dbPool } from "../lib/db";
 
 const router = new Hono<{ Bindings: AuthType }>({
@@ -43,9 +42,11 @@ router.post("/auth/magic-link/qr", async (c) => {
         })
     })
 
+    const data = await res.json();
+    
     return c.json({
-        url: magicLinkUrl,
-        token: magicLinkToken
+        url: data.url,
+        token: data.token
     })
 })
 
