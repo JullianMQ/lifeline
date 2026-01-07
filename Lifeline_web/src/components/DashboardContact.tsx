@@ -9,10 +9,10 @@ export default function DashboardContact({ contact, onBack }: Props) {
   return (
     <>
         <button className="back-btn" onClick={onBack}>
-            <img src="src/assets/close.svg" alt="Back"/>
+            <img src="/images/close.svg" alt="Back"/>
         </button>
         <div className="dashboard-user">
-            <img src={contact?.image || "src/assets/user-example.svg"} alt="User"/>
+            <img src={contact?.image || "/images/user-example.svg"} alt="User"/>
             <div className="dashboard-user-info">
                 <h1>{contact?.name?.split(" ")[0] || "User"}</h1>
             </div>
