@@ -31,7 +31,7 @@ router.post("/check/email", async (c) => {
 // TODO: Change hardcoded url to env variable
 router.post("/auth/magic-link/qr", async (c) => {
     const reqBody = await c.req.json();
-    const res = await fetch("http://localhost:3000/api/auth/sign-in/magic-link", {
+    await fetch("http://localhost:3000/api/auth/sign-in/magic-link", {
         headers: { "Content-Type": "application/json" },
         method: "POST",
         body: JSON.stringify({
