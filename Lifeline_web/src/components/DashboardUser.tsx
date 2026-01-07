@@ -16,7 +16,7 @@ export default function DashboardUser({
   return (
     <>
       <div className="dashboard-user">
-        <img src={user?.image || "src/assets/user-example.svg"} alt="User"/>
+        <img src={user?.image || "/images/user-example.svg"} alt="User"/>
         <div className="dashboard-user-info">
           <p>Hey there,</p>
           <h1>{user?.name?.split(" ")[0] || "User"}</h1>
@@ -27,13 +27,13 @@ export default function DashboardUser({
         <ul>
           {contacts.map((contact, index) => (
             <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
-              <img src={contact.image || "src/assets/user-example.svg"} alt="Contact"/>
+              <img src={contact.image || "/images/user-example.svg"} alt="Contact"/>
               <h3>{contact.name}</h3>
             </li>
           ))}
 
           <li className="dashboard-card" onClick={onAddContact}>
-            <img src="src/assets/add.svg" alt="Add contact" />
+            <img src="/images/add.svg" alt="Add contact" />
             <h3>Add Contact</h3>
           </li>
         </ul>

@@ -26,7 +26,7 @@ function AddContact() {
           {step === 1 && (
             <>
               <h2>Add a family member</h2>
-              <img src="src/assets/connect.svg" alt="Connect" className="connect" />
+              <img src="/images/connect.svg" alt="Connect" className="connect" />
               <h3>Connect with your emergency contacts now</h3>
             </>
           )}
@@ -38,13 +38,13 @@ function AddContact() {
 
                   <label className={`role-choice ${memberForm.role === "mutual" ? "selected" : ""}`}>
                     <input type="radio" name="role" value="mutual" className="roles" checked={memberForm.role === "mutual"} onChange={handleChange} />
-                    <img src="src/assets/mutual-role.svg" alt="mutual" className="role-img"/>
+                    <img src="/images/mutual-role.svg" alt="mutual" className="role-img"/>
                     <h3>Mutual</h3>
                   </label>
 
                   <label className={`role-choice ${memberForm.role === "dependent" ? "selected" : ""}`}>
                     <input type="radio" name="role" value="dependent" className="roles" checked={memberForm.role  === "dependent"} onChange={handleChange}/>
-                    <img src="src/assets/dependent-role.svg" alt="dependent" className="role-img"/>
+                    <img src="/images/dependent-role.svg" alt="dependent" className="role-img"/>
                     <h3>Dependent</h3>
                   </label>
                 
