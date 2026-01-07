@@ -31,6 +31,10 @@ router.post("/check/email", async (c) => {
 router.post("/auth/magic-link/qr", async (c) => {
     const reqBody = await c.req.json();
     
+    if (!reqBody.email) {
+        return c.json({ error: "Email is required" }, 400);
+    }
+    
     try {
         const res = await fetch("http://localhost:3000/api/auth/sign-in/magic-link", {
             headers: { "Content-Type": "application/json" },
