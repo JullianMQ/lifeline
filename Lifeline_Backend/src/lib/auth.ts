@@ -1,16 +1,14 @@
 import { betterAuth } from "better-auth";
-import { Pool } from "pg";
 import { createAuthMiddleware, magicLink, openAPI } from "better-auth/plugins";
 import { z } from "zod";
 import { sendVerifyEmail, sendMagicLinkEmail } from "./email";
+import { dbPool } from "./db";
 
 let magicLinkUrl: string;
 let magicLinkToken: string;
 export const auth = betterAuth({
     appName: "Lifeline",
-    database: new Pool({
-        connectionString: process.env.DATABASE_URL,
-    }),
+    database: dbPool,
     baseURL: process.env.BETTER_AUTH_URL,
     trustedOrigins: ["http://localhost:*", "https://*"],
     emailAndPassword: {
@@ -127,13 +125,9 @@ export const auth = betterAuth({
         user: {
             create: {
                 after: async (user) => {
-                    const pool = new Pool({
-                        connectionString: process.env.DATABASE_URL,
-                    });
-                    const result = await pool.query('INSERT INTO contacts (user_id) VALUES ($1) RETURNING id', [user.id]);
+                    const result = await dbPool.query('INSERT INTO contacts (user_id) VALUES ($1) RETURNING id', [user.id]);
                     const contactId = result.rows[0].id;
-                    await pool.query('UPDATE "user" SET emergency_contact = $1 WHERE id = $2', [contactId, user.id]);
-                    await pool.end();
+                    await dbPool.query('UPDATE "user" SET emergency_contact = $1 WHERE id = $2', [contactId, user.id]);
                 }
             }
         }
