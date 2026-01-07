@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import "../styles/addContact.css";
 import { useAddContact } from "../scripts/useAddContact";
+import QRCode from "react-qr-code";
 
 function AddContact() {
   const navigate = useNavigate();
@@ -14,8 +15,7 @@ function AddContact() {
     loading,
     handleChange,
     handleSubmit,
-    selectedRole,
-    setSelectedRole,
+    qrUrl
   } = useAddContact();
 
   return (
@@ -110,8 +110,17 @@ function AddContact() {
 
           {step === 4 && (
             <>
-              <h2>Show QR</h2>
-              {/* QR component or image goes here later */}
+              <h2>Scan QR</h2>
+              {qrUrl ? (
+                <QRCode
+                  size={200}
+                  value={qrUrl}
+                  viewBox="0 0 256 256"
+                />
+              ) : (
+                <p>Generating QR…</p>
+              )}
+              <p>Scan me to login as <strong>{memberForm.firstName+" "+memberForm.lastName}</strong></p>
             </>
           )}
 
