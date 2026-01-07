@@ -1,3 +1,5 @@
+import type { Contact } from "../types";
+
 type Props = {
   contact: Contact;
   onBack: () => void;

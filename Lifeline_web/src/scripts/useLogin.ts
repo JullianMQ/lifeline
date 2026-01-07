@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { authClient } from "./auth-client";
-import Login from "../pages/login";
 
 type LoginForm = {
   email: string;
@@ -28,7 +27,7 @@ export function useLogin() {
     }
 
     try {
-      const data = await authClient.signIn.email({
+      await authClient.signIn.email({
         email: email,
         password: password,
         callbackURL: "/dashboard",

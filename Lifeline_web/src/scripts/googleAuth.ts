@@ -1,10 +1,9 @@
 import { authClient } from "./auth-client";
-import { useState } from "react";
 export function googleAuth() {
 
     const handleGoogleLogin = async () => {
         try {
-            const data = await signInWithGoogle();
+            await signInWithGoogle();
         } catch (err: any) {
                 console.error("Google login failed:", err.message);
         }

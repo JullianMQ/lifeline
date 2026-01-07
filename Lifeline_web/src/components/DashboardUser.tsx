@@ -1,3 +1,5 @@
+import type { User, Contact } from "../types";
+
 type Props = {
   user: User | null;
   contacts: Contact[];

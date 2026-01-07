@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
 
 type memberForm = {
@@ -13,7 +12,7 @@ type memberForm = {
 };
 
 export function useAddContact() {
-  const navigate = useNavigate();
+  
 
   const [step, setStep] = useState<number>(1);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
@@ -106,12 +105,10 @@ export function useAddContact() {
     setLoading(true);
 
     try {
-      const { data, error } = await authClient.signUp.email({
+      const { error } = await authClient.signUp.email({
         name: `${memberForm.firstName} ${memberForm.lastName}`,
         email: memberForm.email,
         password: memberForm.password,
-        phone_no: memberForm.phoneNo,
-        role: memberForm.role,
       });
 
       if (error) {

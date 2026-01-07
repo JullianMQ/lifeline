@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import DashboardMap from "../components/DashboardMap";
 import DashboardUser from "../components/DashboardUser";
 import DashboardContact from "../components/DashboardContact";
+import type { Contact } from "../types";
 
 function Dashboard() {
   const navigate = useNavigate();
