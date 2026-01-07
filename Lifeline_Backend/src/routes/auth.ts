@@ -30,24 +30,38 @@ router.post("/check/email", async (c) => {
 // TODO: Change hardcoded url to env variable
 router.post("/auth/magic-link/qr", async (c) => {
     const reqBody = await c.req.json();
-    const res = await fetch("http://localhost:3000/api/auth/sign-in/magic-link", {
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-        body: JSON.stringify({
-            email: reqBody.email,
-            "name": reqBody.name || "",
-            "callbackURL": reqBody.callbackURL || "http://localhost:3000",
-            "newUserCallbackURL": reqBody.newUserCallbackURL || "",
-            "errorCallbackURL": reqBody.errorCallbackURL || "",
-        })
-    })
-
-    const data = await res.json();
     
-    return c.json({
-        url: data.url,
-        token: data.token
-    })
+    try {
+        const res = await fetch("http://localhost:3000/api/auth/sign-in/magic-link", {
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+            body: JSON.stringify({
+                email: reqBody.email,
+                "name": reqBody.name || "",
+                "callbackURL": reqBody.callbackURL || "http://localhost:3000",
+                "newUserCallbackURL": reqBody.newUserCallbackURL || "",
+                "errorCallbackURL": reqBody.errorCallbackURL || "",
+            })
+        })
+
+        if (!res.ok) {
+            return c.json({ error: "Failed to generate magic link" }, res.status);
+        }
+
+        const data = await res.json();
+        
+        if (!data.url || !data.token) {
+            return c.json({ error: "Invalid response from magic link service" }, 500);
+        }
+        
+        return c.json({
+            url: data.url,
+            token: data.token
+        })
+    } catch (error) {
+        console.error("Error generating magic link:", error);
+        return c.json({ error: "Failed to generate magic link" }, 500);
+    }
 })
 
 router.on(["POST", "GET"], "/auth/*", (c) => {
