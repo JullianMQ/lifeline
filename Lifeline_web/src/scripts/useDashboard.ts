@@ -1,27 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
-import { connectTime, connectMessage, disconnectTWS } from "./useWebSocket";
+import { connectMessage, disconnectTWS } from "./useWebSocket";
 import { useState, useEffect } from 'react'
 
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  image?: string;
-  role: string;
-  phone_no: string;
-};
-
-type Contact = {
-  name: string;
-  email?: string | null;
-  phone: string;
-  image?: string;
-};
+import type { User, Contact } from "../types";
 
 export function useDashboard() {
   const navigate = useNavigate();
-  const [time, setTime] = useState("")
+  
   const [message, setMessage] = useState("")
   const [user, setUser] = useState<User | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -29,7 +15,7 @@ export function useDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const wsTime = connectTime(setTime);
+    
     return () => disconnectTWS();
   }, []);
 
@@ -126,7 +112,7 @@ export function useDashboard() {
     handleLogout,
     handleSOS,
     message,
-    time,
+    
     contacts,
     loading,
     error,

@@ -1,9 +1,8 @@
-import { useState } from 'react'
+
 import '../styles/index.css'
 import { Link } from "react-router-dom";
 
 function Index() {
-  const [count, setCount] = useState(0)
 
   return (
     <main className='landing'>
