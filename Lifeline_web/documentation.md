@@ -74,3 +74,7 @@ npm install
 - Added Google map on dashboard
 - Restructured files
 - Dashboard switch from user to contact
+
+### 2026-01-07
+
+- Added QR generation on addContact
