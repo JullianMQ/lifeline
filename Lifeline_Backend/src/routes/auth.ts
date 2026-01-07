@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { auth } from "../lib/auth";
 import type { AuthType } from "../lib/auth";
 import { magicLinkToken, magicLinkUrl } from '../lib/auth'
-import dbPool from "../lib/db";
+import { dbPool } from "../lib/db";
 
 const router = new Hono<{ Bindings: AuthType }>({
     strict: false,
