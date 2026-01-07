@@ -105,6 +105,8 @@ ul{
     border: none;    
     background-color: transparent;
     right: 0;
+    width: auto;
+    padding: none;
 }
 
 .back-btn img{
