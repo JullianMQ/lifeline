@@ -1,4 +1,5 @@
 import { authClient } from "./auth-client";
+import { API_BASE_URL } from "../config/api";
 export function googleAuth() {
 
     const handleGoogleLogin = async () => {
@@ -18,7 +19,7 @@ export function googleAuth() {
                 disableRedirect: false, 
             });
             console.log("Data:", data)
-            const res = await fetch("http://localhost:3000/api/auth/get-session", {credentials: "include",});
+            const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, {credentials: "include",});
             const session = await res.json();
             
             return session;
