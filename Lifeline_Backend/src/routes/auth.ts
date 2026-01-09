@@ -51,13 +51,13 @@ router.post("/check/phone", async (c) => {
 // TODO: Change hardcoded url to env variable
 router.post("/auth/magic-link/qr", async (c) => {
     const reqBody = await c.req.json();
-    await fetch("http://localhost:3000/api/auth/sign-in/magic-link", {
+    await fetch(`${process.env.BETTER_AUTH_URL}/api/auth/sign-in/magic-link`, {
         headers: { "Content-Type": "application/json" },
         method: "POST",
         body: JSON.stringify({
             email: reqBody.email,
             "name": reqBody.name || "",
-            "callbackURL": reqBody.callbackURL || "http://localhost:3000",
+            "callbackURL": reqBody.callbackURL || "process.env.BETTER_AUTH_URL",
             "newUserCallbackURL": reqBody.newUserCallbackURL || "",
             "errorCallbackURL": reqBody.errorCallbackURL || "",
         })

@@ -10,7 +10,8 @@ export const auth = betterAuth({
     appName: "Lifeline",
     database: dbPool,
     baseURL: process.env.BETTER_AUTH_URL,
-    trustedOrigins: ["http://localhost:*", "https://*"],
+    basePath: "/api/auth",
+    trustedOrigins: process.env.ALLOWED_ORIGINS?.split(','),
     emailAndPassword: {
         enabled: true,
         autoSignIn: false,
@@ -94,7 +95,9 @@ export const auth = betterAuth({
         }
     },
     plugins: [
-        openAPI(),
+        openAPI({
+            path: "/reference"
+        }),
         magicLink({
             expiresIn: 900, // 15 minutes
             storeToken: "plain",

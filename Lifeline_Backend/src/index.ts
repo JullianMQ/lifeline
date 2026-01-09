@@ -12,7 +12,7 @@ const app = new Hono<{ Variables: AuthType }>({
 
 app.use( 
     cors({
-        origin:['https://localhost:*', 'http://localhost:5173', 'http://localhost:4173'],
+        origin: process.env.ALLOWED_ORIGINS!.split(','),
         allowHeaders: ['Content-Type','X-Custom-Header', 'Upgrade-Insecure-Request'],
         allowMethods: ['POST', 'GET', 'OPTIONS'],
         exposeHeaders: ['Content-length', 'X-Kuma-Revision'],
