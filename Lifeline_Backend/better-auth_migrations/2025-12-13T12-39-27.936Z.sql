@@ -6,7 +6,7 @@ CREATE TABLE "user" (
     "emailVerified" BOOLEAN NOT NULL,
     "image" TEXT,
     "role" role_enum NOT NULL,
-    "phone_no" TEXT NOT NULL UNIQUE,
+    "phone_no" TEXT UNIQUE,
     "emergency_contact" INTEGER,
     "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
