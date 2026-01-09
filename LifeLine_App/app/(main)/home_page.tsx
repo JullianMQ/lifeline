@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
+import { SensorContext } from "@/context/sensor_context";
 import {
     connectTimeSocket,
     connectMessageSocket,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/websocket";
 
 const HomePage = () => {
+    const { isMonitoring, stopMonitoring } = useContext(SensorContext);
     const [time, setTime] = useState("");
     const [messageReply, setMessageReply] = useState("");
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -150,21 +152,35 @@ const HomePage = () => {
                 <Text className="text-lg font-semibold">{time || "Connecting..."}</Text>
             </View>
 
-            {/* SOS BUTTON */}
+            <View style={{ flex: 1 }} />
+            {/* SOS and STOP BUTTON */}
             <View className="items-center mt-12">
                 <TouchableOpacity
-                    className="w-32 h-32 rounded-full items-center justify-center bg-red-600"
+                    className="w-52 h-52 rounded-full items-center justify-center bg-red-600 mb-6"
                     onPress={handleSOS}
                 >
-                    <Ionicons name="call" size={30} color="white" />
-                    <Text className="text-white font-bold mt-1">SOS</Text>
+                    <Ionicons name="call" size={50} color="white" />
+                    <Text className="text-white font-bold mt-1 text-3xl">SOS</Text>
                 </TouchableOpacity>
+
+                {/* STOP MONITORING BUTTON - Only shows if monitoring is active */}
+
 
                 {messageReply ? (
                     <Text className="mt-4 text-center text-gray-700">
                         Server reply: {messageReply}
                     </Text>
                 ) : null}
+
+                {isMonitoring && (
+                    <TouchableOpacity
+                        className="mt-6 mb-8 px-6 py-3 rounded-full border-2 flex-row items-center h-20 w-48 justify-center"
+                        onPress={stopMonitoring}
+                    >
+                        {/* <Ionicons name="stop-circle-outline" size={20} color="#4b5563" /> */}
+                        <Text className=" font-bold ml-2 text-2xl">STOP</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </ScreenWrapper>
     );

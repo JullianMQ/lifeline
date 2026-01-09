@@ -14,7 +14,7 @@ const Login = () => {
     const [loginLoading, setLoginLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
-    const [showScanner, setShowScanner] = useState(false); // NEW: toggle QR scanner
+    const [showScanner, setShowScanner] = useState(false);
 
     useEffect(() => {
         setEmail("");
@@ -55,20 +55,29 @@ const Login = () => {
     };
 
     // QR Scanner success
-    const handleQRScan = async (data: string) => {
+    const handleQRScanSuccess = async (data: string) => {
         setShowScanner(false);
         try {
-            const qrData = JSON.parse(data); // assuming QR contains { email, token } or similar
+            const qrData = JSON.parse(data); // assuming the QR code contains email and token
             const response = await login(qrData.email, qrData.token);
             await saveUser(response.user);
             router.replace("/(main)/landing");
-        } catch (err) {
+        } catch {
             alert("Invalid QR code or login failed");
         }
     };
 
+    const handleQRScanCancel = () => {
+        setShowScanner(false);
+    };
+
     if (showScanner) {
-        return <QRScanner onScanSuccess={handleQRScan} />;
+        return (
+            <QRScanner
+                onScanSuccess={handleQRScanSuccess}
+                onScanCancel={handleQRScanCancel}
+            />
+        );
     }
 
     return (
