@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Image, Text, TouchableOpacity, View, Switch, Alert } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
+import { SensorContext } from "@/context/sensor_context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { logout } from "../../lib/api/auth";
 import { getUser, clearUser } from "../../lib/api/storage/user";
 
 const MenuPage = () => {
+    const { stopMonitoring } = useContext(SensorContext);
     const router = useRouter();
     const [darkMode, setDarkMode] = useState(false);
     const [user, setUser] = useState<any>(null);
@@ -22,6 +24,7 @@ const MenuPage = () => {
 
     const handleLogout = async () => {
         try {
+            await stopMonitoring();
             await logout();
             await clearUser();
             router.replace("/(auth)/login");

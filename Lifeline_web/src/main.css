@@ -144,7 +144,7 @@ button{
   border: 2px var(--text-black) solid;
 }
 
-.login, .signup, .addContact{
+.login, .signup, .addContact, .phoneNumber{
   background: var(--red-background);
   height: 100vh;
   width: 100vw;

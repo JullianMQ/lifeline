@@ -75,3 +75,7 @@
 - Implemented native Google Sign-In for Android using Google ID token flow
 - Integrated Google authentication with backend (Better Auth)
 - Fixed OAuth redirect and localhost issues on Android
+
+- Integrated map view in Home screen
+- Displayed user location
+- Updated SOS button to send current address (location) when pressed

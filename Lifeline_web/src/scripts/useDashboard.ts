@@ -61,8 +61,7 @@ export function useDashboard() {
   const handleLogout = async () => {
     try {
       await authClient.signOut();
-      localStorage.removeItem("lifeline_user");
-      navigate("/login");
+      window.location.reload();
     } catch (err) {
       console.error("Logout failed:", err);
     }
