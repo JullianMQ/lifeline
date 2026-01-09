@@ -1,0 +1,17 @@
+.form.submitted input:invalid {
+  border: 3px solid var(--lifeline-red);
+}
+.phoneNumber .card{
+  display: flex;
+  flex-direction: column;
+}
+.phoneNumber .form{
+  display: flex;
+  height: 100%;
+  justify-content: space-between;
+}
+.phoneNumber .form-cont{
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
