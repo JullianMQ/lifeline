@@ -123,9 +123,9 @@ export async function sendMagicLinkEmail(email: string, url: string, token: stri
             .post("send", { 'version': 'v3.1' })
             .request(data)
 
-        console.log('Magic link email sent successfully')
-        console.log('Token:', token)
-        console.log('URL:', url)
+        // console.log('Magic link email sent successfully')
+        // console.log('Token:', token)
+        // console.log('URL:', url)
         return token
     } catch (error) {
         console.error('Error sending magic link email:', error)

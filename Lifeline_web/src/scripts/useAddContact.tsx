@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
 
 type memberForm = {
@@ -13,14 +12,13 @@ type memberForm = {
 };
 
 export function useAddContact() {
-  const navigate = useNavigate();
+  
 
   const [step, setStep] = useState<number>(1);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<"mutual" | "dependent">();
-
+  const [qrUrl, setQrUrl] = useState<string>("")
 
   const [memberForm, setmemberForm] = useState<memberForm>({
     firstName: "",
@@ -107,7 +105,7 @@ export function useAddContact() {
     setLoading(true);
 
     try {
-      const { data, error } = await authClient.signUp.email({
+      const { error } = await authClient.signUp.email({
         name: `${memberForm.firstName} ${memberForm.lastName}`,
         email: memberForm.email,
         password: memberForm.password,
@@ -133,8 +131,9 @@ export function useAddContact() {
       if (memberForm.role === "mutual") {
         addEmContact(memberForm.phoneNo);
       }
+      
       setStep(4);
-      // navigate("/dashboard");
+      await generateQrLink()
 
     } catch (err) {
       console.error("Signup failed:", err);
@@ -143,6 +142,35 @@ export function useAddContact() {
       setLoading(false);
     }
   };
+
+  const generateQrLink = async () => {
+    try {
+      const res = await fetch(
+        "http://localhost:3000/api/auth/magic-link/qr",
+        {
+          method: "POST",
+          credentials: "include",
+          body: JSON.stringify({
+            email: memberForm.email,
+            name: `${memberForm.firstName} ${memberForm.lastName}`,
+            callbackURL: "http://localhost:5173/dashboard",
+            newUserCallbackURL: "",
+            errorCallbackURL: "",
+          }),
+        }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok || !data.url) {
+        throw new Error("Failed to generate QR")
+      }
+
+      setQrUrl(data.url)
+    } catch (err) {
+      console.error("QR generation failed:", err)
+    }
+  }
 
 
   return {
@@ -154,7 +182,7 @@ export function useAddContact() {
     loading,
     handleChange,
     handleSubmit,
-    selectedRole,
-    setSelectedRole,
+
+    qrUrl
   };
 }

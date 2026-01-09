@@ -1,9 +1,8 @@
-import { useState } from 'react'
+
 import '../styles/index.css'
 import { Link } from "react-router-dom";
 
 function Index() {
-  const [count, setCount] = useState(0)
 
   return (
     <main className='landing'>
@@ -11,7 +10,7 @@ function Index() {
         <section className='left'>
           <article className='mobile'>
             <div className='logo'>
-              <img src="src\assets\LifelineLogo.png" alt="Lifeline" className='lifeline-logo'/>
+              <img src="/images/LifelineLogo.png" alt="Lifeline" className='lifeline-logo'/>
               <h3 className='lifeline-text head-title'>LIFELINE</h3>
             </div>
             <div className='btn'>

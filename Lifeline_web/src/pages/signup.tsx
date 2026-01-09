@@ -1,8 +1,8 @@
 import "../styles/login.css";
 import "../styles/signup.css";
 import { Link } from "react-router-dom";
-import { useSignup } from "../components/useSignup.tsx";
-import { googleAuth } from "../components/googleAuth.tsx";
+import { useSignup } from "../scripts/useSignup";
+import { googleAuth } from "../scripts/googleAuth";
 
 function Signup() {
   const {
@@ -24,7 +24,7 @@ function Signup() {
 
           <div className="login-logo">
             <img
-              src="src/assets/LifelineLogo.png"
+              src="/images/LifelineLogo.png"
               alt="Lifeline"
               className="lifeline-logo-mini"
             />
@@ -68,12 +68,12 @@ function Signup() {
 
                 <div className="line">
                   <hr />
-                  <img src="src/assets/location.svg" alt="Location" />
+                  <img src="/images/location.svg" alt="Location" />
                   <hr />
                 </div>
 
                 <button type="button" className="neg-btn" onClick={handleGoogleLogin}>
-                  <img src="src/assets/google.svg"  alt="Google-Logo" className="google-logo"/>
+                  <img src="/images/google.svg"  alt="Google-Logo" className="google-logo"/>
                   Signup with Google
                 </button>
               </>

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import '../styles/login.css';
 import { Link } from "react-router-dom";
-import { useLogin } from '../components/useLogin.tsx';
-import { googleAuth } from "../components/googleAuth.tsx";
+import { useLogin } from '../scripts/useLogin';
+import { googleAuth } from "../scripts/googleAuth";
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -26,7 +26,7 @@ function Login() {
         <div className="card">
 
           <div className="login-logo">
-            <img src="src/assets/LifelineLogo.png" alt="Lifeline" className='lifeline-logo-mini'/>
+            <img src="/images/LifelineLogo.png" alt="Lifeline" className='lifeline-logo-mini'/>
             <h1 className='lifeline-text'>LOGIN</h1>
           </div>
 
@@ -54,13 +54,13 @@ function Login() {
 
             <div className="line">
               <hr />
-              <img src="src/assets/location.svg" alt="Location" />
+              <img src="/images/location.svg" alt="Location" />
               <hr />
             </div>
 
             <div className="google">
               <button className='neg-btn' type="button" onClick={handleGoogleLogin}>
-                <img src="src/assets/google.svg" alt="Google-Logo" className='google-logo' />
+                <img src="/images/google.svg" alt="Google-Logo" className='google-logo' />
                 Login with Google
               </button>
             </div>

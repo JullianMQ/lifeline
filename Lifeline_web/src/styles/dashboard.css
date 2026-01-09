@@ -26,12 +26,18 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info{
     height: 100%;
     width: 100%;
     display: grid;
+    gap: var(--space-md);
     grid-template-columns: repeat(3, 1fr);
+    padding: var(--space-md) var(--space-xl) ;
+}
+
+.dashboard-content{
+    position: relative;
+    gap: var(--space-md);
 }
 
 .dashboard-content, .dashboard-contacts, .dashboard-user{
     width: 100%;
-    padding: var(--space-sm) var(--space-md);
 }
 
 .dashboard-user, .dashboard-card, ul{
@@ -50,6 +56,8 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info{
 .dashboard-user img{
     aspect-ratio: 1/1;
     height: 100%;
+    border-radius: 100%;
+    border: 1px solid var(--text-black);
 }
 
 .dashboard-user-info{
@@ -76,16 +84,47 @@ ul{
     height: 100%;
     text-align: center;
     cursor: pointer;
+    font-size: 20px;
 }
 
 .dashboard footer{
     height: 60px;
     width: 100vw;
 }
+
 .logout-btn{
     border: none;
     background-color: transparent;
     font-weight: 800;
     text-decoration: underline;
     width: fit-content;
+}
+
+.back-btn{
+    position: absolute;
+    border: none;    
+    background-color: transparent;
+    right: 0;
+    width: auto;
+    padding: none;
+}
+
+.back-btn img{
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.map{ 
+    /* padding: var(--space-md) var(--space-md) var(--space-md) 0; */
+}
+
+@media screen and (max-width: 768px) {
+
+}
+@media screen and (min-width: 768px) and (max-width:1024px) {
+
+}
+@media screen and (min-width: 1024px) {
+
 }

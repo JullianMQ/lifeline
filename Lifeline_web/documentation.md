@@ -65,4 +65,16 @@ npm install
 - Added OAuth
 - Applied Better-Auth for login and signup
 
+### 2026-01-03
 
+- Added Dashboard contents
+
+### 2026-01-05
+
+- Added Google map on dashboard
+- Restructured files
+- Dashboard switch from user to contact
+
+### 2026-01-07
+
+- Added QR generation on addContact

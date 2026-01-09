@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { redirect, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
 
 type FormData = {
@@ -122,7 +122,7 @@ export function useSignup() {
 
     setLoading(true);
     try {
-      const data = await authClient.signUp.email({
+      await authClient.signUp.email({
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         password: formData.password,

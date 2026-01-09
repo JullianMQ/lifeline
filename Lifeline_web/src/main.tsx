@@ -8,7 +8,7 @@ import Login from "./pages/login.tsx";
 import Signup from "./pages/signup.tsx";
 import Dashboard from "./pages/dashboard.tsx";
 import AddContact from "./pages/addContact.tsx";
-import { ProtectedRoute } from "./components/ProtectedRoute.tsx"
+import { ProtectedRoute } from "./scripts/ProtectedRoute.tsx"
 
 
 createRoot(document.getElementById("root")!).render(
