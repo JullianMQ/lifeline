@@ -78,3 +78,9 @@ npm install
 ### 2026-01-07
 
 - Added QR generation on addContact
+
+### 2026-01-09
+
+- Implemented protected and public routes
+- Added phone number validation for social login
+- Adding contacts now has create new and add existing options

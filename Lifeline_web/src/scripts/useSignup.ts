@@ -128,7 +128,7 @@ export function useSignup() {
         password: formData.password,
         phone_no: formData.phoneNo,
         role: formData.role,
-      });
+      }as any);
       navigate("/login");
       } catch (err: any) {
       if (err.code === "USER_ALREADY_EXISTS") {
