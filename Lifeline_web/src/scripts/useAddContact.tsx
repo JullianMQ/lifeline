@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { authClient } from "./auth-client";
 
-type memberForm = {
+type createForm = {
   firstName: string;
   lastName: string;
   email: string;
@@ -11,16 +11,20 @@ type memberForm = {
   role: "" | "mutual" | "dependent";
 };
 
-export function useAddContact() {
-  
+type addForm = {
+  phoneNo: string;
+};
 
+export function useAddContact() {
   const [step, setStep] = useState<number>(1);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [qrUrl, setQrUrl] = useState<string>("")
+  const [qrUrl, setQrUrl] = useState<string>("");
+  const [fetchedUser, setFetchedUser] = useState<any>(null);
 
-  const [memberForm, setmemberForm] = useState<memberForm>({
+
+  const [createForm, setcreateForm] = useState<createForm>({
     firstName: "",
     lastName: "",
     email: "",
@@ -30,88 +34,82 @@ export function useAddContact() {
     role: "",
   });
 
+  const [addForm, setaddForm] = useState<addForm>({
+    phoneNo: "",
+  });
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setmemberForm(prev => ({ ...prev, [name]: value }));
+    setcreateForm(prev => ({ ...prev, [name]: value }));
+    setaddForm(prev => ({ ...prev, [name]: value }));
     setInvalidFields(prev => prev.filter(f => f !== name));
     setError(null);
   };
 
-  const validateForm = () => {
+  const validateForm = (mode: "create" | "add") => {
     const errors: string[] = [];
     const phoneRegex = /^09\d{9}$/;
 
-    if (!memberForm.firstName) errors.push("firstName");
-    if (!memberForm.lastName) errors.push("lastName");
-    if (!memberForm.email) errors.push("email");
+    if (mode === "create") {
+      if (!createForm.firstName) errors.push("firstName");
+      if (!createForm.lastName) errors.push("lastName");
+      if (!createForm.email) errors.push("email");
 
-    if (!memberForm.phoneNo || !phoneRegex.test(memberForm.phoneNo)) {
-      errors.push("phone_no");
-      setError(
-        !memberForm.phoneNo
-          ? "Phone number is required"
-          : "Invalid phone number. Must start with 09 and be 11 digits."
-      );
+      if (!createForm.phoneNo || !phoneRegex.test(createForm.phoneNo)) {
+        errors.push("phoneNo");
+        setError(!createForm.phoneNo
+            ? "Phone number is required"
+            : "Invalid phone number. Must start with 09 and be 11 digits."
+        );
+      }
+
+      if (!createForm.password) errors.push("password");
+
+      if (!createForm.confirmPassword || createForm.password !== createForm.confirmPassword) {
+        errors.push("confirmPassword");
+        setError(!createForm.confirmPassword
+            ? "Please confirm your password"
+            : "Passwords do not match"
+        );
+      }
     }
 
-    if (!memberForm.password) errors.push("password");
-
-    if (!memberForm.confirmPassword || memberForm.password !== memberForm.confirmPassword) {
-      errors.push("confirmPassword");
-      setError(
-        !memberForm.confirmPassword
-          ? "Please confirm your password"
-          : "Passwords do not match"
-      );
+    if (mode === "add") {
+      if (!addForm.phoneNo || !phoneRegex.test(addForm.phoneNo)) {
+        errors.push("phoneNo");
+        setError(!addForm.phoneNo
+            ? "Phone number is required"
+            : "Invalid phone number. Must start with 09 and be 11 digits."
+        );
+      }
     }
 
     return errors;
   };
 
-  const addEmContact = async (emergency_contact: string) => {
-  for (let count = 1; count <= 5; count++) {
-    const res = await fetch("http://localhost:3000/api/contacts", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        [`emergency_contact_${count}`]: emergency_contact,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      return data;
-    }
-
-    if (count === 5) {
-      throw new Error(data.message || "Failed to add emergency contact");
-    }
-  }
-};
-
-
-  const handleSubmit = async () => {
+  const handleCreate = async () => {
     setError(null);
     setInvalidFields([]);
 
-    const errors = validateForm();
+    const errors = validateForm("create");
     if (errors.length) {
       setInvalidFields(errors);
       return;
     }
-
     setLoading(true);
-
+    const contSlot = await checkContactSlots();
+    if (!contSlot){
+      setLoading(false);
+      return;
+    } ;
     try {
       const { error } = await authClient.signUp.email({
-        name: `${memberForm.firstName} ${memberForm.lastName}`,
-        email: memberForm.email,
-        password: memberForm.password,
-        phone_no: memberForm.phoneNo,
-        role: memberForm.role,
-      });
+        name: `${createForm.firstName} ${createForm.lastName}`,
+        email: createForm.email,
+        password: createForm.password,
+        phone_no: createForm.phoneNo,
+        role: createForm.role,
+      }as any);
 
       if (error) {
         const message = error.message?.toLowerCase() || "";
@@ -128,11 +126,11 @@ export function useAddContact() {
         return;
       }
 
-      if (memberForm.role === "mutual") {
-        addEmContact(memberForm.phoneNo);
+      if (createForm.role === "mutual") {
+        addEmContact(createForm.phoneNo);
       }
       
-      setStep(4);
+      setStep(3);
       await generateQrLink()
 
     } catch (err) {
@@ -151,8 +149,8 @@ export function useAddContact() {
           method: "POST",
           credentials: "include",
           body: JSON.stringify({
-            email: memberForm.email,
-            name: `${memberForm.firstName} ${memberForm.lastName}`,
+            email: createForm.email,
+            name: `${createForm.firstName} ${createForm.lastName}`,
             callbackURL: "http://localhost:5173/dashboard",
             newUserCallbackURL: "",
             errorCallbackURL: "",
@@ -172,17 +170,114 @@ export function useAddContact() {
     }
   }
 
+  const handleAdd = async () => {
+    setLoading(true);
+    addEmContact(addForm.phoneNo);
+    setStep(3);
+  };
+
+  // contact handling
+  const checkContactSlots = async () => {
+    const session = await fetch("/api/auth/get-session", { credentials: "include" });
+    const sessionInfo = await session.json();
+    if (addForm.phoneNo === sessionInfo.user.phone_no) {
+      setError("You cannot add your own number");
+      setInvalidFields(prev => [...prev, "phoneNo"]);
+      return false;
+    }
+
+    const allContacts = await fetch("http://localhost:3000/api/contacts", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    const contacts = await allContacts.json();
+    let slot: string | null = null;
+
+    for (let i = 1; i <= 5; i++) {
+      if (contacts[`emergency_contact_${i}`] === addForm.phoneNo) {
+        setError("Contact already added");
+        setInvalidFields(prev => [...prev, "phoneNo"]);
+        return false;
+      }else if (slot === null && contacts[`emergency_contact_${i}`] === null) {
+        slot = `emergency_contact_${i}`;
+      }
+    }
+    if (!slot){
+      setError("Contacts are full");
+    }
+    console.log(slot);
+    return slot;
+  }
+
+  const addEmContact = async (emergency_contact: string) => {
+    let contact = await checkContactSlots();
+    if (!contact) {
+      setError("Cannot add contact");
+      return;
+    }
+    const contRes = await fetch("http://localhost:3000/api/contacts", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [contact]: emergency_contact }),
+    });
+
+    const data = await contRes.json();
+    return data;
+  };
+  
+  const validateNumber = async () => {
+    setError(null);
+    setInvalidFields([]);
+    const contSlot = await checkContactSlots();
+    if (!contSlot) return;
+    
+    const errors = validateForm("add");
+    if (errors.length) {
+      setInvalidFields(errors);
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:3000/api/contacts/${addForm.phoneNo}`, {method: "GET",credentials: "include",});
+      const data = await res.json();
+
+      if (data.role === "dependent") {
+        setError("Dependent contacts cannot be added");
+        setInvalidFields(["phoneNo"]);
+        return;
+      }
+      
+      setFetchedUser(data);
+      if (!res.ok || data.error) {
+        setInvalidFields(["phoneNo"]);
+        setError("Contact does not exist. Try again");
+        return;
+      }
+      
+      setStep(2); 
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong. Try again");
+    }
+  };
 
   return {
     step,
     setStep,
-    memberForm,
+    createForm,
+    addForm,
+    fetchedUser,
     invalidFields,
     error,
     loading,
     handleChange,
-    handleSubmit,
-
-    qrUrl
+    handleCreate,
+    qrUrl,
+    validateNumber,
+    checkContactSlots,
+    addEmContact,
+    handleAdd
   };
 }
