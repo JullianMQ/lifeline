@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { authClient } from "./auth-client";
+import { API_BASE_URL } from "../config/api";
 
 type createForm = {
   firstName: string;
@@ -144,7 +145,7 @@ export function useAddContact() {
   const generateQrLink = async () => {
     try {
       const res = await fetch(
-        "http://localhost:3000/api/auth/magic-link/qr",
+        `${API_BASE_URL}/api/auth/magic-link/qr`,
         {
           method: "POST",
           credentials: "include",
@@ -186,7 +187,7 @@ export function useAddContact() {
       return false;
     }
 
-    const allContacts = await fetch("http://localhost:3000/api/contacts", {
+    const allContacts = await fetch(`${API_BASE_URL}/api/contacts`, {
       method: "GET",
       credentials: "include",
     });
@@ -216,7 +217,7 @@ export function useAddContact() {
       setError("Cannot add contact");
       return;
     }
-    const contRes = await fetch("http://localhost:3000/api/contacts", {
+    const contRes = await fetch(`${API_BASE_URL}/api/contacts`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -240,7 +241,7 @@ export function useAddContact() {
     }
 
     try {
-      const res = await fetch(`http://localhost:3000/api/contacts/${addForm.phoneNo}`, {method: "GET",credentials: "include",});
+      const res = await fetch(`${API_BASE_URL}/api/contacts/${addForm.phoneNo}`, {method: "GET",credentials: "include",});
       const data = await res.json();
 
       if (data.role === "dependent") {

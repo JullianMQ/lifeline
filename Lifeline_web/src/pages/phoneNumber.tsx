@@ -1,7 +1,7 @@
 // CompletePhone.tsx
 import { useState } from "react";
-import "../styles/phoneNumber.css";
-import "../styles/signup.css";
+import "./../styles/PhoneNumber.css";
+import "./../styles/signup.css";
 
 function phoneNumber() {
   const [phoneNo, setPhoneNo] = useState("");
