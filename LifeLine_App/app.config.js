@@ -17,7 +17,12 @@ export default {
     },
     android: {
       permissions: [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "android.permission.WAKE_LOCK",
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION",
@@ -60,6 +65,7 @@ export default {
       "expo-secure-store",
       "expo-build-properties",
       "expo-web-browser",
+      "expo-av"
     ],
     experiments: {
       typedRoutes: true,

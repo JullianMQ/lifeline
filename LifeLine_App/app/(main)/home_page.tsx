@@ -91,7 +91,6 @@ const HomePage = () => {
         };
     }, []);
 
-
     // SOS button
     const handleSOS = () => {
         const messageParts = [];
