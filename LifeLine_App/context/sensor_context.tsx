@@ -1,6 +1,7 @@
 import React, { createContext, useState } from 'react';
-import { Accelerometer } from 'expo-sensors';
+import { Accelerometer, Gyroscope } from 'expo-sensors';
 import * as Location from 'expo-location';
+import { Audio } from 'expo-av';
 
 export const SensorContext = createContext({
     isMonitoring: false,
@@ -10,34 +11,28 @@ export const SensorContext = createContext({
 
 export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
     const [isMonitoring, setIsMonitoring] = useState(false);
-    const [subscription, setSubscription] = useState<any>(null);
+    const [subscriptions, setSubscriptions] = useState<any[]>([]);
+    const [recording, setRecording] = useState<Audio.Recording | null>(null);
 
     const startMonitoring = async () => {
         if (isMonitoring) return;
 
         console.log("Starting Foreground Monitoring...");
 
-        // 1. Only request Foreground permissions for now
-        const { status: sensorStatus } = await Accelerometer.requestPermissionsAsync();
+        const { status: accStatus } = await Accelerometer.requestPermissionsAsync();
+        const { status: gyroStatus } = await Gyroscope.requestPermissionsAsync();
         const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+        const { status: micStatus } = await Audio.requestPermissionsAsync();
 
-        if (sensorStatus !== 'granted') {
-            alert("Accelerometer permissions are required.");
+        if (accStatus !== 'granted' || gyroStatus !== 'granted' || micStatus !== 'granted') {
+            alert("Accelerometer, Gyroscope and Microphone permissions are required.");
             return;
         }
 
-        // 2. We SKIP background location updates for this test
-        // This avoids the 'ACCESS_BACKGROUND_LOCATION' error
-
-        // 3. Start the Accelerometer listener
+        // ACCELEROMETER SETUP 
         Accelerometer.setUpdateInterval(300);
-        const sub = Accelerometer.addListener(accelerometerData => {
-            const { x, y, z } = accelerometerData;
-
-            // Calculate Magnitude (G-force)
-            const magnitude = Math.sqrt(x ** 2 + y ** 2 + z ** 2);
-
-            // Log every 1 second (approx) or on movement
+        const accSub = Accelerometer.addListener(data => {
+            const magnitude = Math.sqrt(data.x ** 2 + data.y ** 2 + data.z ** 2);
             if (magnitude > 1.5) {
                 console.log(`Movement: ${magnitude.toFixed(2)}g`);
             } else if (Math.random() > 0.90) {
@@ -49,21 +44,55 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
             }
         });
 
-        setSubscription(sub);
+        // GYROSCOPE SETUP 
+        Gyroscope.setUpdateInterval(300);
+        const gyroSub = Gyroscope.addListener(gyroData => {
+            const { x, y, z } = gyroData;
+            const rotationSpeed = Math.abs(x) + Math.abs(y) + Math.abs(z);
+            if (rotationSpeed > 2.0) {
+                console.log(`Rotation detected: ${rotationSpeed.toFixed(2)} rad/s`);
+            }
+        });
+
+        // MICROPHONE SETUP
+        await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+        });
+
+
+        const { recording: newRecording } = await Audio.Recording.createAsync(
+            Audio.RecordingOptionsPresets.LOW_QUALITY,
+            (status: Audio.RecordingStatus) => {
+                if (status.metering !== undefined) {
+                    const volume = status.metering;
+                    if (volume > -10) {
+                        console.log("LOUD NOISE DETECTED!", volume.toFixed(2), "dB");
+                    }
+                }
+            },
+            300
+        );
+
+        setRecording(newRecording);
+        setSubscriptions([accSub, gyroSub]);
         setIsMonitoring(true);
     };
 
     const stopMonitoring = async () => {
         console.log("Stopping monitoring...");
 
-        if (subscription) {
-            subscription.remove();
-            setSubscription(null);
+        subscriptions.forEach(sub => sub && sub.remove());
+
+        if (recording) {
+            await recording.stopAndUnloadAsync();
+            setRecording(null);
         }
 
-        // Force cleanup of any active listeners
         Accelerometer.removeAllListeners();
+        Gyroscope.removeAllListeners();
 
+        setSubscriptions([]);
         setIsMonitoring(false);
         console.log("Monitoring stopped.");
     };
