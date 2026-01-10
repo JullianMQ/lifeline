@@ -4,16 +4,19 @@ import ScreenWrapper from "../../components/screen_wrapper";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
+import reverseGeocodeWithGoogle from "@/lib/geocode";
 import { SensorContext } from "@/context/sensor_context";
 import {
-    connectTimeSocket,
-    connectMessageSocket,
-    disconnectTimeSocket,
+    connectRoomSocket,
+    disconnectRoomSocket,
+    sendChatMessage,
+    WSMessage,
 } from "@/lib/websocket";
+
 
 const HomePage = () => {
     const { isMonitoring, stopMonitoring } = useContext(SensorContext);
-    const [time, setTime] = useState("");
+    const [serverTime, setServerTime] = useState("");
     const [messageReply, setMessageReply] = useState("");
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
@@ -39,25 +42,14 @@ const HomePage = () => {
                 });
 
                 // Reverse geocode location
-                const geocode = await Location.reverseGeocodeAsync({
-                    latitude: loc.coords.latitude,
-                    longitude: loc.coords.longitude,
-                });
+                const googleAddress = await reverseGeocodeWithGoogle(
+                    loc.coords.latitude,
+                    loc.coords.longitude
+                );
 
-                if (geocode.length > 0) {
-                    const place = geocode[0];
-                    const readable = [
-                        // place.name,     
-                        place.street,
-                        place.city,
-                        place.subregion,
-                        // place.region,    
-                        place.country,
-                    ].filter(Boolean).join(", ");
-
-                    setAddress(readable);
-                }
-
+                setAddress(
+                    googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`
+                );
             } catch (err) {
                 console.log("Error fetching location:", err);
             } finally {
@@ -68,14 +60,40 @@ const HomePage = () => {
 
     // Time socket
     useEffect(() => {
-        const wsTime = connectTimeSocket(setTime);
-        return () => disconnectTimeSocket();
+        const roomId = "emergency-room";
+
+        connectRoomSocket(roomId, (msg: WSMessage) => {
+
+            if ("timestamp" in msg) {
+                setServerTime(msg.timestamp);
+            }
+            switch (msg.type) {
+                case "connected":
+                    console.log("Connected to room", msg.roomId);
+                    break;
+
+                case "chat":
+                    setMessageReply(`${msg.user.name}: ${msg.message}`);
+                    break;
+
+                case "direct_message":
+                    setMessageReply(`Private: ${msg.message}`);
+                    break;
+
+                case "error":
+                    console.warn(msg.message);
+                    break;
+            }
+        });
+
+        return () => {
+            disconnectRoomSocket();
+        };
     }, []);
+
 
     // SOS button
     const handleSOS = () => {
-        const wsMsg = connectMessageSocket(setMessageReply);
-
         const messageParts = [];
 
         if (address) {
@@ -83,23 +101,19 @@ const HomePage = () => {
         }
 
         if (location) {
-            messageParts.push(`(${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`);
+            messageParts.push(
+                `(${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`
+            );
         }
 
-        const message = messageParts.length > 0
-            ? `SOS! Current location: ${messageParts.join(" ")}`
-            : "SOS pressed! Help needed.";
+        const message =
+            messageParts.length > 0
+                ? `SOS! Current location: ${messageParts.join(" ")}`
+                : "SOS pressed! Help needed.";
 
-        if (wsMsg.readyState === WebSocket.OPEN) {
-            wsMsg.send(message);
-        } else {
-            wsMsg.onopen = () => wsMsg.send(message);
-        }
-
-        wsMsg.onmessage = (event) => {
-            setMessageReply(event.data);
-        };
+        sendChatMessage(message);
     };
+
 
 
     return (
@@ -121,7 +135,7 @@ const HomePage = () => {
                             longitudeDelta: 0.01,
                         }}
                         showsUserLocation
-                        provider="google" // Use Google Maps provider
+                        provider="google"
                     >
                         <Marker coordinate={location} title="You are here" />
                     </MapView>
@@ -149,7 +163,12 @@ const HomePage = () => {
             {/* LIVE TIME DISPLAY */}
             <View className="mx-4 mt-4">
                 <Text className="text-gray-600">Server Time:</Text>
-                <Text className="text-lg font-semibold">{time || "Connecting..."}</Text>
+                <Text className="text-lg font-semibold">
+                    {serverTime
+                        ? new Date(serverTime).toLocaleTimeString()
+                        : "Connecting..."}
+                </Text>
+
             </View>
 
             <View style={{ flex: 1 }} />
