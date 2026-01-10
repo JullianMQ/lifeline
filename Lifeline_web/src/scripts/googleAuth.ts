@@ -14,8 +14,8 @@ export function googleAuth() {
         try {
             const data = await authClient.signIn.social({
                 provider: "google",
-                callbackURL: "http://localhost:5173/dashboard",
-                newUserCallbackURL: "http://localhost:5173/addContact",
+                callbackURL: `${window.location.origin}/dashboard`,
+                newUserCallbackURL: `${window.location.origin}/addContact`,
                 disableRedirect: false, 
             });
             console.log("Data:", data)

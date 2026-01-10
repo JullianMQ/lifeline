@@ -152,7 +152,7 @@ export function useAddContact() {
           body: JSON.stringify({
             email: createForm.email,
             name: `${createForm.firstName} ${createForm.lastName}`,
-            callbackURL: "http://localhost:5173/dashboard",
+            callbackURL: `${window.location.origin}/dashboard`,
             newUserCallbackURL: "",
             errorCallbackURL: "",
           }),
