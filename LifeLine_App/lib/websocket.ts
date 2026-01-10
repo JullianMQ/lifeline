@@ -1,51 +1,72 @@
-let timeSocket: WebSocket | null = null;
-let messageSocket: WebSocket | null = null;
+let socket: WebSocket | null = null;
 
-const WS_BASE_URL = "ws://192.168.100.185:3000";
+const WS_BASE_URL = "ws://192.168.100.185:3000/api/ws";
 
-export function connectTimeSocket(onTime: (time: string) => void) {
-    if (timeSocket) return timeSocket;
+export type WSMessage =
+    | { type: "connected"; roomId: string; user: any }
+    | { type: "user_joined"; user: any }
+    | { type: "user_left"; clientId: string }
+    | { type: "chat"; message: string; user: any; timestamp: string }
+    | { type: "direct_message"; message: string; fromUser: any }
+    | { type: "room_users"; users: any[] }
+    | { type: "pong" }
+    | { type: "error"; message: string };
 
-    timeSocket = new WebSocket(`${WS_BASE_URL}/api/ws/time`);
+export function connectRoomSocket(
+    roomId: string,
+    onMessage: (data: WSMessage) => void
+) {
+    if (socket) return socket;
 
-    timeSocket.onopen = () => console.log("Time WS connected");
-    timeSocket.onmessage = (e) => onTime(e.data);
-    timeSocket.onerror = (e) => console.log("Time WS error", e);
-    timeSocket.onclose = () => {
-        console.log("Time WS closed");
-        timeSocket = null;
+    socket = new WebSocket(`${WS_BASE_URL}/${roomId}`);
+
+    socket.onopen = () => {
+        console.log("WS connected to room:", roomId);
     };
 
-    return timeSocket;
-};
-
-export function disconnectTimeSocket() {
-    timeSocket?.close();
-    timeSocket = null;
-}
-
-export function connectMessageSocket(onMessage: (data: string) => void) {
-    if (messageSocket) return messageSocket;
-
-    messageSocket = new WebSocket(`${WS_BASE_URL}/api/ws/message`);
-
-    messageSocket.onopen = () => console.log("Message WS connected");
-    messageSocket.onmessage = (e) => onMessage(e.data);
-    messageSocket.onerror = (e) => console.log("Message WS error", e);
-    messageSocket.onclose = () => {
-        console.log("Message WS closed");
-        messageSocket = null;
+    socket.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            onMessage(data);
+        } catch (err) {
+            console.warn("Non-JSON WS message:", e.data);
+        }
     };
 
-    return messageSocket;
-};
+    socket.onerror = (e) => {
+        console.log("WS error", e);
+    };
 
-export function disconnectMessageSocket() {
-    messageSocket?.close();
-    messageSocket = null;
+    socket.onclose = () => {
+        console.log("WS closed");
+        socket = null;
+    };
+
+    return socket;
 }
 
-export function disconnectAllSockets() {
-    disconnectTimeSocket();
-    disconnectMessageSocket();
+export function disconnectRoomSocket() {
+    socket?.close();
+    socket = null;
+}
+
+export function sendChatMessage(message: string) {
+    if (!socket) return;
+
+    socket.send(
+        JSON.stringify({
+            type: "chat",
+            message,
+        })
+    );
+}
+
+export function sendPing() {
+    if (!socket) return;
+
+    socket.send(
+        JSON.stringify({
+            type: "ping",
+        })
+    );
 }
