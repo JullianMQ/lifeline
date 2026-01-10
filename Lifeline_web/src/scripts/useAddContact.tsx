@@ -179,7 +179,7 @@ export function useAddContact() {
 
   // contact handling
   const checkContactSlots = async () => {
-    const session = await fetch("/api/auth/get-session", { credentials: "include" });
+    const session = await fetch(`${API_BASE_URL}/api/auth/get-session`, { credentials: "include" });
     const sessionInfo = await session.json();
     if (addForm.phoneNo === sessionInfo.user.phone_no) {
       setError("You cannot add your own number");

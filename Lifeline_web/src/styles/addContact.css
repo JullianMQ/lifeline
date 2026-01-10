@@ -26,4 +26,17 @@
     gap: var(--space-sm);
 }
 
+.backHeader {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
 
+.backButton {
+    all: unset;
+}
+
+.backButton:focus {
+    outline: 2px solid red;
+    outline-offset: 2px;
+}

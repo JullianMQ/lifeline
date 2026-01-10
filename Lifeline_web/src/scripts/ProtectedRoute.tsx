@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
+import { API_BASE_URL } from "../config/api";
 
 type ProtectedRouteProps = {
   children: ReactNode;
@@ -15,7 +16,7 @@ export function ProtectedRoutes({ children, mode = "protected" }: ProtectedRoute
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const res = await fetch("/api/auth/get-session", { credentials: "include" });
+        const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, { credentials: "include" });
         const data = await res.json();
         setSession(data.user || null);
       } catch {
