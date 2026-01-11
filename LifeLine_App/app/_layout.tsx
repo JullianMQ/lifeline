@@ -1,11 +1,11 @@
 import { Stack } from "expo-router";
 import "./globals.css";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import "../tasks/backgroud_sensors";
-import { SensorProvider } from "@/context/sensor_context";
+import "../lib/tasks/background_sensors";
+import { SensorProvider } from "@/lib/context/sensor_context";
 
 GoogleSignin.configure({
-  webClientId: "648793210978-a1a9sonc1v4i4n2qi4sbt6pe8cr4bisg.apps.googleusercontent.com",
+  webClientId: process.env.EXPO_PUBLIC_WEB_CLIENT_ID,
   offlineAccess: true,
 });
 

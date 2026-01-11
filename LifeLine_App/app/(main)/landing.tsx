@@ -1,7 +1,7 @@
 import React, { useContext } from "react"; // 1. Import useContext
 import { useRouter } from "expo-router";
 import { Image, View, TouchableOpacity, Text } from "react-native";
-import { SensorContext } from "@/context/sensor_context";
+import { SensorContext } from "@/lib/context/sensor_context";
 
 const Landing = () => {
   const router = useRouter();

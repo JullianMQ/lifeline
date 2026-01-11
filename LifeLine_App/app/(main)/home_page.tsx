@@ -5,7 +5,7 @@ import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import reverseGeocodeWithGoogle from "@/lib/geocode";
-import { SensorContext } from "@/context/sensor_context";
+import { SensorContext } from "@/lib/context/sensor_context";
 import {
     connectRoomSocket,
     disconnectRoomSocket,
