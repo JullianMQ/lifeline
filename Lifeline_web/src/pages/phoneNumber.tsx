@@ -2,6 +2,7 @@
 import { useState } from "react";
 import "./../styles/PhoneNumber.css";
 import "./../styles/signup.css";
+import { API_BASE_URL } from "../config/api";
 
 function phoneNumber() {
   const [phoneNo, setPhoneNo] = useState("");
@@ -25,7 +26,7 @@ function phoneNumber() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/update-user", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/update-user`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
