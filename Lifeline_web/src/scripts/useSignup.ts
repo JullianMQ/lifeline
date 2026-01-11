@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
+import { API_BASE_URL } from "../config/api";
 
 type FormData = {
   firstName: string;
@@ -73,7 +74,7 @@ export function useSignup() {
     if (!formData.email) return;
 
     try {
-      const res = await fetch("/api/check/email", {
+      const res = await fetch(`${API_BASE_URL}/api/check/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
