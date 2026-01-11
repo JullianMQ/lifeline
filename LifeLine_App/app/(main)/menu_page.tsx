@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Image, Text, TouchableOpacity, View, Switch, Alert } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
-import { SensorContext } from "@/context/sensor_context";
+import { SensorContext } from "@/lib/context/sensor_context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { logout } from "../../lib/api/auth";

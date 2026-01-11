@@ -79,3 +79,10 @@
 - Integrated map view in Home screen
 - Displayed user location
 - Updated SOS button to send current address (location) when pressed
+
+### 2026-01-09
+- Accelerometer Test Implementation: Integrated expo-sensors to monitor real-time G-force.
+- Global Sensor Context: Created a SensorContext to manage monitoring state across the entire app.
+
+### 2026-01-10
+- Fixed reverse geocoding in Home screen: now displays full readable address instead of just coordinates.
