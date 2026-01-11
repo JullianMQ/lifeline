@@ -86,3 +86,5 @@
 
 ### 2026-01-10
 - Fixed reverse geocoding in Home screen: now displays full readable address instead of just coordinates.
+- Gyroscope Test Implementation
+- Microphone Test Implementation
