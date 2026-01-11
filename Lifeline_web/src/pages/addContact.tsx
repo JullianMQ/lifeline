@@ -13,13 +13,12 @@ function AddContact() {
                 <section className="login-card">
                     <div className="card">
                         <div className="backHeader">
-                            <h3 onClick={() => navigate(-1)} onKeyDown={(e) => e.key === 'Enter' && navigate(-1)}>
-                                <button type="button" className="backButton" aria-label="Go back">
+                            <h3>
+                                <button type="button" className="backButton" aria-label="Go back" onClick={() => navigate(-1)} onKeyDown={(e) => e.key === 'Enter' && navigate(-1)}>
                                     &larr;
                                 </button>
                             </h3>
                             <h3 aria-label="Add a family member">Add a family member</h3>
-                            <h3></h3>
                         </div>
                         <img src="/images/connect.svg" alt="Connect" className="connect" />
                         <h3 aria-label="Connect with your emergency contacts now">Connect with your emergency contacts now</h3>
