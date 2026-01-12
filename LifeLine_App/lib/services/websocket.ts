@@ -1,6 +1,6 @@
 let socket: WebSocket | null = null;
 
-const WS_BASE_URL = "https://api.lifeline-help.me/api/ws"
+const WS_BASE_URL = "wss://api.lifeline-help.me/api/ws"
 // const WS_BASE_URL = "ws://192.168.100.185:3000/api/ws";
 
 export type WSMessage =
@@ -18,9 +18,7 @@ export function connectRoomSocket(
     onMessage: (data: WSMessage) => void
 ) {
     if (socket) return socket;
-
     socket = new WebSocket(`${WS_BASE_URL}/${roomId}`);
-
     socket.onopen = () => {
         console.log("WS connected to room:", roomId);
     };
