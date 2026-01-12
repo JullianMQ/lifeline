@@ -87,7 +87,7 @@ npm install
 
 ### 2026-01-09
 
-- implemented google maps on dashboard
+- implemented google maps api on dashboard
 - added marker for dashboard maps(user and contacts)
 - added geocoder for maps
 - added geolocation with time stamp history{under maintenance}
