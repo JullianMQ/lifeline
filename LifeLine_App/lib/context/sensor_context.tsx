@@ -47,7 +47,7 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
 
     const startMonitoring = async () => {
         if (isMonitoring) return;
-        await initCsv();
+        await initCsv(true);
 
         const { status: accStatus } = await Accelerometer.requestPermissionsAsync();
         const { status: gyroStatus } = await Gyroscope.requestPermissionsAsync();

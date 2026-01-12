@@ -6,23 +6,28 @@ export const FILE = DIR + 'session.csv';
 
 let initialized = false;
 
-const CSV_HEADER = 'sensor,x,y,z,magnitude,rotationSpeed,metering\n';
+const CSV_HEADER = 'sensor,Accelerometer,Gyroscope,Microphone\n';
 
-export async function initCsv() {
-    if (initialized) return;
+export async function initCsv(reset = false) {
+    if (initialized && !reset) return;
 
     const dirInfo = await FileSystem.getInfoAsync(DIR);
     if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(DIR, { intermediates: true });
     }
 
-    const fileInfo = await FileSystem.getInfoAsync(FILE);
-    if (!fileInfo.exists) {
+    if (reset) {
         await FileSystem.writeAsStringAsync(FILE, CSV_HEADER);
+    } else {
+        const fileInfo = await FileSystem.getInfoAsync(FILE);
+        if (!fileInfo.exists) {
+            await FileSystem.writeAsStringAsync(FILE, CSV_HEADER);
+        }
     }
 
     initialized = true;
 }
+
 
 export async function appendSummaryRow() {
     if (!initialized) return;
@@ -34,14 +39,14 @@ export async function appendSummaryRow() {
     const formatMic = (v: number | null | undefined) => (v != null ? v.toFixed(2) + ' dBFS' : '');
 
     const summaryRow = [
-        'MAX', '', '', '',
+        'HIGHEST',
         formatAccel(stats.maxAccel),
         formatGyro(stats.maxGyro),
         formatMic(stats.maxMic),
     ].join(',') + '\n';
 
     const minRow = [
-        'MIN', '', '', '',
+        'LOWEST',
         formatAccel(stats.minAccel),
         formatGyro(stats.minGyro),
         formatMic(stats.minMic),
