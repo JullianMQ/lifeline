@@ -96,12 +96,37 @@ ws.use("*", async (c, next) => {
 });
 
 // TODO: Add room access control for security
-// FUTURE: Implement validateRoomAccess() function to check:
-// - Family relationships for family-{familyId} rooms
-// - Organization membership for org-{orgId} rooms  
-// - Emergency contact relationships for emergency-{userId} rooms
-// This will ensure users can only join authorized rooms
-
+// - The implementation of the room access control is to use a middleware that checks the current user's session to check if they are valid to access the room.
+// If user1 is a mutual contact of user2, and they connect to a room like room1, and they are the first client.
+// user2 is able to go inside of that room as long as that user is given permission by the first user (in this case it's user1) in that room.
+// The current implementation of the websocket will change to become -> If a user connects to an endpoint ws/ then they are searching for a room to connect to.
+// The server will then create a room code (implementation or algorithm to use still unknown) and add that user to that room. Let's say that room code is room1. They will be the "first" user in that room.
+// If user2 is a valid emergency or dependent contact of user1 and they are trying to connect to room1 then they have a "chance" to enter the same room as user1. They can successfully enter room1 once user1 has accepted their "request" to join.
+/*
+{
+  "rooms": [
+    {
+      "id": "1",
+      "clientCount": 3,
+      "clients": [
+        {
+          "id": "user_1_id",
+          "name": "John Doe",
+          "user": {
+            "id": "user_1_id",
+            "name": "John Doe",
+            "email": "john@example.com",
+            "role": "mutual",
+            "phone_no": "09123456789"
+          }
+        }
+      ]
+    }
+  ],
+  "totalRooms": 1,
+  "totalClients": 3
+}
+ * */
 ws.get('/ws/:roomId', upgradeWebSocket((c) => {
     const roomId = c.req.param('roomId');
     const user = c.get("user");

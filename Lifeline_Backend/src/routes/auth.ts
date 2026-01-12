@@ -48,7 +48,6 @@ router.post("/check/phone", async (c) => {
     }
 });
 
-// TODO: Change hardcoded url to env variable
 router.post("/auth/magic-link/qr", async (c) => {
     const reqBody = await c.req.json();
     await fetch(`${process.env.NODE_ENV === 'production' ? process.env.HOSTED_BETTER_AUTH_URL : process.env.LOCAL_BETTER_AUTH_URL}/api/auth/sign-in/magic-link`, {

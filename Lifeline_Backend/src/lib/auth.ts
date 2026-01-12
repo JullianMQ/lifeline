@@ -88,10 +88,11 @@ export const auth = betterAuth({
             ipAddressHeaders: ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"],
             disableIpTracking: false
         },
+        // COMMENTED OUT, DOES MORE WRONG THAN GOOD
         // defaultCookieAttributes: {
         //     httpOnly: false,
         //     secure: process.env.NODE_ENV === "production",
-        //     sameSite: "none", // TODO: Turned into none for use in different domains but only on trusted origins
+        //     sameSite: "none", // Turned into none for use in different domains but only on trusted origins
         //     partitioned: true
         // }
     },
