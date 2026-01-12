@@ -4,14 +4,14 @@ import ScreenWrapper from "../../components/screen_wrapper";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
-import reverseGeocodeWithGoogle from "@/lib/geocode";
+import reverseGeocodeWithGoogle from "@/lib/services/geocode";
 import { SensorContext } from "@/lib/context/sensor_context";
 import {
     connectRoomSocket,
     disconnectRoomSocket,
     sendChatMessage,
     WSMessage,
-} from "@/lib/websocket";
+} from "@/lib/services/websocket";
 
 
 const HomePage = () => {
