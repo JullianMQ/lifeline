@@ -1,5 +1,6 @@
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
-import '../styles/dashboard.css'
+import "../styles/dashboard.css";
+import type { LatLng } from "../types";
 
 const containerStyle = {
   border: "2px solid var(--text-black)",
@@ -8,18 +9,18 @@ const containerStyle = {
   height: "100%",
 };
 
-const center = {
-  lat: 15.133367975125921, 
-  lng: 120.59005391186881,
+type Props = {
+  markers: LatLng[];
+  loading: boolean;
+  center?: LatLng;
 };
 
-function DashboardMap() {
+function DashboardMap({ markers, center }: Props) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
   });
 
-  if (!isLoaded) return <p>Loading map...</p>;
-
+  if (!isLoaded) return <div className="map"> Loading...</div>; 
   return (
     <GoogleMap
       mapContainerStyle={containerStyle}
@@ -30,7 +31,9 @@ function DashboardMap() {
         zoomControl: true,
       }}
     >
-      <Marker position={center} />
+      {markers.map((position, index) => (
+        <Marker key={index} position={position} />
+      ))}
     </GoogleMap>
   );
 }

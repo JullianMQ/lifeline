@@ -84,3 +84,11 @@ npm install
 - Implemented protected and public routes
 - Added phone number validation for social login
 - Adding contacts now has create new and add existing options
+
+### 2026-01-09
+
+- implemented google maps on dashboard
+- added marker for dashboard maps(user and contacts)
+- added geocoder for maps
+- added geolocation with time stamp history{under maintenance}
+- added buttons for sensors
