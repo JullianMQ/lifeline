@@ -24,9 +24,6 @@ export async function initCsv() {
     initialized = true;
 }
 
-/**
- * Call this at the end of monitoring to write only MAX/MIN summary
- */
 export async function appendSummaryRow() {
     if (!initialized) return;
 
@@ -51,8 +48,17 @@ export async function appendSummaryRow() {
     ].join(',') + '\n';
 
     try {
-        await FileSystem.writeAsStringAsync(FILE, summaryRow + minRow, { append: true } as any);
+        let existing = '';
+        const fileInfo = await FileSystem.getInfoAsync(FILE);
+        if (fileInfo.exists) {
+            existing = await FileSystem.readAsStringAsync(FILE);
+        }
+
+        const newContent = existing + summaryRow + minRow;
+        await FileSystem.writeAsStringAsync(FILE, newContent);
+
     } catch (err) {
         console.error('Failed to write summary row', err);
     }
 }
+
