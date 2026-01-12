@@ -50,7 +50,10 @@ export function disconnectRoomSocket() {
 }
 
 export function sendChatMessage(message: string) {
-    if (!socket) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        console.warn("Cannot send message: socket not ready");
+        return;
+    }
 
     socket.send(
         JSON.stringify({
@@ -61,8 +64,10 @@ export function sendChatMessage(message: string) {
 }
 
 export function sendPing() {
-    if (!socket) return;
-
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        console.warn("Cannot send ping: socket not ready");
+        return;
+    }
     socket.send(
         JSON.stringify({
             type: "ping",
