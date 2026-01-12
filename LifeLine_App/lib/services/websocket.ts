@@ -1,7 +1,5 @@
+import { WS_BASE_URL } from "../api/config";
 let socket: WebSocket | null = null;
-
-const WS_BASE_URL = "wss://api.lifeline-help.me/api/ws"
-// const WS_BASE_URL = "ws://192.168.100.185:3000/api/ws";
 
 export type WSMessage =
     | { type: "connected"; roomId: string; user: any }
