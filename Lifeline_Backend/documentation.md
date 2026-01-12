@@ -34,18 +34,20 @@ This is the backend for the Lifeline application, built with Bun, Hono, Better A
 
 ### Contacts
 
-- `GET /api/contacts` - Get user's emergency contacts
-- `POST /api/contacts` - Update emergency contacts (partial)
-- `PUT /api/contacts` - Update emergency contacts (full)
-- `DELETE /api/contacts` - Clear all emergency contacts
-- `DELETE /api/contacts/:id` - Clear specific emergency contact (1-5)
+- `GET /api/contacts` - Get user's contacts (raw phone numbers)
+- `GET /api/contacts/users` - Get user's contacts with user details (name, email, phone)
+- `GET /api/contacts/:phone` - Get user details by phone number
+- `POST /api/contacts` - Update contacts (partial update)
+- `PUT /api/contacts` - Update contacts (full update)
+- `DELETE /api/contacts` - Clear all contacts
+- `DELETE /api/contacts/:type/:index` - Remove contact by type and index (emergency/0, dependent/1)
 
 ## Features
 
 - Email/password authentication with Better Auth
 - Google OAuth integration
 - User roles: "mutual" or "dependent"
-- Emergency contacts management (up to 5 per user)
+- Emergency and dependent contacts management (unlimited per user, stored in arrays)
 - Phone number validation for Philippine formats
 - Automatic contacts creation on user signup
 
@@ -69,3 +71,6 @@ This is the backend for the Lifeline application, built with Bun, Hono, Better A
 - Added Google OAuth integration with social providers
 - Fixed various TypeScript and database issues
 - Completed full authentication and contacts management system
+- Migrated contacts table from hardcoded columns to array-based structure
+- Added support for both emergency and dependent contacts with unlimited entries
+- Updated all API endpoints to handle array-based contact storage
