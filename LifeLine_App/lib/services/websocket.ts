@@ -1,4 +1,8 @@
 import { WS_BASE_URL } from "../api/config";
+
+if (!WS_BASE_URL) {
+    console.error("No WS_BASE_URL");
+};
 let socket: WebSocket | null = null;
 
 export type WSMessage =
