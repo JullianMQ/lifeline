@@ -7,7 +7,7 @@ type AddressComponent = {
 const reverseGeocodeWithGoogle = async (lat: number, lng: number) => {
     try {
         const res = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.EXPO_PUBLIC_GEOCODING_API_KEY}`
         );
 
         const data: any = await res.json();
