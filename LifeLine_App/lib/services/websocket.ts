@@ -4,6 +4,7 @@ if (!WS_BASE_URL) {
     console.error("No WS_BASE_URL");
 };
 let socket: WebSocket | null = null;
+let currentRoom: string | null = null;
 
 export type WSMessage =
     | { type: "connected"; roomId: string; user: any }
@@ -19,8 +20,16 @@ export function connectRoomSocket(
     roomId: string,
     onMessage: (data: WSMessage) => void
 ) {
+    // if socket is already connected to a different room, disconnect
+    if (socket && currentRoom !== roomId) {
+        disconnectRoomSocket();
+    }
+
+
     if (socket) return socket;
+
     socket = new WebSocket(`${WS_BASE_URL}/${roomId}`);
+    currentRoom = roomId;
     socket.onopen = () => {
         console.log("WS connected to room:", roomId);
     };
@@ -41,6 +50,7 @@ export function connectRoomSocket(
     socket.onclose = () => {
         console.log("WS closed");
         socket = null;
+        currentRoom = null;
     };
 
     return socket;
@@ -49,6 +59,7 @@ export function connectRoomSocket(
 export function disconnectRoomSocket() {
     socket?.close();
     socket = null;
+    currentRoom = null;
 }
 
 export function sendChatMessage(message: string) {
