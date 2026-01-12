@@ -1,24 +1,28 @@
 import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
-import { connectMessage, disconnectTWS } from "./useWebSocket";
+import { connectMessage } from "./useWebSocket";
 import { useState, useEffect } from 'react'
 import { API_BASE_URL } from "../config/api";
-
 import type { User, Contact } from "../types";
+
+//hard coded for testing
+const contloc = { //contacts
+  contact2_location: { lat: 15.135924992274758, lng: 120.58057235415056},
+  contact3_location: { lat: 15.134754688327266, lng: 120.59033559494401},
+};
+const userloc = { //user
+  lat: 15.12080856539815,
+  lng: 120.60186959586032,
+};
 
 export function useDashboard() {
     const navigate = useNavigate();
 
-    const [message, setMessage] = useState("")
     const [user, setUser] = useState<User | null>(null);
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-
-        return () => disconnectTWS();
-    }, []);
+    const [message, setMessage] = useState("")
 
     const getUserInfo = async () => {
         try {
@@ -37,6 +41,7 @@ export function useDashboard() {
             setUser({
                 ...data.user,
                 name: firstName,
+                location: userloc,
             });
         } catch (err) {
             console.error("Failed to get user info:", err);
@@ -88,9 +93,10 @@ export function useDashboard() {
                 const name = data[`contact${i}_name`];
                 const email = data[`contact${i}_email`];
                 const phone = data[`contact${i}_phone`];
-
+                const location = (contloc as any)[`contact${i}_location`];
+                // const image = data[`contact${i}_phone`];
                 if (name && phone) {
-                    formatted.push({ name, email, phone });
+                    formatted.push({ name, email, phone, location });
                 }
             }
 
@@ -112,10 +118,10 @@ export function useDashboard() {
         handleLogout,
         handleSOS,
         message,
-
         contacts,
         loading,
         error,
         displayContact,
+        history
     };
 }

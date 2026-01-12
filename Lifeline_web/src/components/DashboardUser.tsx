@@ -13,6 +13,7 @@ export default function DashboardUser({
   onSelectContact,
   onAddContact,
 }: Props) {
+
   return (
     <>
       <div className="dashboard-user">
@@ -28,13 +29,13 @@ export default function DashboardUser({
           {contacts.map((contact, index) => (
             <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
               <img src={contact.image || "/images/user-example.svg"} alt="Contact"/>
-              <h3>{contact.name}</h3>
+              <h3>{contact.name.split(" ")[0]}</h3>
             </li>
           ))}
 
           <li className="dashboard-card" onClick={onAddContact}>
             <img src="/images/add.svg" alt="Add contact" />
-            <h3>Add Contact</h3>
+            <h3>Add</h3>
           </li>
         </ul>
       </div>
