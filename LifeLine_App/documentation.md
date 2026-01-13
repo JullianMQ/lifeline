@@ -88,3 +88,12 @@
 - Fixed reverse geocoding in Home screen: now displays full readable address instead of just coordinates.
 - Gyroscope Test Implementation
 - Microphone Test Implementation
+
+### 2026-01-12
+- Added CSV logging for sensor monitoring: appended MAX and MIN values with units (g, rad/s, dBFS) at the end of each session
+- Refactored API_BASE_URL to use environment variable with safe localhost fallback
+- Fixed sendPing WebSocket function to check socket.readyState before sending, matching sendChatMessage pattern
+
+### 2026-01-13
+- Sensor CSV Fix: Corrected MAX/MIN summary rows to align values under Accelerometer, Gyroscope, and Microphone columns
+- WebSocket Fix: Allowed switching rooms by tracking currentRoom to prevent blocking new room connections
