@@ -78,8 +78,6 @@ router.put("/update-user", async (c) => {
 
         const { name, phone_no, role } = await c.req.json();
         const currentUser = session.user;
-        console.log('Current user role:', currentUser.role);
-        console.log('Requested role change to:', role);
         const updateData: any = {};
 
         // Update name if provided
@@ -139,23 +137,19 @@ router.put("/update-user", async (c) => {
                 body: updateData
             });
 
-            // If phone number was changed, update contacts where this user is an emergency contact
+            // If phone number was changed, update contacts where this user is listed
             if (updateData.phone_no !== undefined && updateData.phone_no !== currentUser.phone_no) {
-                // Update all emergency contact fields that reference the old phone number
-                const updateContactFields = [
-                    'emergency_contact_1',
-                    'emergency_contact_2',
-                    'emergency_contact_3',
-                    'emergency_contact_4',
-                    'emergency_contact_5'
-                ];
+                // Update emergency contacts arrays
+                await dbPool.query(
+                    `UPDATE contacts SET emergency_contacts = array_replace(emergency_contacts, $1, $2) WHERE $1 = ANY(emergency_contacts)`,
+                    [currentUser.phone_no, updateData.phone_no || null]
+                );
 
-                for (const field of updateContactFields) {
-                    await dbPool.query(
-                        `UPDATE contacts SET "${field}" = $1 WHERE "${field}" = $2`,
-                        [updateData.phone_no || null, currentUser.phone_no]
-                    );
-                }
+                // Update dependent contacts arrays
+                await dbPool.query(
+                    `UPDATE contacts SET dependent_contacts = array_replace(dependent_contacts, $1, $2) WHERE $1 = ANY(dependent_contacts)`,
+                    [currentUser.phone_no, updateData.phone_no || null]
+                );
             }
 
             await dbPool.query('COMMIT');

@@ -5,12 +5,18 @@ import { dbPool } from "../lib/db";
 
 type User = NonNullable<typeof auth.$Infer.Session.user>;
 
+interface ContactResponse {
+    id: number;
+    user_id: string;
+    emergency_contacts: string[] | null;
+    dependent_contacts: string[] | null;
+}
+
+const phoneValidation = z.string().refine(val => /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Invalid Philippine phone number");
+
 const contactSchema = z.object({
-    emergency_contact_1: z.string().refine(val => val === "" || /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Invalid Philippine phone number or empty to clear").optional(),
-    emergency_contact_2: z.string().refine(val => val === "" || /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Invalid Philippine phone number or empty to clear").optional(),
-    emergency_contact_3: z.string().refine(val => val === "" || /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Invalid Philippine phone number or empty to clear").optional(),
-    emergency_contact_4: z.string().refine(val => val === "" || /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Invalid Philippine phone number or empty to clear").optional(),
-    emergency_contact_5: z.string().refine(val => val === "" || /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Invalid Philippine phone number or empty to clear").optional(),
+    emergency_contacts: z.array(phoneValidation).optional(),
+    dependent_contacts: z.array(phoneValidation).optional(),
 });
 
 const router = new Hono<{ Variables: { user: User } }>({
@@ -31,24 +37,17 @@ router.get("/contacts/users", async (c) => {
     const user = c.get("user");
     const result = await dbPool.query(`
         SELECT 
-            c.id, c.user_id,
-            u1.name as contact1_name, u1.email as contact1_email, u1.phone_no as contact1_phone,
-            u2.name as contact2_name, u2.email as contact2_email, u2.phone_no as contact2_phone,
-            u3.name as contact3_name, u3.email as contact3_email, u3.phone_no as contact3_phone,
-            u4.name as contact4_name, u4.email as contact4_email, u4.phone_no as contact4_phone,
-            u5.name as contact5_name, u5.email as contact5_email, u5.phone_no as contact5_phone
+            c.id, c.user_id, c.emergency_contacts, c.dependent_contacts
         FROM contacts c
-        LEFT JOIN "user" u1 ON c.emergency_contact_1 = u1.phone_no
-        LEFT JOIN "user" u2 ON c.emergency_contact_2 = u2.phone_no
-        LEFT JOIN "user" u3 ON c.emergency_contact_3 = u3.phone_no
-        LEFT JOIN "user" u4 ON c.emergency_contact_4 = u4.phone_no
-        LEFT JOIN "user" u5 ON c.emergency_contact_5 = u5.phone_no
         WHERE c.user_id = $1
     `, [user.id]);
     if (result.rows.length === 0) {
         return c.json({ error: "Contacts not found" }, 404);
     }
-    return c.json(result.rows[0]);
+
+    const contact: ContactResponse = result.rows[0];
+
+    return c.json(contact);
 });
 
 router.get("/contacts", async (c) => {
@@ -69,56 +68,62 @@ router.get("/contacts/:phone", async (c) => {
     return c.json(result.rows[0]);
 });
 
-const updateContactsHandler = async (c: any) => {
+const updateContactsHandler = async (c: any): Promise<Response> => {
     const user = c.get("user");
     const body = await c.req.json();
     const parsed = contactSchema.safeParse(body);
     if (!parsed.success) {
-        return c.json({ error: "Invalid Philippine phone number. Use 09XXXXXXXXX, +639XXXXXXXXX, or empty string to clear" }, 400);
+        return c.json({ error: "Invalid Philippine phone numbers in contact arrays" }, 400);
     }
-    // Check if emergency contacts are registered users
-    const contactsToCheck = [
-        parsed.data.emergency_contact_1,
-        parsed.data.emergency_contact_2,
-        parsed.data.emergency_contact_3,
-        parsed.data.emergency_contact_4,
-        parsed.data.emergency_contact_5,
-    ].filter(contact => contact && contact !== "");
-    for (const contact of contactsToCheck) {
-        if (contact === user.phone_no) {
-            return c.json({ error: "You cannot add your own phone number as an emergency contact." }, 400);
-        }
-        const result = await dbPool.query('SELECT id FROM "user" WHERE phone_no = $1 AND role = $2', [contact, "mutual"]);
-        if (result.rows.length === 0) {
-            return c.json({ error: `Emergency contact ${contact} is not a registered user or is a dependent user.` }, 400);
-        }
-    }
-    const updateFields = [];
-    const values = [];
+
+    const updateFields: string[] = [];
+    const values: (string[] | string)[] = [];
     let index = 1;
-    if (parsed.data.emergency_contact_1 !== undefined) {
-        updateFields.push(`emergency_contact_1 = $${index++}`);
-        values.push(parsed.data.emergency_contact_1);
+
+    // Handle emergency contacts validation
+    if (parsed.data.emergency_contacts !== undefined) {
+        // Remove duplicates and empty strings
+        const uniqueEmergencyContacts = Array.from(new Set(parsed.data.emergency_contacts.filter(contact => contact.trim() !== "")));
+
+        // Validate each emergency contact
+        for (const contact of uniqueEmergencyContacts) {
+            if (contact === user.phone_no) {
+                return c.json({ error: "You cannot add your own phone number as an emergency contact." }, 400);
+            }
+            const result = await dbPool.query('SELECT id FROM "user" WHERE phone_no = $1 AND role = $2', [contact, "mutual"]);
+            if (result.rows.length === 0) {
+                return c.json({ error: `Emergency contact ${contact} is not a registered user or is a dependent user.` }, 400);
+            }
+        }
+
+        updateFields.push(`emergency_contacts = $${index++}`);
+        values.push(uniqueEmergencyContacts);
     }
-    if (parsed.data.emergency_contact_2 !== undefined) {
-        updateFields.push(`emergency_contact_2 = $${index++}`);
-        values.push(parsed.data.emergency_contact_2);
+
+    // Handle dependent contacts validation
+    if (parsed.data.dependent_contacts !== undefined) {
+        // Remove duplicates and empty strings
+        const uniqueDependentContacts = Array.from(new Set(parsed.data.dependent_contacts.filter(contact => contact.trim() !== "")));
+
+        // Validate each dependent contact
+        for (const contact of uniqueDependentContacts) {
+            if (contact === user.phone_no) {
+                return c.json({ error: "You cannot add your own phone number as a dependent contact." }, 400);
+            }
+            const result = await dbPool.query('SELECT id FROM "user" WHERE phone_no = $1 AND role = $2', [contact, "dependent"]);
+            if (result.rows.length === 0) {
+                return c.json({ error: `Dependent contact ${contact} is not a registered user or is a mutual user.` }, 400);
+            }
+        }
+
+        updateFields.push(`dependent_contacts = $${index++}`);
+        values.push(uniqueDependentContacts);
     }
-    if (parsed.data.emergency_contact_3 !== undefined) {
-        updateFields.push(`emergency_contact_3 = $${index++}`);
-        values.push(parsed.data.emergency_contact_3);
-    }
-    if (parsed.data.emergency_contact_4 !== undefined) {
-        updateFields.push(`emergency_contact_4 = $${index++}`);
-        values.push(parsed.data.emergency_contact_4);
-    }
-    if (parsed.data.emergency_contact_5 !== undefined) {
-        updateFields.push(`emergency_contact_5 = $${index++}`);
-        values.push(parsed.data.emergency_contact_5);
-    }
+
     if (updateFields.length === 0) {
         return c.json({ error: "No fields to update" }, 400);
     }
+
     values.push(user.id);
     const query = `UPDATE contacts SET ${updateFields.join(', ')}, "updatedAt" = CURRENT_TIMESTAMP WHERE user_id = $${index}`;
     await dbPool.query(query, values);
@@ -131,18 +136,41 @@ router.put("/contacts", updateContactsHandler);
 
 router.delete("/contacts", async (c) => {
     const user = c.get("user");
-    await dbPool.query('UPDATE contacts SET emergency_contact_1 = NULL, emergency_contact_2 = NULL, emergency_contact_3 = NULL, emergency_contact_4 = NULL, emergency_contact_5 = NULL, "updatedAt" = CURRENT_TIMESTAMP WHERE user_id = $1', [user.id]);
+    await dbPool.query('UPDATE contacts SET emergency_contacts = NULL, dependent_contacts = NULL, "updatedAt" = CURRENT_TIMESTAMP WHERE user_id = $1', [user.id]);
     return c.json({ success: true });
 });
 
-router.delete("/contacts/:id", async (c) => {
+router.delete("/contacts/:type/:index", async (c) => {
     const user = c.get("user");
-    const id = parseInt(c.req.param("id"));
-    if (isNaN(id) || id < 1 || id > 5) {
-        return c.json({ error: "Invalid contact ID. Must be 1-5" }, 400);
+    const type = c.req.param("type");
+    const index = parseInt(c.req.param("index"));
+
+    if (!["emergency", "dependent"].includes(type)) {
+        return c.json({ error: "Invalid contact type. Must be 'emergency' or 'dependent'" }, 400);
     }
-    const field = `emergency_contact_${id}`;
-    await dbPool.query(`UPDATE contacts SET "${field}" = NULL, "updatedAt" = CURRENT_TIMESTAMP WHERE user_id = $1`, [user.id]);
+
+    if (isNaN(index) || index < 0) {
+        return c.json({ error: "Invalid contact index. Must be 0 or greater" }, 400);
+    }
+
+    const fieldName = type === "emergency" ? "emergency_contacts" : "dependent_contacts";
+
+    // Get current contacts array
+    const result = await dbPool.query(`SELECT ${fieldName} FROM contacts WHERE user_id = $1`, [user.id]);
+    if (result.rows.length === 0) {
+        return c.json({ error: "Contacts not found" }, 404);
+    }
+
+    const contacts: string[] = (result.rows[0][fieldName] as string[]) || [];
+    if (index >= contacts.length) {
+        return c.json({ error: "Contact index out of bounds" }, 400);
+    }
+
+    // Remove contact at specified index
+    const updatedContacts = [...contacts];
+    updatedContacts.splice(index, 1);
+
+    await dbPool.query(`UPDATE contacts SET ${fieldName} = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE user_id = $2`, [updatedContacts, user.id]);
     return c.json({ success: true });
 });
 

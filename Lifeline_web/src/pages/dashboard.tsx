@@ -13,16 +13,16 @@ function Dashboard() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [location, setLocation] = useState<LatLng | undefined>(undefined);
   // const [time, setTime] = useState<string>("");
-  const [history, setHistory] = useState<{ time: string; lat: number; lng: number }[]>([]);
+  const [history, setHistory] = useState<Record<string, { time: string; lat: number; lng: number }[]>>({});
 
   const { markers, loading, handleLocation, getGeocode, setAddress, address } = useMap();
   const { user, handleLogout, contacts } = useDashboard();
   
   useEffect(() => {
-     if (!user || !contacts) return;
-     handleLocation(user);
-     contacts.forEach(c => handleLocation(c));
-   }, [user, contacts]);
+    if (!user || !contacts) return;
+    handleLocation(user);
+    contacts.forEach(c => handleLocation(c));
+  }, [user, contacts]);
    
   useEffect(() => {
     if (!selectedContact) return;
@@ -34,10 +34,13 @@ function Dashboard() {
       // setTime(timestamp);
       setLocation(selectedContact.location);
       setAddress(res);
-      setHistory(prev => [
-      { time: timestamp, lat, lng },
-      ...prev,
-    ]);
+      setHistory(prev => ({
+        ...prev,
+        [selectedContact.phone]: [
+          { time: timestamp, lat, lng },
+          ...(prev[selectedContact.phone] || []),
+        ],
+      }));
     };
     
     updateAddress();
@@ -52,10 +55,13 @@ function Dashboard() {
   return (
     <main className="dashboard">
       <header>
-        <h2 className="head-title">Lifeline</h2>
-        <button className="logout-btn" onClick={handleLogout}>
-          LOGOUT
-        </button>
+          <h2 className="head-title">Lifeline</h2>
+          <div>
+            <p className="logout-btn" onClick={handleLogout}>
+                LOGOUT
+            </p>
+            <img src={user?.image || "/images/user-example.svg"} alt="user-img" className="dashboard-img"  onClick={() => navigate("/profile")}/>
+          </div>         
       </header>
 
       <section className="dashboard-body">
@@ -73,13 +79,13 @@ function Dashboard() {
               onBack={() => setSelectedContact(null)}
               geocode={address}
               location={location}
-              history={history}
+              history={history[selectedContact.phone] || []}
             />
           )}
         </div>
 
         <div className="map">
-           <DashboardMap markers={markers} loading={loading} center={selectedContact?.location || user?.location} />
+          <DashboardMap markers={markers} loading={loading} center={selectedContact?.location || user?.location} />
         </div>
       </section>
       <footer></footer>

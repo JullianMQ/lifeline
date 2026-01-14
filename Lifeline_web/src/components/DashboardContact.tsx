@@ -46,6 +46,7 @@ export default function DashboardContact({ contact, onBack, geocode, location, h
         <section className="dashboard-history">
             <p>History:</p>
             <div className="table-card">
+                <article className="table-scroll">
                 <table>
                     <tbody>
                     <tr>
@@ -53,7 +54,7 @@ export default function DashboardContact({ contact, onBack, geocode, location, h
                         <td>Location</td>
                     </tr>
                        {history.map((row, i) => (
-                            <tr key={i}>
+                           <tr key={i}>
                                 <td>{row.time}</td>
                                 <td>
                                 {row.lng}
@@ -64,6 +65,7 @@ export default function DashboardContact({ contact, onBack, geocode, location, h
                         ))}
                     </tbody>
                 </table>
+                </article>
             </div>
         </section>
     </>

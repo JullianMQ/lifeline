@@ -10,10 +10,10 @@ const app = new Hono<{ Variables: AuthType }>({
     strict: false,
 })
 
-app.use( 
+app.use(
     cors({
         origin: process.env.ALLOWED_ORIGINS!.split(','),
-        allowHeaders: ['Content-Type','X-Custom-Header', 'Upgrade-Insecure-Request'],
+        allowHeaders: ['Content-Type', 'X-Custom-Header', 'Upgrade-Insecure-Request'],
         allowMethods: ['POST', 'GET', 'OPTIONS'],
         exposeHeaders: ['Content-length', 'X-Kuma-Revision'],
         maxAge: 600,
