@@ -23,7 +23,6 @@ const reverseGeocodeWithGoogle = async (lat: number, lng: number) => {
         const components: AddressComponent[] = result.address_components;
         const city = components.find(c => c.types.includes("locality"))?.long_name;
         const province = components.find(c => c.types.includes("administrative_area_level_2"))?.long_name;
-        const country = components.find(c => c.types.includes("country"))?.long_name;
         const readable = [city, province].filter(Boolean).join(", ");
 
         return readable || null;
