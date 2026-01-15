@@ -59,7 +59,7 @@ function AddContactExisting({ setMode }: Props) {
             <div className="btn">
                 {/* Red Buttons */}
                 {step === 1 && (   //step 1
-                    <button className="pos-btn" disabled={loading} onClick={() => validateNumber()}>
+                    <button className="pos-btn" disabled={loading} onClick={() => validateNumber}>
                         {loading ? "Creating Account..." : "Confirm"}
                     </button>
                 )}

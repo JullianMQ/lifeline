@@ -1,6 +1,10 @@
 header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .dashboard-cont-info, .map, .dashboard-cont-ws, .dashboard-history{
     display: flex;
 }
+
+.dashboard-img, .logout-btn{
+    cursor: pointer;
+}
 .dashboard{
     height: 100vh;
     width: 100vw;
@@ -10,12 +14,26 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 
 .dashboard header{
     box-shadow: 0px 6px 4px rgba(0, 0, 0, 0.25);
+    height: 60px;
+}
+
+.dashboard header div{
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-xs);   
+    align-items: center;
+    height: 100%;
+}
+
+.dashboard-img{
+    aspect-ratio: 1/1;
+    height: 100%;
 }
 
 .dashboard header{
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-sm) var(--space-xl);
 }
 
 .dashboard header, .dashboard footer{
@@ -56,7 +74,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 
 .dashboard-user img{
     aspect-ratio: 1/1;
-    height: 100%;
+    width: 20%;
     border-radius: 100%;
     border: 1px solid var(--text-black);
 }
@@ -164,7 +182,6 @@ ul{
     gap: var(--space-sm);
     flex: 1;
     min-height: 0;
-    overflow-x: hidden;
 }
 
 .table-card{
@@ -172,6 +189,7 @@ ul{
     padding: var(--space-xs);
     overflow-y: auto;
     min-height: 0;
+    height: 35vh;
 }
 
 .table-card table{

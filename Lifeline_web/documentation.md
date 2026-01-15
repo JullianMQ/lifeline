@@ -92,3 +92,9 @@ npm install
 - added geocoder for maps
 - added geolocation with time stamp history{under maintenance}
 - added buttons for sensors
+
+### 2026-01-14
+
+- Added profile page
+- added edit profile
+- Added avatar selection modal for edit profile

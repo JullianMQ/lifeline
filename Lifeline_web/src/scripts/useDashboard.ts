@@ -36,11 +36,9 @@ export function useDashboard() {
                 throw new Error("Not authenticated");
             }
 
-            const firstName = data.user.name?.split(" ")[0] || "User";
-
             setUser({
                 ...data.user,
-                name: firstName,
+                name: data.user.name,
                 location: userloc,
             });
         } catch (err) {
