@@ -26,8 +26,9 @@ function Dashboard() {
    
   useEffect(() => {
     if (!selectedContact) return;
-    const { lat, lng } = selectedContact.location!;
-
+    const lat = selectedContact.location?.lat!;
+    const lng = selectedContact.location?.lng!;
+    console.log("longlat",markers);
     const updateAddress = async () => {
       const res = await getGeocode(lat, lng);
       const timestamp = new Date().toLocaleTimeString();
@@ -57,7 +58,7 @@ function Dashboard() {
       <header>
           <h2 className="head-title">Lifeline</h2>
           <div>
-            <p className="logout-btn" onClick={handleLogout}>
+            <p className="uline-btn" onClick={handleLogout}>
                 LOGOUT
             </p>
             <img src={user?.image || "/images/user-example.svg"} alt="user-img" className="dashboard-img"  onClick={() => navigate("/profile")}/>

@@ -2,9 +2,10 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
     display: flex;
 }
 
-.dashboard-img, .logout-btn{
+.dashboard-img, .uline-btn{
     cursor: pointer;
 }
+
 .dashboard{
     height: 100vh;
     width: 100vw;
@@ -42,7 +43,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 
 .dashboard-body{
     height: 100%;
-    width: 100%;
+    width: 100vw;
     display: grid;
     gap: var(--space-md);
     grid-template-columns: repeat(5, 1fr);
@@ -59,6 +60,18 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
     width: 100%;
 }
 
+.dashboard-contacts{
+    display: grid;
+    height: 100%;
+    gap: var(--space-md);
+}
+
+.dashboard-contacts > div{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
 .dashboard-user, .dashboard-card, ul{
     gap: var(--space-sm);
 }
@@ -67,22 +80,28 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
     flex-direction: column;
 }
 
-.dashboard-card img{
+.dashboard-card-img{
     aspect-ratio: 1/1;
-    width: 100%;
+    height: auto;
 }
 
-.dashboard-user img{
+.dashboard-user-img{
+    display: flex;
+}
+
+.user-img{
+    align-self: stretch;
     aspect-ratio: 1/1;
-    width: 20%;
     border-radius: 100%;
     border: 1px solid var(--text-black);
+    height: 100%;
 }
 
 .dashboard-user-info{
     padding: var(--space-sm) 0;
     gap: var(--space-xs);
-    justify-content: center;
+    height: fit-content;
+    flex: 1;
 }
 
 .dashboard-cont-info{
@@ -100,9 +119,9 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 
 ul{
     list-style: none;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
 }
+
 .dashboard-card{
     display: flex;
     padding: var(--space-sm);
@@ -119,7 +138,8 @@ ul{
     width: 100vw;
 }
 
-.logout-btn{
+.uline-btn{
+    letter-spacing: 2px;
     border: none;
     background-color: transparent;
     font-weight: 800;
@@ -208,6 +228,13 @@ ul{
 
 .table-card table td, .table-card table th{
     padding: var(--space-xxs) 0;
+}
+
+.add-btn{
+    flex-direction: row !important; 
+    justify-content: space-between;
+    gap: var(--space-sm);
+    align-items: center;
 }
 
 @media screen and (max-width: 768px) {

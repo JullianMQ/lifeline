@@ -1,4 +1,4 @@
-# Lifeline Backend Documentation
+# Lifeline Web Documentation
 
 ## Overview
 
@@ -98,3 +98,10 @@ npm install
 - Added profile page
 - added edit profile
 - Added avatar selection modal for edit profile
+
+### 2026-01-15
+
+- Added optimized avatars
+- Improved image responsiveness
+- Display contacts in dashboard as dependent and mutual
+- Added delete contacts

@@ -14,6 +14,7 @@ export interface Contact {
   phone: string;
   image?: string;
   location?: { lat: number; lng: number };
+  role: "mutual" | "dependent";
 }
 
 export type LatLng = {

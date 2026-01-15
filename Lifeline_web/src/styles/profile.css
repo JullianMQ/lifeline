@@ -35,8 +35,8 @@
     align-items: center;
 }
 
-.profile-user form{
-    gap: 0;
+form.profile-user{
+    gap: 0px;
 }
 
 .profile-id{
@@ -51,7 +51,7 @@
 
 .profile-id img{
     aspect-ratio: 1/1;
-    height: 100px;
+    height: 120px;
     border-radius: 100%;
     border: 1px solid var(--text-black);
 }
@@ -108,7 +108,7 @@
 
 .edit-img{
     position: absolute;
-    top: 85px;
+    top: 100px;
     background-color: var(--lifeline-red);
     width: auto;
     border: none;
@@ -181,4 +181,57 @@
     position: absolute;
     right: 0;
     top: 0;
+}
+
+.profile-contacts > div{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+.profile-contacts{
+    display: flex;
+    flex-direction: column;
+    grid-column: 2/5;
+    gap: var(--space-md);
+}
+.add-btn{
+    display: flex;
+}
+
+.profile-card{
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-sm);
+    border-radius: var(--space-sm);
+    background-color: var(--soft-white);
+    box-shadow: 0px 6px 4px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    gap: var(--space-xs);
+    min-width: 300px;
+}
+
+.profile-card-name{
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+}
+
+.profile-card-name img{
+    aspect-ratio: 1/1;
+    width: 32px;
+    height: auto;
+    border-radius: 100%;
+    border: 1px solid var(--text-black);
+}
+
+.neg{
+    color: var(--lifeline-red);
+}
+
+.pos{
+    color: var(--highlight-green);
+}
+
+.remove{
+    margin-top: var(--space-xs);
 }

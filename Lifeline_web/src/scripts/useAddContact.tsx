@@ -24,7 +24,6 @@ export function useAddContact() {
     const [qrUrl, setQrUrl] = useState<string>("");
     const [fetchedUser, setFetchedUser] = useState<any>(null);
 
-
     const [createForm, setcreateForm] = useState<createForm>({
         firstName: "",
         lastName: "",
@@ -98,11 +97,6 @@ export function useAddContact() {
             return;
         }
         setLoading(true);
-        const contSlot = await checkContactSlots();
-        if (!contSlot) {
-            setLoading(false);
-            return;
-        };
         try {
             const { error } = await authClient.signUp.email({
                 name: `${createForm.firstName} ${createForm.lastName}`,
@@ -127,9 +121,8 @@ export function useAddContact() {
                 return;
             }
 
-            if (createForm.role === "mutual") {
-                addEmContact(createForm.phoneNo);
-            }
+            await addEmContact(createForm.phoneNo, createForm.role as "mutual" | "dependent");
+            
 
             setStep(3);
             await generateQrLink()
@@ -173,68 +166,34 @@ export function useAddContact() {
 
     const handleAdd = async () => {
         setLoading(true);
-        addEmContact(addForm.phoneNo);
+        addEmContact(addForm.phoneNo, fetchedUser.role);
         setStep(3);
     };
 
     // contact handling
-    const checkContactSlots = async () => {
-        const session = await fetch(`${API_BASE_URL}/api/auth/get-session`, { credentials: "include" });
-        const sessionInfo = await session.json();
-        if (addForm.phoneNo === sessionInfo.user.phone_no) {
-            setError("You cannot add your own number");
-            setInvalidFields(prev => [...prev, "phoneNo"]);
-            return false;
-        }
 
-        const allContacts = await fetch(`${API_BASE_URL}/api/contacts`, {
-            method: "GET",
-            credentials: "include",
-        });
+    const addEmContact = async ( contact: string, role: "mutual" | "dependent" ) => {
+        const body = role === "dependent"
+            ? { dependent_contacts: [contact] }
+            : { emergency_contacts: [contact] };
 
-        const contacts = await allContacts.json();
-        let slot: string | null = null;
-
-        for (let i = 1; i <= 5; i++) {
-            if (contacts[`emergency_contact_${i}`] === addForm.phoneNo) {
-                setError("Contact already added");
-                setInvalidFields(prev => [...prev, "phoneNo"]);
-                return false;
-            } else if (slot === null && contacts[`emergency_contact_${i}`] === null) {
-                slot = `emergency_contact_${i}`;
-            }
-        }
-        if (!slot) {
-            setError("Contacts are full");
-        }
-        console.log(slot);
-        return slot;
-    }
-
-    const addEmContact = async (emergency_contact: string) => {
-        let contact = await checkContactSlots();
-        if (!contact) {
-            setError("Cannot add contact");
-            return;
-        }
-        const contRes = await fetch(`${API_BASE_URL}/api/contacts`, {
+        const res = await fetch(`${API_BASE_URL}/api/contacts`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ [contact]: emergency_contact }),
+            body: JSON.stringify(body),
         });
 
-        const data = await contRes.json();
-        return data;
+        if (!res.ok) { throw new Error("Failed to add contact"); }
+
+        return await res.json();
     };
 
     const validateNumber = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setInvalidFields([]);
-        const contSlot = await checkContactSlots();
-        if (!contSlot) return;
-
+        console.log(addForm.phoneNo);
         const errors = validateForm("add");
         if (errors.length) {
             setInvalidFields(errors);
@@ -244,12 +203,6 @@ export function useAddContact() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/contacts/${addForm.phoneNo}`, { method: "GET", credentials: "include", });
             const data = await res.json();
-
-            if (data.role === "dependent") {
-                setError("Dependent contacts cannot be added");
-                setInvalidFields(["phoneNo"]);
-                return;
-            }
 
             setFetchedUser(data);
             if (!res.ok || data.error) {
@@ -278,7 +231,6 @@ export function useAddContact() {
         handleCreate,
         qrUrl,
         validateNumber,
-        checkContactSlots,
         addEmContact,
         handleAdd
     };

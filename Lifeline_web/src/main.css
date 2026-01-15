@@ -184,6 +184,9 @@ input:invalid, input.invalid, input:not(:placeholder-shown):invalid {
   border:2px solid var(--lifeline-red);
 }
 
+input[type="radio"]:checked {
+  accent-color: var(--lifeline-red)
+}
 
 input:-webkit-autofill, input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 1000px var(--base-white) inset;

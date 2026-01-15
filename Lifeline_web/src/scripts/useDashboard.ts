@@ -5,11 +5,11 @@ import { useState, useEffect } from 'react'
 import { API_BASE_URL } from "../config/api";
 import type { User, Contact } from "../types";
 
-//hard coded for testing
-const contloc = { //contacts
-  contact2_location: { lat: 15.135924992274758, lng: 120.58057235415056},
-  contact3_location: { lat: 15.134754688327266, lng: 120.59033559494401},
-};
+// TODO: remove when ws is implemented
+const contloc = [//contacts
+    { lat: 15.135924992274758, lng: 120.58057235415056},
+    { lat: 15.134754688327266, lng: 120.59033559494401}
+];
 const userloc = { //user
   lat: 15.12080856539815,
   lng: 120.60186959586032,
@@ -85,19 +85,19 @@ export function useDashboard() {
                 throw new Error(data.message || "Failed to load contacts");
             }
 
-            const formatted: Contact[] = [];
-
-            for (let i = 1; i <= 5; i++) {
-                const name = data[`contact${i}_name`];
-                const email = data[`contact${i}_email`];
-                const phone = data[`contact${i}_phone`];
-                const location = (contloc as any)[`contact${i}_location`];
-                // const image = data[`contact${i}_phone`];
-                if (name && phone) {
-                    formatted.push({ name, email, phone, location });
-                }
-            }
-
+            const userContacts: string[] = [
+                ...(data.emergency_contacts || []),
+                ...(data.dependent_contacts || []),
+            ];
+            
+            const formatted: Contact[] = userContacts.map((user: any, index: number) => ({
+                name: user.name,
+                email: user.email,
+                phone: user.phone_no,
+                image: user.image,
+                role: user.role,
+                location: contloc[index], 
+            }));
             setContacts(formatted);
         } catch (err: any) {
             setError(err.message || "Failed to load contacts");

@@ -3,12 +3,15 @@ import "../styles/profile.css";
 import { useNavigate } from "react-router-dom";
 import { useDashboard } from "../scripts/useDashboard";
 import { useState } from "react";
+import  useProfile  from "../scripts/useProfile";
 import ProfileForm from "../components/profileForm";
 
 function Profile() {
     const navigate = useNavigate();
-    const { user } = useDashboard();
+    const { user, contacts } = useDashboard();
+    const { removeContact } = useProfile();
     const [isEditing, setIsEditing] = useState(false);
+    const [isRemoving, setRemoving] = useState(false);
 
     return (
         <main className="dashboard">
@@ -59,6 +62,69 @@ function Profile() {
                 onCancel={() => setIsEditing(false)}
                 />
             )}
+            <div className="profile-contacts">
+            {contacts && contacts.length !== 0 ? (  
+                <>
+                    <div>
+                    <div className="add-btn">
+                        <h2>Mutual</h2>
+                        {isRemoving ? (
+                            <p className="uline-btn pos" onClick={()=>setRemoving(false)}>                           
+                                DONE
+                            </p>
+                        ) : (                            
+                            <p className="uline-btn neg" onClick={()=>setRemoving(true)}>                           
+                                REMOVE
+                            </p>
+                        )}
+                    </div>
+                    <ul>
+                        {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
+                            <li key={index} className="profile-card" >
+                                <div className="profile-card-name">
+                                    <img src={contact.image || "/images/user-example.svg"} />
+                                    <h3>{contact.name}</h3>
+                                </div>
+                                <p>{contact.email}</p>
+                                <p>{contact.phone}</p>
+                                {isRemoving &&(
+                                <button className="pos-btn remove" onClick={()=>removeContact(contact.phone, contact.role)}>
+                                    REMOVE
+                                </button>
+                                )}
+                            </li>
+                        ))}           
+                    </ul>
+                    </div>
+
+                    <div>
+                    <h2>Dependent</h2>
+                    <ul>
+                        {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                        <li key={index} className="profile-card" >
+                            <div className="profile-card-name">
+                                <img src={contact.image || "/images/user-example.svg"} />
+                                <h3>{contact.name}</h3>
+                            </div>
+                            <p>{contact.email}</p>
+                            <p>{contact.phone}</p>
+                            {isRemoving &&(
+                            <button className="pos-btn remove" onClick={()=>removeContact(contact.phone, contact.role)}>
+                                REMOVE
+                            </button>
+                            )}
+                        </li>
+                        ))}
+                    </ul>
+                    </div>
+                </>
+                ) : (
+                <div onClick={() => navigate('/addContact')}>              
+                    <h3>Oops! looks like you don't have any contacts yet</h3>
+                    <p><span className="uline-btn" onClick={() => navigate('/addContact')}>Add a contact</span> to get started</p>
+                </div>
+            )}
+            </div>
         </section>
 
         <footer></footer>

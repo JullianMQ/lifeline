@@ -1,4 +1,5 @@
 import type { User, Contact } from "../types";
+import { useNavigate } from 'react-router-dom';
 
 type Props = {
   user: User | null;
@@ -11,13 +12,14 @@ export default function DashboardUser({
   user,
   contacts,
   onSelectContact,
-  onAddContact,
 }: Props) {
-
+  const navigate = useNavigate();
   return (
     <>
       <div className="dashboard-user">
-        <img src={user?.image || "/images/user-example.svg"} alt="User"/>
+        <div className="dashboard-user-img">
+          <img src={user?.image || "/images/user-example.svg"} alt="User" className="user-img"/>
+        </div>
         <div className="dashboard-user-info">
           <p>Hey there,</p>
           <h1>{user?.name?.split(" ")[0] || "User"}</h1>
@@ -25,19 +27,44 @@ export default function DashboardUser({
       </div>
 
       <div className="dashboard-contacts">
-        <ul>
-          {contacts.map((contact, index) => (
-            <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
-              <img src={contact.image || "/images/user-example.svg"} alt="Contact"/>
-              <h3>{contact.name.split(" ")[0]}</h3>
-            </li>
-          ))}
+        {contacts && contacts.length !== 0 ? (  
+          <>
+            <div>
+              <div className="add-btn">
+                <h2>Mutual</h2>
+                <p className="uline-btn" onClick={() => navigate('/addContact')}>
+                  + ADD
+                </p>
+              </div>
+              <ul>
+                {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
+                  <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
+                      <img src={contact.image || "/images/user-example.svg"} className="dashboard-card-img"/>
+                      <h3>{contact.name.split(" ")[0]}</h3>
+                    </li>
+                ))}           
+              </ul>
+            </div>
 
-          <li className="dashboard-card" onClick={onAddContact}>
-            <img src="/images/add.svg" alt="Add contact" />
-            <h3>Add</h3>
-          </li>
-        </ul>
+            <div>
+              <h2>Dependent</h2>
+              <ul>
+                {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                  <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
+                      <img src={contact.image || "/images/user-example.svg"} className="dashboard-card-img"/>
+                      <h3>{contact.name.split(" ")[0]}</h3>
+                    </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        ) : (
+          <div onClick={() => navigate('/addContact')}>
+            
+            <h3>Oops! looks like you don't have any contacts yet</h3>
+            <p><span className="uline-btn" onClick={() => navigate('/addContact')}>Add a contact</span> to get started</p>
+          </div>
+        )}
       </div>
     </>
   );
