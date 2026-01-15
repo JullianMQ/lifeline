@@ -64,8 +64,8 @@ interface ContactUser {
 | GET | `/contacts/users` | Get contacts with full user details | Required |
 | GET | `/contacts` | Get raw contact arrays | Required |
 | GET | `/contacts/:phone` | Lookup user by phone | Required |
-| POST | `/contacts` | Partial update with validation | Required |
-| PUT | `/contacts` | Full replacement with validation | Required |
+| POST | `/contacts` | Append contacts to existing arrays | Required |
+| PUT | `/contacts` | Replace entire contact arrays | Required |
 | DELETE | `/contacts` | Clear all contacts bidirectionally | Required |
 | DELETE | `/contacts/:type/:index` | Remove specific contact bidirectionally | Required |
 
@@ -78,6 +78,11 @@ interface ContactUser {
 - **Self-reference prevention**: Users cannot add themselves
 - **Deduplication**: Automatic removal of duplicate phone numbers
 - **Role-based guards**: Dependent users cannot add dependent contacts
+
+#### HTTP Method Behavior
+- **POST**: Appends contacts to existing arrays, prevents duplicates, returns 200 with details of newly added contacts
+- **PUT**: Replaces entire contact arrays, handles bidirectional cleanup for removed contacts
+- **Duplicate Handling**: Both methods deduplicate before database operations, existing contacts in POST return 200 with no changes
 
 #### Role-Based Bidirectional Relationship Logic
 

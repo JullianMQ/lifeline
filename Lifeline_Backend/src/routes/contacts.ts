@@ -157,7 +157,195 @@ router.get("/contacts/:phone", async (c) => {
     return c.json(result.rows[0]);
 });
 
-const updateContactsHandler = async (c: any): Promise<Response> => {
+
+
+router.post("/contacts", async (c) => {
+    const user = c.get("user");
+    const body = await c.req.json();
+    const parsed = contactSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: "Invalid Philippine phone numbers in contact arrays" }, 400);
+    }
+
+    // Guard: Dependent users cannot add dependent contacts
+    if (user.role === "dependent" && parsed.data.dependent_contacts && parsed.data.dependent_contacts.length > 0) {
+        return c.json({ error: "Dependent users cannot add dependent contacts." }, 400);
+    }
+
+    // Get current contacts first
+    const currentContactsResult = await dbPool.query('SELECT emergency_contacts, dependent_contacts FROM contacts WHERE user_id = $1', [user.id]);
+    let currentEmergency: string[] = [];
+    let currentDependent: string[] = [];
+
+    if (currentContactsResult.rows.length > 0) {
+        currentEmergency = currentContactsResult.rows[0].emergency_contacts || [];
+        currentDependent = currentContactsResult.rows[0].dependent_contacts || [];
+    }
+
+    const updateFields: string[] = [];
+    const values: (string[] | string)[] = [];
+    let index = 1;
+    let newEmergencyContacts: string[] = [];
+    let newDependentContacts: string[] = [];
+
+    // Handle emergency contacts (APPEND logic)
+    if (parsed.data.emergency_contacts !== undefined) {
+        // Remove duplicates and empty strings from new contacts
+        const uniqueNewContacts = Array.from(new Set(parsed.data.emergency_contacts.filter(contact => contact.trim() !== "")));
+
+        // Validate each new emergency contact
+        for (const contact of uniqueNewContacts) {
+            if (contact === user.phone_no) {
+                return c.json({ error: "You cannot add your own phone number as an emergency contact." }, 400);
+            }
+            const result = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contact]);
+            if (result.rows.length === 0) {
+                return c.json({ error: `Emergency contact ${contact} is not a registered user.` }, 400);
+            }
+
+            const contactUser = result.rows[0];
+
+            // Emergency contacts can only be mutual users
+            if (contactUser.role !== "mutual") {
+                return c.json({ error: `Emergency contact ${contact} must be a mutual user, not ${contactUser.role}.` }, 400);
+            }
+        }
+
+        // APPEND: Combine existing + new, then remove duplicates
+        const combinedEmergency = [...currentEmergency, ...uniqueNewContacts];
+        newEmergencyContacts = Array.from(new Set(combinedEmergency));
+
+        updateFields.push(`emergency_contacts = $${index++}`);
+        values.push(newEmergencyContacts);
+    }
+
+    // Handle dependent contacts (APPEND logic)
+    if (parsed.data.dependent_contacts !== undefined) {
+        // Remove duplicates and empty strings from new contacts
+        const uniqueNewContacts = Array.from(new Set(parsed.data.dependent_contacts.filter(contact => contact.trim() !== "")));
+
+        // Validate each new dependent contact
+        for (const contact of uniqueNewContacts) {
+            if (contact === user.phone_no) {
+                return c.json({ error: "You cannot add your own phone number as a dependent contact." }, 400);
+            }
+            const result = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contact]);
+            if (result.rows.length === 0) {
+                return c.json({ error: `Dependent contact ${contact} is not a registered user.` }, 400);
+            }
+
+            const contactUser = result.rows[0];
+
+            // Dependent contacts can only be dependent users
+            if (contactUser.role !== "dependent") {
+                return c.json({ error: `Dependent contact ${contact} must be a dependent user, not ${contactUser.role}.` }, 400);
+            }
+        }
+
+        // APPEND: Combine existing + new, then remove duplicates
+        const combinedDependent = [...currentDependent, ...uniqueNewContacts];
+        newDependentContacts = Array.from(new Set(combinedDependent));
+
+        updateFields.push(`dependent_contacts = $${index++}`);
+        values.push(newDependentContacts);
+    }
+
+    if (updateFields.length === 0) {
+        return c.json({ error: "No fields to update" }, 400);
+    }
+
+    values.push(user.id);
+    const query = `UPDATE contacts SET ${updateFields.join(', ')}, "updatedAt" = CURRENT_TIMESTAMP WHERE user_id = $${index}`;
+    await dbPool.query(query, values);
+
+    // Create bidirectional relationships for newly added contacts only
+    const newlyAddedEmergency = newEmergencyContacts.filter(contact => !currentEmergency.includes(contact));
+    const newlyAddedDependent = newDependentContacts.filter(contact => !currentDependent.includes(contact));
+
+    // Handle emergency contacts (mutual ↔ mutual)
+    if (newlyAddedEmergency.length > 0) {
+        for (const contactPhone of newlyAddedEmergency) {
+            const contactUserResult = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contactPhone]);
+            if (contactUserResult.rows.length > 0) {
+                const contactUser = contactUserResult.rows[0];
+                const contactUserId = contactUser.id;
+
+                if (contactUser.role === "mutual" && user.role === "mutual") {
+                    await dbPool.query(`
+                        UPDATE contacts 
+                        SET emergency_contacts = CASE 
+                            WHEN emergency_contacts IS NULL THEN ARRAY[$1]
+                            WHEN NOT ($1 = ANY(emergency_contacts)) THEN emergency_contacts || $1
+                            ELSE emergency_contacts
+                        END,
+                        "updatedAt" = CURRENT_TIMESTAMP 
+                        WHERE user_id = $2
+                    `, [user.phone_no, contactUserId]);
+                } else if (user.role === "dependent" && contactUser.role === "mutual") {
+                    await dbPool.query(`
+                        UPDATE contacts 
+                        SET dependent_contacts = CASE 
+                            WHEN dependent_contacts IS NULL THEN ARRAY[$1]
+                            WHEN NOT ($1 = ANY(dependent_contacts)) THEN dependent_contacts || $1
+                            ELSE dependent_contacts
+                        END,
+                        "updatedAt" = CURRENT_TIMESTAMP 
+                        WHERE user_id = $2
+                    `, [user.phone_no, contactUserId]);
+                }
+            }
+        }
+    }
+
+    // Handle dependent contacts (mutual → dependent)
+    if (newlyAddedDependent.length > 0) {
+        for (const contactPhone of newlyAddedDependent) {
+            const contactUserResult = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contactPhone]);
+            if (contactUserResult.rows.length > 0) {
+                const contactUser = contactUserResult.rows[0];
+                const contactUserId = contactUser.id;
+
+                if (user.role === "mutual" && contactUser.role === "dependent") {
+                    await dbPool.query(`
+                        UPDATE contacts 
+                        SET emergency_contacts = CASE 
+                            WHEN emergency_contacts IS NULL THEN ARRAY[$1]
+                            WHEN NOT ($1 = ANY(emergency_contacts)) THEN emergency_contacts || $1
+                            ELSE emergency_contacts
+                        END,
+                        "updatedAt" = CURRENT_TIMESTAMP 
+                        WHERE user_id = $2
+                    `, [user.phone_no, contactUserId]);
+                }
+            }
+        }
+    }
+
+    // Check if any new contacts were actually added
+    const hasNewContacts = newlyAddedEmergency.length > 0 || newlyAddedDependent.length > 0;
+
+    if (hasNewContacts) {
+        return c.json({
+            success: true,
+            message: "New contacts added successfully",
+            added: {
+                emergency_contacts: newlyAddedEmergency,
+                dependent_contacts: newlyAddedDependent
+            }
+        });
+    } else {
+        return c.json({
+            success: true,
+            message: "No new contacts added (duplicates detected)",
+            added: {
+                emergency_contacts: [],
+                dependent_contacts: []
+            }
+        });
+    }
+});
+
+router.put("/contacts", async (c) => {
     const user = c.get("user");
     const body = await c.req.json();
     const parsed = contactSchema.safeParse(body);
@@ -176,7 +364,7 @@ const updateContactsHandler = async (c: any): Promise<Response> => {
     let uniqueEmergencyContacts: string[] = [];
     let uniqueDependentContacts: string[] = [];
 
-    // Handle emergency contacts validation
+    // Handle emergency contacts (REPLACE logic)
     if (parsed.data.emergency_contacts !== undefined) {
         // Remove duplicates and empty strings
         uniqueEmergencyContacts = Array.from(new Set(parsed.data.emergency_contacts.filter(contact => contact.trim() !== "")));
@@ -203,7 +391,7 @@ const updateContactsHandler = async (c: any): Promise<Response> => {
         values.push(uniqueEmergencyContacts);
     }
 
-    // Handle dependent contacts validation
+    // Handle dependent contacts (REPLACE logic)
     if (parsed.data.dependent_contacts !== undefined) {
         // Remove duplicates and empty strings
         uniqueDependentContacts = Array.from(new Set(parsed.data.dependent_contacts.filter(contact => contact.trim() !== "")));
@@ -234,20 +422,58 @@ const updateContactsHandler = async (c: any): Promise<Response> => {
         return c.json({ error: "No fields to update" }, 400);
     }
 
+    // Get current contacts before replacement for bidirectional cleanup
+    const currentContactsResult = await dbPool.query('SELECT emergency_contacts, dependent_contacts FROM contacts WHERE user_id = $1', [user.id]);
+    let currentEmergency: string[] = [];
+    let currentDependent: string[] = [];
+
+    if (currentContactsResult.rows.length > 0) {
+        currentEmergency = currentContactsResult.rows[0].emergency_contacts || [];
+        currentDependent = currentContactsResult.rows[0].dependent_contacts || [];
+    }
+
     values.push(user.id);
     const query = `UPDATE contacts SET ${updateFields.join(', ')}, "updatedAt" = CURRENT_TIMESTAMP WHERE user_id = $${index}`;
     await dbPool.query(query, values);
 
-    // Create bidirectional relationships after successful update
-    // Handle emergency contacts (mutual <-> mutual)
+    // Handle bidirectional relationships for REPLACE operation
+    // Emergency contacts: mutual ↔ mutual
     if (parsed.data.emergency_contacts !== undefined) {
-        for (const contactPhone of uniqueEmergencyContacts) {
+        const contactsToRemove = currentEmergency.filter(contact => !uniqueEmergencyContacts.includes(contact));
+        const contactsToAdd = uniqueEmergencyContacts.filter(contact => !currentEmergency.includes(contact));
+
+        // Remove from other users' contacts
+        for (const contactPhone of contactsToRemove) {
             const contactUserResult = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contactPhone]);
             if (contactUserResult.rows.length > 0) {
                 const contactUser = contactUserResult.rows[0];
                 const contactUserId = contactUser.id;
 
-                // mutual -> mutual: add to emergency contacts
+                if (contactUser.role === "mutual" && user.role === "mutual") {
+                    await dbPool.query(`
+                        UPDATE contacts 
+                        SET emergency_contacts = array_remove(emergency_contacts, $1),
+                        "updatedAt" = CURRENT_TIMESTAMP 
+                        WHERE user_id = $2 AND $1 = ANY(emergency_contacts)
+                    `, [user.phone_no, contactUserId]);
+                } else if (user.role === "dependent" && contactUser.role === "mutual") {
+                    await dbPool.query(`
+                        UPDATE contacts 
+                        SET dependent_contacts = array_remove(dependent_contacts, $1),
+                        "updatedAt" = CURRENT_TIMESTAMP 
+                        WHERE user_id = $2 AND $1 = ANY(dependent_contacts)
+                    `, [user.phone_no, contactUserId]);
+                }
+            }
+        }
+
+        // Add to other users' contacts
+        for (const contactPhone of contactsToAdd) {
+            const contactUserResult = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contactPhone]);
+            if (contactUserResult.rows.length > 0) {
+                const contactUser = contactUserResult.rows[0];
+                const contactUserId = contactUser.id;
+
                 if (contactUser.role === "mutual" && user.role === "mutual") {
                     await dbPool.query(`
                         UPDATE contacts 
@@ -260,7 +486,6 @@ const updateContactsHandler = async (c: any): Promise<Response> => {
                         WHERE user_id = $2
                     `, [user.phone_no, contactUserId]);
                 } else if (user.role === "dependent" && contactUser.role === "mutual") {
-                    // dependent -> mutual: add dependent to mutual's dependent contacts
                     await dbPool.query(`
                         UPDATE contacts 
                         SET dependent_contacts = CASE 
@@ -276,16 +501,37 @@ const updateContactsHandler = async (c: any): Promise<Response> => {
         }
     }
 
-    // Handle dependent contacts (mutual -> dependent, dependent -> mutual)
+    // Dependent contacts: mutual → dependent
     if (parsed.data.dependent_contacts !== undefined) {
-        for (const contactPhone of uniqueDependentContacts) {
+        const contactsToRemove = currentDependent.filter(contact => !uniqueDependentContacts.includes(contact));
+        const contactsToAdd = uniqueDependentContacts.filter(contact => !currentDependent.includes(contact));
+
+        // Remove from other users' contacts
+        for (const contactPhone of contactsToRemove) {
             const contactUserResult = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contactPhone]);
             if (contactUserResult.rows.length > 0) {
                 const contactUser = contactUserResult.rows[0];
                 const contactUserId = contactUser.id;
 
                 if (user.role === "mutual" && contactUser.role === "dependent") {
-                    // mutual -> dependent: add mutual to dependent's emergency contacts
+                    await dbPool.query(`
+                        UPDATE contacts 
+                        SET emergency_contacts = array_remove(emergency_contacts, $1),
+                        "updatedAt" = CURRENT_TIMESTAMP 
+                        WHERE user_id = $2 AND $1 = ANY(emergency_contacts)
+                    `, [user.phone_no, contactUserId]);
+                }
+            }
+        }
+
+        // Add to other users' contacts
+        for (const contactPhone of contactsToAdd) {
+            const contactUserResult = await dbPool.query('SELECT id, role FROM "user" WHERE phone_no = $1', [contactPhone]);
+            if (contactUserResult.rows.length > 0) {
+                const contactUser = contactUserResult.rows[0];
+                const contactUserId = contactUser.id;
+
+                if (user.role === "mutual" && contactUser.role === "dependent") {
                     await dbPool.query(`
                         UPDATE contacts 
                         SET emergency_contacts = CASE 
@@ -301,12 +547,15 @@ const updateContactsHandler = async (c: any): Promise<Response> => {
         }
     }
 
-    return c.json({ success: true });
-};
-
-router.post("/contacts", updateContactsHandler);
-
-router.put("/contacts", updateContactsHandler);
+    return c.json({
+        success: true,
+        message: "Contacts replaced successfully",
+        contacts: {
+            emergency_contacts: uniqueEmergencyContacts,
+            dependent_contacts: uniqueDependentContacts
+        }
+    });
+});
 
 router.delete("/contacts", async (c) => {
     const user = c.get("user");
