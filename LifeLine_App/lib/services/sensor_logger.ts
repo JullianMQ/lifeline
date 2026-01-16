@@ -30,26 +30,40 @@ class SensorLogger {
     }
 
     getStats() {
-        const accelValues = this.logs
-            .filter(l => l.magnitude !== undefined)
-            .map(l => l.magnitude!);
-        const gyroValues = this.logs
-            .filter(l => l.rotationSpeed !== undefined)
-            .map(l => l.rotationSpeed!);
-        const micValues = this.logs
-            .filter(l => l.metering !== undefined)
-            .map(l => l.metering!);
+        const accelLogs = this.logs.filter(l => l.magnitude !== undefined);
+        const gyroLogs = this.logs.filter(l => l.rotationSpeed !== undefined);
+        const micLogs = this.logs.filter(l => l.metering !== undefined);
+
+        const getMaxMin = (logs: any[], key: string) => {
+            if (!logs.length) return { max: null, maxTime: null, min: null, minTime: null };
+            let maxLog = logs.reduce((a, b) => (b[key] > a[key] ? b : a));
+            let minLog = logs.reduce((a, b) => (b[key] < a[key] ? b : a));
+            return { max: maxLog[key], maxTime: maxLog.timestamp, min: minLog[key], minTime: minLog.timestamp };
+        };
+
+        const accelStats = getMaxMin(accelLogs, 'magnitude');
+        const gyroStats = getMaxMin(gyroLogs, 'rotationSpeed');
+        const micStats = getMaxMin(micLogs, 'metering');
 
         return {
-            maxAccel: accelValues.length ? Math.max(...accelValues) : null,
-            minAccel: accelValues.length ? Math.min(...accelValues) : null,
-            maxGyro: gyroValues.length ? Math.max(...gyroValues) : null,
-            minGyro: gyroValues.length ? Math.min(...gyroValues) : null,
-            maxMic: micValues.length ? Math.max(...micValues) : null,
-            minMic: micValues.length ? Math.min(...micValues) : null,
+            maxAccel: accelStats.max,
+            maxAccelTime: accelStats.maxTime,
+            minAccel: accelStats.min,
+            minAccelTime: accelStats.minTime,
+
+            maxGyro: gyroStats.max,
+            maxGyroTime: gyroStats.maxTime,
+            minGyro: gyroStats.min,
+            minGyroTime: gyroStats.minTime,
+
+            maxMic: micStats.max,
+            maxMicTime: micStats.maxTime,
+            minMic: micStats.min,
+            minMicTime: micStats.minTime,
         };
     }
 
 }
+
 
 export const sensorLogger = new SensorLogger();

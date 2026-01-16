@@ -1,36 +1,72 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { sensorLogger } from './sensor_logger';
+import { getUser } from '../api/storage/user';
 
 const DIR = FileSystem.documentDirectory + 'sensors/';
-export const FILE = DIR + 'session.csv';
+
+// CSV header with user info
+const CSV_HEADER = 'UserID,UserName,Sensor,Accelerometer,Gyroscope,Microphone,Timestamp\n';
+
+const formatTimestamp = (ts?: number) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${(d.getMonth() + 1)
+        .toString()
+        .padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ` +
+        `${d.getHours().toString().padStart(2, '0')}:${d
+            .getMinutes()
+            .toString()
+            .padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
+};
+
+// Compute the CSV file path for the current user
+export const getUserFile = async () => {
+    const user = await getUser();
+    const userId = user?.id || 'unknown';
+    return DIR + `${userId}_session.csv`;
+};
 
 let initialized = false;
 
-const CSV_HEADER = 'sensor,Accelerometer,Gyroscope,Microphone\n';
-
+// Initialize the CSV for the current user
 export async function initCsv(reset = false) {
     if (initialized && !reset) return;
+
+    const userFile = await getUserFile();
 
     const dirInfo = await FileSystem.getInfoAsync(DIR);
     if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(DIR, { intermediates: true });
     }
 
-    if (reset) {
-        await FileSystem.writeAsStringAsync(FILE, CSV_HEADER);
-    } else {
-        const fileInfo = await FileSystem.getInfoAsync(FILE);
-        if (!fileInfo.exists) {
-            await FileSystem.writeAsStringAsync(FILE, CSV_HEADER);
-        }
+    const fileInfo = await FileSystem.getInfoAsync(userFile);
+    if (reset || !fileInfo.exists) {
+        await FileSystem.writeAsStringAsync(userFile, CSV_HEADER);
     }
 
     initialized = true;
 }
 
-
+// Append HIGHEST and LOWEST summary for current session
 export async function appendSummaryRow() {
     if (!initialized) return;
+
+    const user = await getUser();
+    const userId = user?.id || 'unknown';
+    const userName = user?.name || 'unknown';
+    const userFile = await getUserFile();
+
+    // Ensure directory exists
+    const dirInfo = await FileSystem.getInfoAsync(DIR);
+    if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(DIR, { intermediates: true });
+    }
+
+    // If file doesn’t exist, add header
+    const fileInfo = await FileSystem.getInfoAsync(userFile);
+    if (!fileInfo.exists) {
+        await FileSystem.writeAsStringAsync(userFile, CSV_HEADER);
+    }
 
     const stats = sensorLogger.getStats();
 
@@ -39,31 +75,52 @@ export async function appendSummaryRow() {
     const formatMic = (v: number | null | undefined) => (v != null ? v.toFixed(2) + ' dBFS' : '');
 
     const summaryRow = [
+        userId,
+        userName,
         'HIGHEST',
         formatAccel(stats.maxAccel),
         formatGyro(stats.maxGyro),
         formatMic(stats.maxMic),
+        formatTimestamp(stats.maxAccelTime),
     ].join(',') + '\n';
 
     const minRow = [
+        userId,
+        userName,
         'LOWEST',
         formatAccel(stats.minAccel),
         formatGyro(stats.minGyro),
         formatMic(stats.minMic),
+        formatTimestamp(stats.minAccelTime),
     ].join(',') + '\n';
 
     try {
         let existing = '';
-        const fileInfo = await FileSystem.getInfoAsync(FILE);
         if (fileInfo.exists) {
-            existing = await FileSystem.readAsStringAsync(FILE);
+            existing = await FileSystem.readAsStringAsync(userFile);
         }
 
         const newContent = existing + summaryRow + minRow;
-        await FileSystem.writeAsStringAsync(FILE, newContent);
-
+        await FileSystem.writeAsStringAsync(userFile, newContent);
     } catch (err) {
         console.error('Failed to write summary row', err);
     }
 }
 
+// Optional: export a helper to share CSV for the current user
+export async function shareCsv() {
+    const userFile = await getUserFile();
+    try {
+        const Sharing = await import('expo-sharing');
+        if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(userFile, {
+                mimeType: 'text/csv',
+                dialogTitle: 'Share your sensor CSV',
+            });
+        } else {
+            console.log('Sharing not available on this device');
+        }
+    } catch (err) {
+        console.error('Failed to share CSV', err);
+    }
+}
