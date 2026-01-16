@@ -151,7 +151,7 @@ export async function checkEmail(email: string) {
 // Check session
 export async function checkSession() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/contacts`, {
+        const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, {
             method: "GET",
             credentials: "include",
         });

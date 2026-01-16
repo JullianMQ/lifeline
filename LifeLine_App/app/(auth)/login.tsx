@@ -58,7 +58,7 @@ const Login = () => {
     const handleQRScanSuccess = async (data: string) => {
         setShowScanner(false);
         try {
-            const qrData = JSON.parse(data); // assuming the QR code contains email and token
+            const qrData = JSON.parse(data);
             const response = await login(qrData.email, qrData.token);
             await saveUser(response.user);
             router.replace("/(main)/landing");
@@ -146,7 +146,7 @@ const Login = () => {
                     {/* QR Code Button */}
                     <TouchableOpacity
                         className="border-2 border-black py-4 mt-6 rounded-full flex-row justify-center items-center"
-                        onPress={() => setShowScanner(true)} // OPEN scanner
+                        onPress={() => setShowScanner(true)}
                     >
                         <Ionicons name="qr-code-outline" size={24} />
                         <Text className="text-gray-700 font-semibold ml-2">
