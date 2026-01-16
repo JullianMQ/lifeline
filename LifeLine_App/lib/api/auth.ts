@@ -81,6 +81,18 @@ export async function login(email: string, password: string) {
 }
 
 
+export const loginWithToken = async (token: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/magic-link/verify?token=${token}`, {
+        method: "GET",
+        credentials: "include",
+    });
+
+    if (!res.ok) throw new Error("Magic link verification failed");
+
+    return await res.json();
+};
+
+
 // Sign up
 interface SignUpPayload {
     name: string;
