@@ -5,12 +5,10 @@ import { useSegments } from "expo-router";
 
 export default function AuthLayout() {
     const router = useRouter();
-    const segments = useSegments(); // gives current route segments
+    const segments = useSegments();
 
     useEffect(() => {
         checkSession().then((session) => {
-            // segments[0] is "(auth)" folder segment
-            // segments[1] is the page inside it, e.g. "login"
             const currentPage = segments[1];
 
             if (session && (currentPage === "login" || currentPage === "signup")) {
