@@ -28,7 +28,7 @@ const RenderHeader = ({
         </View>
 
         <TouchableOpacity
-            onPress={() => router.push("/add_contact")}
+            onPress={() => router.push("/(auth)/add_member_existing")}
             className="w-14 h-14 items-center justify-center"
         >
             <Ionicons name="add-circle-outline" size={40} color="#404040" />

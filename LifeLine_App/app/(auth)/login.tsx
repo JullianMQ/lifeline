@@ -51,7 +51,6 @@ const Login = () => {
             });
             if (!data) return;
 
-
         } catch (err: any) {
             alert(err.message || "Google login failed");
         } finally {
