@@ -19,8 +19,8 @@ export default function AvatarModal({
   if (!open) return null;
 
   return (
-    <div className="avatar-modal">
-      <div className="avatar-modal-content">
+    <div className="modal">
+      <div className="modal-content">
         <div className="relative">
             <h3 className="info-label">Select Avatar</h3>
             <img src="/images/close.svg" alt="Back" onClick={onClose} className="absolute-right"/>

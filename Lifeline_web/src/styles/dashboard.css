@@ -62,7 +62,6 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 
 .dashboard-contacts{
     display: grid;
-    height: 100%;
     gap: var(--space-md);
 }
 

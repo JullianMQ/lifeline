@@ -1,8 +1,6 @@
 import { API_BASE_URL } from "../config/api";
-import { useDashboard } from "./useDashboard";
 
 function useProfile() {
-    const { displayContact } = useDashboard();
     const getContactIndex = async (phone:string, role: "mutual" | "dependent" | "emergency") => {
         const getPhoneIndex = await fetch(`${API_BASE_URL}/api/contacts`, {
             credentials: "include",
@@ -35,7 +33,6 @@ function useProfile() {
             if (!res.ok) {
                 throw new Error("Failed to remove contact");
             }
-            await displayContact();
         }catch(err){
             console.error("Remove contact error:", err);
         }

@@ -112,7 +112,7 @@ function AddContactNew({ setMode }: Props) {
               ) : (
                 <p>Generating QR…</p>
               )}
-              <p>Scan me to login as <strong>{createForm.firstName+" "+createForm.lastName}</strong></p>
+              <p>Scan me to login as <br /><strong>{createForm.firstName+" "+createForm.lastName}</strong></p>
             </>
           )}
 

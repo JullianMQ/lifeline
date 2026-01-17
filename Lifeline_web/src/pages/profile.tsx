@@ -5,13 +5,19 @@ import { useDashboard } from "../scripts/useDashboard";
 import { useState } from "react";
 import  useProfile  from "../scripts/useProfile";
 import ProfileForm from "../components/profileForm";
+import ConfirmModal from "../components/confirmModal";
 
 function Profile() {
     const navigate = useNavigate();
-    const { user, contacts } = useDashboard();
+    const { user, contacts, displayContact } = useDashboard();
     const { removeContact } = useProfile();
     const [isEditing, setIsEditing] = useState(false);
     const [isRemoving, setRemoving] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [pendingRemove, setPendingRemove] = useState<{
+        phone: string;
+        role: "mutual" | "dependent" | "emergency";
+    } | null>(null);
 
     return (
         <main className="dashboard">
@@ -88,7 +94,10 @@ function Profile() {
                                 <p>{contact.email}</p>
                                 <p>{contact.phone}</p>
                                 {isRemoving &&(
-                                <button className="pos-btn remove" onClick={()=>removeContact(contact.phone, contact.role)}>
+                                <button className="pos-btn remove" onClick={() => {
+                                    setPendingRemove({ phone: contact.phone, role: contact.role });
+                                    setShowConfirm(true);
+                                }}>
                                     REMOVE
                                 </button>
                                 )}
@@ -109,7 +118,10 @@ function Profile() {
                             <p>{contact.email}</p>
                             <p>{contact.phone}</p>
                             {isRemoving &&(
-                            <button className="pos-btn remove" onClick={()=>removeContact(contact.phone, contact.role)}>
+                            <button className="pos-btn remove" onClick={() => {
+                                setPendingRemove({ phone: contact.phone, role: contact.role });
+                                setShowConfirm(true);
+                            }}>
                                 REMOVE
                             </button>
                             )}
@@ -126,7 +138,20 @@ function Profile() {
             )}
             </div>
         </section>
-
+            {showConfirm && pendingRemove && (
+                <ConfirmModal
+                    open={showConfirm} onClose={() => {
+                        setShowConfirm(false);
+                        setPendingRemove(null);
+                    }}
+                    onConfirm={async () => { 
+                        removeContact(pendingRemove.phone, pendingRemove.role);
+                        await displayContact();
+                        setShowConfirm(false);
+                        setPendingRemove(null);
+                    }}
+                />
+            )}
         <footer></footer>
         </main>
     );

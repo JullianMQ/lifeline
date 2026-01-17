@@ -119,7 +119,7 @@ form.profile-user{
     color: var(--soft-white);
 }
 
-.avatar-modal{
+.modal{
     position: absolute;
     top: 0;
     left: 0;
@@ -131,7 +131,7 @@ form.profile-user{
     background-color: rgba(0, 0, 0, 0.5);
 }
 
-.avatar-modal-content{
+.modal-content{
     display: flex;
     width: 60%;
     max-width: 800px;
@@ -234,4 +234,12 @@ form.profile-user{
 
 .remove{
     margin-top: var(--space-xs);
+}
+
+.btn-row{
+    display: flex;
+    gap: var(--space-sm);
+}
+.confirm-modal{
+    width: 30%;
 }
