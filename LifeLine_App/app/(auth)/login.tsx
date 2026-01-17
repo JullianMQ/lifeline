@@ -6,7 +6,6 @@ import { login, signInWithGoogle, loginWithToken } from "../../lib/api/auth";
 import { saveUser } from "@/lib/api/storage/user";
 import QRScanner from "@/components/QRScanner";
 import * as Linking from "expo-linking";
-import { API_BASE_URL } from "@/lib/api/config";
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -45,10 +44,14 @@ const Login = () => {
     const handleGoogleLogin = async () => {
         setGoogleLoading(true);
         try {
-            const data = await signInWithGoogle();
+            const data = await signInWithGoogle({
+                callbackURL: "lifeline://landing",
+                errorCallbackURL: "lifeline://login",
+                flow: "login",
+            });
             if (!data) return;
-            await saveUser(data.user);
-            router.replace("/(main)/landing");
+
+            // You can add any post-login logic here if needed
         } catch (err: any) {
             alert(err.message || "Google login failed");
         } finally {

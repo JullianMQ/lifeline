@@ -15,15 +15,6 @@ const VerifyEmail = () => {
             </Text>
 
             <TouchableOpacity
-                className="bg-lifelineRed px-8 py-4 rounded-full mb-4"
-                onPress={() => router.replace("/(auth)/add_member")}
-            >
-                <Text className="text-white font-semibold text-base text-center">
-                    Add Member
-                </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
                 className="bg-lifelineRed px-8 py-4 rounded-full"
                 onPress={() => router.replace("/(auth)/login")}
             >

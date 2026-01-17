@@ -38,7 +38,7 @@ const AddMember = () => {
 
                     {/* Skip */}
                     <TouchableOpacity
-                        onPress={() => router.push("/(auth)/login")}
+                        onPress={() => router.push("/(auth)/add_member_existing")}
                         className="border-2 border-black py-4 mt-2 rounded-full flex-row justify-center items-center"
                     >
                         <Text className="text-center text-black font-semibold text-lg">

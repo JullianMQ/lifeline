@@ -30,7 +30,7 @@ export default function MemberSignupQr() {
                 {/* BOTTOM BUTTON */}
                 <View className="mb-10">
                     <TouchableOpacity
-                        onPress={() => router.replace("/(auth)/select_role")}
+                        onPress={() => router.replace("/(auth)/add_member")}
                         className="bg-lifelineRed py-4 rounded-full mb-4"
                     >
                         <Text className="text-center text-white font-semibold text-lg">

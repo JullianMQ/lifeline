@@ -10,7 +10,6 @@ export interface Contact {
     type: "emergency" | "dependent";
 }
 
-
 const mapContact = (
     c: any,
     index: number,
@@ -42,11 +41,9 @@ export const getContacts = async (): Promise<Contact[]> => {
         const emergencyContacts = (data.emergency_contacts ?? []).map(
             (c: any, index: number) => mapContact(c, index, "em", "emergency")
         );
-
         const dependentContacts = (data.dependent_contacts ?? []).map(
             (c: any, index: number) => mapContact(c, index, "dep", "dependent")
         );
-
         return [...emergencyContacts, ...dependentContacts];
     } catch (error) {
         console.error("Error fetching contacts:", error);
@@ -75,10 +72,44 @@ export const saveContacts = async (contacts: any) => {
     } catch (err) {
         throw new Error("Failed to save contacts: " + err);
     }
-
-
-
 };
+
+// get user by number
+export const getUserByPhone = async (
+    phone: string
+): Promise<Contact | null> => {
+    try {
+        console.log("Fetching user by phone:", phone);
+
+        const res = await fetch(`${API_BASE_URL}/api/contacts/${encodeURIComponent(phone)}`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+        });
+
+        console.log("Fetch response status:", res.status);
+
+        if (res.status === 404) {
+            console.log("User not found (404)");
+            return null;
+        }
+
+        if (!res.ok) {
+            const text = await res.text();
+            console.log("Fetch failed, response:", text);
+            throw new Error("Failed to fetch user");
+        }
+
+        const data = await res.json();
+        console.log("User data received:", data);
+        return data;
+    } catch (err) {
+        console.error("getUserByPhone error:", err);
+        throw err;
+    }
+};
+
+
 
 
 export const generateMagicLinkQr = async ({
