@@ -105,3 +105,8 @@ npm install
 - Improved image responsiveness
 - Display contacts in dashboard as dependent and mutual
 - Added delete contacts
+
+### 2026-01-17
+
+- Added overflow scrolling for contacts
+- Added style for scroll bar

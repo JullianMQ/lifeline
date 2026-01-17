@@ -61,7 +61,8 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 }
 
 .dashboard-contacts{
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-md);
 }
 
@@ -114,11 +115,6 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 
 .map{
     grid-column: 3/6;
-}
-
-ul{
-    list-style: none;
-    display: flex;
 }
 
 .dashboard-card{
@@ -234,6 +230,25 @@ ul{
     justify-content: space-between;
     gap: var(--space-sm);
     align-items: center;
+}
+
+.dashboard-contacts > div{
+    display: flex;
+    width: 100%;
+}
+
+.scrollable{
+    display: block;
+    width: inherit;
+    padding-bottom: var(--space-xs);
+    overflow-x: auto;
+}
+
+
+
+ul{
+    list-style: none;
+    display: flex;
 }
 
 @media screen and (max-width: 768px) {

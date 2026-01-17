@@ -72,62 +72,62 @@ function Profile() {
             {contacts && contacts.length !== 0 ? (  
                 <>
                     <div>
-                    <div className="add-btn">
-                        <h2>Mutual</h2>
-                        {isRemoving ? (
-                            <p className="uline-btn pos" onClick={()=>setRemoving(false)}>                           
-                                DONE
-                            </p>
-                        ) : (                            
-                            <p className="uline-btn neg" onClick={()=>setRemoving(true)}>                           
-                                REMOVE
-                            </p>
-                        )}
-                    </div>
-                    <ul>
-                        {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
-                            <li key={index} className="profile-card" >
-                                <div className="profile-card-name">
-                                    <img src={contact.image || "/images/user-example.svg"} />
-                                    <h3>{contact.name}</h3>
-                                </div>
-                                <p>{contact.email}</p>
-                                <p>{contact.phone}</p>
-                                {isRemoving &&(
-                                <button className="pos-btn remove" onClick={() => {
-                                    setPendingRemove({ phone: contact.phone, role: contact.role });
-                                    setShowConfirm(true);
-                                }}>
-                                    REMOVE
-                                </button>
-                                )}
-                            </li>
-                        ))}           
-                    </ul>
+                        <div className="add-btn">
+                            <h2>Mutual</h2>
+                            {isRemoving ? (
+                                <p className="uline-btn pos" onClick={()=>setRemoving(false)}>DONE</p>
+                            ) : (                            
+                                <p className="uline-btn neg" onClick={()=>setRemoving(true)}>REMOVE</p>
+                            )}
+                        </div>
+                        <div className="scrollable">
+                            <ul>
+                                {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
+                                    <li key={index} className="profile-card" >
+                                        <div className="profile-card-name">
+                                            <img src={contact.image || "/images/user-example.svg"} />
+                                            <h3>{contact.name}</h3>
+                                        </div>
+                                        <p>{contact.email}</p>
+                                        <p>{contact.phone}</p>
+                                        {isRemoving &&(
+                                        <button className="pos-btn remove" onClick={() => {
+                                            setPendingRemove({ phone: contact.phone, role: contact.role });
+                                            setShowConfirm(true);
+                                        }}>
+                                            REMOVE
+                                        </button>
+                                        )}
+                                    </li>
+                                ))}           
+                            </ul>
+                        </div>
                     </div>
 
                     <div>
-                    <h2>Dependent</h2>
-                    <ul>
-                        {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
-                        <li key={index} className="profile-card" >
-                            <div className="profile-card-name">
-                                <img src={contact.image || "/images/user-example.svg"} />
-                                <h3>{contact.name}</h3>
+                        <h2>Dependent</h2>
+                        <ul>
+                            <div className="scrollable">
+                                {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                                    <li key={index} className="profile-card" >
+                                        <div className="profile-card-name">
+                                            <img src={contact.image || "/images/user-example.svg"} />
+                                            <h3>{contact.name}</h3>
+                                        </div>
+                                        <p>{contact.email}</p>
+                                        <p>{contact.phone}</p>
+                                        {isRemoving &&(
+                                            <button className="pos-btn remove" onClick={() => {
+                                                setPendingRemove({ phone: contact.phone, role: contact.role });
+                                                setShowConfirm(true);
+                                            }}>
+                                                REMOVE
+                                            </button>
+                                        )}
+                                    </li>
+                                ))}
                             </div>
-                            <p>{contact.email}</p>
-                            <p>{contact.phone}</p>
-                            {isRemoving &&(
-                            <button className="pos-btn remove" onClick={() => {
-                                setPendingRemove({ phone: contact.phone, role: contact.role });
-                                setShowConfirm(true);
-                            }}>
-                                REMOVE
-                            </button>
-                            )}
-                        </li>
-                        ))}
-                    </ul>
+                        </ul>
                     </div>
                 </>
                 ) : (
