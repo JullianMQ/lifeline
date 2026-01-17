@@ -62,14 +62,14 @@ const AddPhoneNum = () => {
                     <Text className="text-3xl font-extrabold mb-12">Fill up member details</Text>
 
                     {/* FORM */}
-                    <View className="w-full mt-8">
+                    <View className="w-full">
                         <TextInput
                             placeholder="Phone Number"
                             value={phone}
                             onChangeText={setPhone}
                             keyboardType="phone-pad"
                             autoCapitalize="none"
-                            className="border border-gray-300 rounded px-4 py-2"
+                            className="border-2 border-black rounded-full px-4 py-4"
                         />
                     </View>
                 </View>

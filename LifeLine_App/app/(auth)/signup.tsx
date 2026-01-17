@@ -70,7 +70,7 @@ const Signup: React.FC = () => {
             });
             if (!data) return;
 
-            // You can add any post-signup logic here if needed
+
         } catch (err: any) {
             alert(err.message || "Google signup failed");
         } finally {

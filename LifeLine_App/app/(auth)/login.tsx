@@ -51,7 +51,7 @@ const Login = () => {
             });
             if (!data) return;
 
-            // You can add any post-login logic here if needed
+
         } catch (err: any) {
             alert(err.message || "Google login failed");
         } finally {
