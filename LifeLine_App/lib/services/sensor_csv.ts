@@ -34,13 +34,7 @@ export const getUserFile = async () => {
     return DIR + `${userId}_session.csv`;
 };
 
-
-let initialized = false;
-
-// Initialize the CSV for the current user
 export async function initCsv(reset = false) {
-    if (initialized && !reset) return;
-
     const userFile = await getUserFile();
 
     const dirInfo = await FileSystem.getInfoAsync(DIR);
@@ -52,24 +46,25 @@ export async function initCsv(reset = false) {
     if (reset || !fileInfo.exists) {
         await FileSystem.writeAsStringAsync(userFile, CSV_HEADER);
     }
-
-    initialized = true;
 }
+
 
 // Append HIGHEST and LOWEST summary for current session
 export async function appendSummaryRow(endTime?: number) {
-    if (!initialized) return;
-
     const userFile = await getUserFile();
+
+    const fileInfo = await FileSystem.getInfoAsync(userFile);
+    if (!fileInfo.exists) {
+        await initCsv(false);
+    }
+
     const userId = userFile.split('/').pop()?.split('_')[0] || 'unknown';
-
     const sessionTimestamp = formatTimestamp(endTime || Date.now());
-
     const stats = sensorLogger.getStats();
 
-    const formatAccel = (v: number | null | undefined) => (v != null ? v.toFixed(2) + 'g' : '');
-    const formatGyro = (v: number | null | undefined) => (v != null ? v.toFixed(2) + ' rad/s' : '');
-    const formatMic = (v: number | null | undefined) => (v != null ? v.toFixed(2) + ' dBFS' : '');
+    const formatAccel = (v?: number | null) => (v != null ? v.toFixed(2) + 'g' : '');
+    const formatGyro = (v?: number | null) => (v != null ? v.toFixed(2) + ' rad/s' : '');
+    const formatMic = (v?: number | null) => (v != null ? v.toFixed(2) + ' dBFS' : '');
 
     const summaryRow = [
         userId,
@@ -90,21 +85,17 @@ export async function appendSummaryRow(endTime?: number) {
     ].join(',') + '\n';
 
     try {
-
         let existing = '';
         try {
             existing = await FileSystem.readAsStringAsync(userFile);
-        } catch (err) {
-            existing = '';
-        }
+        } catch { }
 
-        const newContent = existing + summaryRow + minRow;
-        await FileSystem.writeAsStringAsync(userFile, newContent);
+        await FileSystem.writeAsStringAsync(userFile, existing + summaryRow + minRow);
     } catch (err) {
         console.error('Failed to write summary row', err);
     }
-
 }
+
 
 
 // export a helper to share CSV for the current user (for testing)
