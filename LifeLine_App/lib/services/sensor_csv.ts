@@ -1,12 +1,13 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { sensorLogger } from './sensor_logger';
 import { getUser } from '../api/storage/user';
+import * as Crypto from 'expo-crypto';
 
 const DIR = FileSystem.documentDirectory + 'sensors/';
 
 // CSV header with user info
-const CSV_HEADER = 'UserID,UserName,Sensor,Accelerometer,Gyroscope,Microphone,Timestamp\n';
-
+const CSV_HEADER = 'UserID,Sensor,Accelerometer,Gyroscope,Microphone,Timestamp\n';
+const SALT = "LifeLine";
 const formatTimestamp = (ts?: number) => {
     if (!ts) return '';
     const d = new Date(ts);
@@ -22,9 +23,17 @@ const formatTimestamp = (ts?: number) => {
 // Compute the CSV file path for the current user
 export const getUserFile = async () => {
     const user = await getUser();
-    const userId = user?.id || 'unknown';
+    let userId = 'unknown';
+
+    if (user?.id) {
+        userId = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            `${SALT}${user.id}`
+        );
+    }
     return DIR + `${userId}_session.csv`;
 };
+
 
 let initialized = false;
 
@@ -51,10 +60,8 @@ export async function initCsv(reset = false) {
 export async function appendSummaryRow() {
     if (!initialized) return;
 
-    const user = await getUser();
-    const userId = user?.id || 'unknown';
-    const userName = user?.name || 'unknown';
     const userFile = await getUserFile();
+    const userId = userFile.split('/').pop()?.split('_')[0] || 'unknown';
 
     // Ensure directory exists
     const dirInfo = await FileSystem.getInfoAsync(DIR);
@@ -76,7 +83,6 @@ export async function appendSummaryRow() {
 
     const summaryRow = [
         userId,
-        userName,
         'HIGHEST',
         formatAccel(stats.maxAccel),
         formatGyro(stats.maxGyro),
@@ -86,7 +92,6 @@ export async function appendSummaryRow() {
 
     const minRow = [
         userId,
-        userName,
         'LOWEST',
         formatAccel(stats.minAccel),
         formatGyro(stats.minGyro),
