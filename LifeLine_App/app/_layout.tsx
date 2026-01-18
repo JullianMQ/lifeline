@@ -1,7 +1,6 @@
 import { Stack } from "expo-router";
 import "./globals.css";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import "../lib/tasks/background_sensors";
 import { SensorProvider } from "@/lib/context/sensor_context";
 
 GoogleSignin.configure({
