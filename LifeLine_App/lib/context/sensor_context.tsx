@@ -57,7 +57,6 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         // Microphone
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: false });
         const { recording } = await Audio.Recording.createAsync(
             Audio.RecordingOptionsPresets.LOW_QUALITY,
             status => {
