@@ -76,7 +76,7 @@ const Login = () => {
                 const { token, ...restParams } = queryParams ?? {};
                 console.log("Scanned deep link:", path, restParams);
 
-                if (!path) return;
+                if (!path && !queryParams?.token && !queryParams?.error) return;
 
 
                 if (queryParams?.error) {
