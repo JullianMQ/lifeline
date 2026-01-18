@@ -57,23 +57,13 @@ export async function initCsv(reset = false) {
 }
 
 // Append HIGHEST and LOWEST summary for current session
-export async function appendSummaryRow() {
+export async function appendSummaryRow(endTime?: number) {
     if (!initialized) return;
 
     const userFile = await getUserFile();
     const userId = userFile.split('/').pop()?.split('_')[0] || 'unknown';
 
-    // Ensure directory exists
-    const dirInfo = await FileSystem.getInfoAsync(DIR);
-    if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(DIR, { intermediates: true });
-    }
-
-    // If file doesn’t exist, add header
-    const fileInfo = await FileSystem.getInfoAsync(userFile);
-    if (!fileInfo.exists) {
-        await FileSystem.writeAsStringAsync(userFile, CSV_HEADER);
-    }
+    const sessionTimestamp = formatTimestamp(endTime || Date.now());
 
     const stats = sensorLogger.getStats();
 
@@ -87,7 +77,7 @@ export async function appendSummaryRow() {
         formatAccel(stats.maxAccel),
         formatGyro(stats.maxGyro),
         formatMic(stats.maxMic),
-        formatTimestamp(stats.maxAccelTime),
+        sessionTimestamp,
     ].join(',') + '\n';
 
     const minRow = [
@@ -96,15 +86,15 @@ export async function appendSummaryRow() {
         formatAccel(stats.minAccel),
         formatGyro(stats.minGyro),
         formatMic(stats.minMic),
-        formatTimestamp(stats.minAccelTime),
+        sessionTimestamp,
     ].join(',') + '\n';
 
     try {
         let existing = '';
+        const fileInfo = await FileSystem.getInfoAsync(userFile);
         if (fileInfo.exists) {
             existing = await FileSystem.readAsStringAsync(userFile);
         }
-
         const newContent = existing + summaryRow + minRow;
         await FileSystem.writeAsStringAsync(userFile, newContent);
     } catch (err) {
@@ -112,7 +102,8 @@ export async function appendSummaryRow() {
     }
 }
 
-// Optional: export a helper to share CSV for the current user
+
+// export a helper to share CSV for the current user (for testing)
 export async function shareCsv() {
     const userFile = await getUserFile();
     try {

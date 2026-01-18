@@ -23,7 +23,7 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
     const accSubRef = useRef<any>(null);
     const gyroSubRef = useRef<any>(null);
     const micRecordingRef = useRef<Audio.Recording | null>(null);
-
+    let sessionEndTime: number | null = null;
     const requestAudioPermission = async () => {
         const { status } = await Audio.requestPermissionsAsync();
         return status === 'granted';
@@ -106,9 +106,9 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         await BackgroundService.stop();
-
+        sessionEndTime = Date.now();
         // Append summary with user info
-        await appendSummaryRow();
+        await appendSummaryRow(sessionEndTime);
 
         setIsMonitoring(false);
 
