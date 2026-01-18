@@ -6,15 +6,13 @@ import { SensorContext } from "@/lib/context/sensor_context";
 const Landing = () => {
   const router = useRouter();
 
-  // 3. Pull the start function from the context
-  const { startMonitoring } = useContext(SensorContext);
 
+  const { startMonitoring } = useContext(SensorContext);
   const handleStart = async () => {
-    // 4. Trigger the background sensor logic
     await startMonitoring();
 
-    // 5. Navigate to the next screen
-    router.push("/home_page");
+
+    router.replace("/home_page");
   };
 
   return (
@@ -26,7 +24,7 @@ const Landing = () => {
       />
 
       <TouchableOpacity
-        onPress={handleStart} // 6. Use the new handler
+        onPress={handleStart}
         className="bg-black w-3/4 py-6 rounded-full"
       >
         <Text className="text-white text-2xl font-semibold text-center">
