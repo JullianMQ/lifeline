@@ -62,7 +62,7 @@ const Login = () => {
 
     // QR Scanner success
 
-    const handleQRScanSuccess = async (data: string) => {
+ const handleQRScanSuccess = async (data: string) => {
         setShowScanner(false);
 
         try {
