@@ -90,16 +90,20 @@ export async function appendSummaryRow(endTime?: number) {
     ].join(',') + '\n';
 
     try {
+
         let existing = '';
-        const fileInfo = await FileSystem.getInfoAsync(userFile);
-        if (fileInfo.exists) {
+        try {
             existing = await FileSystem.readAsStringAsync(userFile);
+        } catch (err) {
+            existing = '';
         }
+
         const newContent = existing + summaryRow + minRow;
         await FileSystem.writeAsStringAsync(userFile, newContent);
     } catch (err) {
         console.error('Failed to write summary row', err);
     }
+
 }
 
 
