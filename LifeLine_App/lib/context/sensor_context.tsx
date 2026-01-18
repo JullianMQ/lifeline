@@ -91,8 +91,9 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
 
         await initCsv(false);
         startNewSession();
-        setIsMonitoring(true);
+
         await BackgroundService.start(backgroundTask, options);
+        setIsMonitoring(true);
     };
 
     const stopMonitoring = async () => {
