@@ -73,7 +73,8 @@ const Login = () => {
                 data.startsWith("lifeline://")
             ) {
                 const { path, queryParams } = Linking.parse(data);
-                console.log("Scanned deep link:", path, queryParams);
+                const { token, ...restParams } = queryParams ?? {};
+                console.log("Scanned deep link:", path, restParams);
 
                 if (!path) return;
 
