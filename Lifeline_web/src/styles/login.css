@@ -1,6 +1,7 @@
 .login-card, .logo, .line, .neg-btn, .switch{
     display: flex;
 }
+
 .login-card{
     background-color: var(--base-white);
     height: 100%;
@@ -8,7 +9,7 @@
     flex-direction: column;
     justify-content: space-between;
     border-radius: 12px;
-    padding: 20px 20px;
+    padding: var(--space-xxl) var(--space-sm) var(--space-sm);
     box-shadow: 0px 6px 4px rgba(0, 0, 0, 0.25);
 }
 .login-logo{
@@ -58,7 +59,16 @@ a{
     font-size: 16px;
     color: var(--lifeline-red);
 }
-
+@media screen and (max-width: 767px){
+    .login-card{
+        border-radius: 0;
+    }
+}
+@media screen and (max-height: 667px){
+    .login-card{
+       padding-top: var(--space-md);
+    }
+}
 @media screen and (min-width: 768px) and (max-width: 1024px) {
     .login-card{
         width: 600px;

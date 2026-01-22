@@ -43,3 +43,14 @@
     outline: 2px solid red;
     outline-offset: 2px;
 }
+
+@media screen and (max-height: 667px){
+    .login-card{
+        padding-top: var(--space-sm) !important;
+    }
+}
+@media screen and (max-width:767px) {
+    .login-card{
+        padding-top: var(--space-md);
+    }
+}

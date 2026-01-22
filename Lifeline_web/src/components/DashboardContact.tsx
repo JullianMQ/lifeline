@@ -15,7 +15,7 @@ export default function DashboardContact({ contact, onBack, geocode, location, h
             <img src="/images/close.svg" alt="Back"/>
         </button>
         <section className="dashboard-user">
-            <img src={contact?.image || "/images/user-example.svg"} alt={`${contact?.name}`} className="dashboard-card-img"/>
+            <img src={contact?.image || "/images/user-example.svg"} alt={`${contact?.name}`} className="dashboard-user-img"/>
             <div className="dashboard-cont-info">
                 <h1>{contact?.name?.split(" ")[0] || "User"}</h1>
                 <p>{contact?.phone}</p>

@@ -1,69 +1,148 @@
-.landing h1{font-size: 90px; color: var(--soft-white);}
-.landing h2{font-size: 48px;}
-.landing h3{font-size: 40px;}
+.landing h1{
+  font-size: clamp(3rem, 2.3629rem + 2.7184vw, 5.625rem);
+  letter-spacing: 2px;
+  color: var(--soft-white);
+}
+
+.landing h2{
+  font-size: clamp(2rem, 1.7573rem + 1.0356vw, 3rem);
+}
+
+.landing h3{
+  font-size: clamp(1.5rem, 1.3786rem + 0.5178vw, 2rem);
+  letter-spacing: 2px;
+}
+
+.landing, .content, .left, .right, .mobile, .logo, .context{
+  display: flex;
+}
+
+.landing, .left, .right, .logo{
+  justify-content: center;
+}
+
 strong{
   font-weight: 800px;
   color: var(--muted-grey);
   text-transform: uppercase;
 }
+
 .landing{
   background: var(--red-landing);
-  display: flex;
-  justify-content: center;
 }
+
 .content{
-  display: flex;
   width: 100%;
   height: 100vh;
-  padding: 0 var(--space-md);
-  gap: var(--space-md);
   max-width: 1440px;
+  padding: var(--space-xxl) var(--space-sm) var(--space-sm);
 }
-.left{
-  width: 33vw;
-  display: flex;
-  justify-content: center;
+
+.left, .logo{
   align-items: center;
 }
-.right{
-  width: 66vw;
-  display: flex;
+
+.right, .mobile, .logo, .context{
   flex-direction: column;
-  justify-content: center;
+}
+
+.right, .content{
   gap: var(--space-md );
 }
-.mobile{
-  height: 812px;
-  width: 375px;
-  border: 8px var(--text-black) solid;
-  border-radius: 50px;
-  padding:var(--space-md);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  background-color: var(--base-white);
-}
+
 .logo{
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
   text-align: center;
   margin-top: var(--space-lg);
 }
+
 .landing .lifeline-logo{
-  padding: 0 var(--space-lg);
-  aspect-ratio: 2/1.3;
-  height: 150px;
+  aspect-ratio: 1/1;
+  height: auto;
+  width: 60%;
 }
+
+.mobile{
+  width: 100%;
+}
+
 .landing p{
   width: 70%;
 }
+
 .context{
-  display: flex;
-  flex-direction: column;
   gap: var(--space-sm);
 }
-.landing button{
-  max-width: 300px;
+
+@media screen and (min-width: 768px) {
+  .content{
+    padding: 0 var(--space-md);
+  }
+  .mobile{
+    aspect-ratio: 375 / 812;
+    height: 60%;
+    max-height: 812px;
+    max-width: 375px;
+    border: 8px var(--text-black) solid;
+    border-radius: 50px;
+    padding:var(--space-md);
+    justify-content: space-between;
+    background-color: var(--base-white);
+  }
+
+  .right button{
+    max-width: 300px;
+  }
+}
+
+@media screen and (max-height: 667px){
+  .content{
+    padding-top: var(--space-md);
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .landing{background: var(--base-white) !important;}
+  .landing h1{color: var(--lifeline-red);}
+  .content{
+    flex-direction: column-reverse;
+    gap: var(--space-sm);
+   
+    justify-content: space-between;
+  }
+  
+  .right{
+    gap: var(--space-sm);
+  }
+
+  .context{
+    gap: var(--space-xs);
+  }
+
+  .landing p{
+    width: 100%;
+  }
+
+  .logo{
+    display: none !important;
+  }
+
+  .left a{
+    width: 100%;
+  }
+
+  .left button{
+    height: 100%;
+  }
+
+  .left .btn{
+    flex-direction: row;
+    gap: var(--space-xs);
+  }
+}
+
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  .mobile{
+    height: auto;
+    width: 35vw;
+  }
 }
