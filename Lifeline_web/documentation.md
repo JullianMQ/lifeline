@@ -110,3 +110,7 @@ npm install
 
 - Added overflow scrolling for contacts
 - Added style for scroll bar
+
+### 2026-01-23
+
+- Mobile and tablet responsiveness for all pages

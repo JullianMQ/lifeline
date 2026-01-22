@@ -31,25 +31,27 @@ function Profile() {
         <section className="profile-body">
             {!isEditing ? (
             <article className="profile-user">
-                <div className="profile-id">
-                    <img src={user?.image || "/images/user-example.svg"} alt="user-img"/>
-                    <h2>{user?.name}</h2>
-                </div>
-                    <hr />
-                <div className="profile-info">
-                    <div>
-                        <p className="info-label">Email:</p>   
-                        <p>{user?.email}</p>
+                <section className="profile-user-content">
+                    <div className="profile-id">
+                        <img src={user?.image || "/images/user-example.svg"} alt="user-img"/>
+                        <h2>{user?.name}</h2>
                     </div>
-                    <div>
-                        <p className="info-label">Phone number:</p> 
-                        <p>{user?.phone_no}</p>
+                        <hr className="vr"/>
+                    <div className="profile-info">
+                        <div>
+                            <p className="info-label">Email:</p>   
+                            <p>{user?.email}</p>
+                        </div>
+                        <div>
+                            <p className="info-label">Phone number:</p> 
+                            <p>{user?.phone_no}</p>
+                        </div>
+                        <div>
+                            <p className="info-label">Role:</p>
+                            <p>{user?.role}</p>
+                        </div>                  
                     </div>
-                    <div>
-                        <p className="info-label">Role:</p>
-                        <p>{user?.role}</p>
-                    </div>                  
-                </div>
+                </section>
                     <hr />
                 <div className="profile-edit">
                     <button className="neg-btn" onClick={() => setIsEditing(true)}>Edit Profile</button>
@@ -81,7 +83,7 @@ function Profile() {
                             )}
                         </div>
                         <div className="scrollable">
-                            <ul>
+                            <ul className="profile-grid">
                                 {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
                                     <li key={index} className="profile-card" >
                                         <div className="profile-card-name">
@@ -106,28 +108,28 @@ function Profile() {
 
                     <div>
                         <h2>Dependent</h2>
-                        <ul>
-                            <div className="scrollable">
-                                {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
-                                    <li key={index} className="profile-card" >
-                                        <div className="profile-card-name">
-                                            <img src={contact.image || "/images/user-example.svg"} />
-                                            <h3>{contact.name}</h3>
-                                        </div>
-                                        <p>{contact.email}</p>
-                                        <p>{contact.phone}</p>
-                                        {isRemoving &&(
-                                            <button className="pos-btn remove" onClick={() => {
-                                                setPendingRemove({ phone: contact.phone, role: contact.role });
-                                                setShowConfirm(true);
-                                            }}>
-                                                REMOVE
-                                            </button>
-                                        )}
-                                    </li>
-                                ))}
-                            </div>
-                        </ul>
+                        <div className="scrollable">
+                            <ul className="profile-grid">
+                            {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                                <li key={index} className="profile-card" >
+                                    <div className="profile-card-name">
+                                        <img src={contact.image || "/images/user-example.svg"} />
+                                        <h3>{contact.name}</h3>
+                                    </div>
+                                    <p>{contact.email}</p>
+                                    <p>{contact.phone}</p>
+                                    {isRemoving &&(
+                                        <button className="pos-btn remove" onClick={() => {
+                                            setPendingRemove({ phone: contact.phone, role: contact.role });
+                                            setShowConfirm(true);
+                                        }}>
+                                            REMOVE
+                                        </button>
+                                    )}
+                                </li>
+                            ))}
+                            </ul>
+                        </div>
                     </div>
                 </>
                 ) : (

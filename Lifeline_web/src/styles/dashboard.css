@@ -37,7 +37,8 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
     height: 100vh;
     width: 100vw;
     background: var(--base-white);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .dashboard header div, .dashboard-body, .dashboard-card, .map{
@@ -130,7 +131,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
     background-color: transparent;
     font-weight: 800;
     text-decoration: underline;
-    width: fit-content;
+    width: auto;
 }
 
 .back-btn{
@@ -243,6 +244,12 @@ ul{
         gap: var(--space-xs);
     }
     .dashboard-history{
+        gap: var(--space-xs);
+    }
+    .dashboard-contacts{
+        gap: var(--space-sm);
+    }
+    .dashboard-contacts > div{
         gap: var(--space-xs);
     }
     footer{

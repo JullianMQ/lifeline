@@ -50,14 +50,16 @@ export default function DashboardUser({
 
             <div>
               <h2>Dependent</h2>
-              <ul>
-                {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
-                  <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
-                      <img src={contact.image || "/images/user-example.svg"} className="dashboard-card-img"/>
-                      <h3>{contact.name.split(" ")[0]}</h3>
-                    </li>
-                ))}
-              </ul>
+              <div className="scrollable">
+                <ul>
+                  {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                    <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
+                        <img src={contact.image || "/images/user-example.svg"} className="dashboard-card-img"/>
+                        <h3>{contact.name.split(" ")[0]}</h3>
+                      </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </>
         ) : (

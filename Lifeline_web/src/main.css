@@ -196,7 +196,8 @@ input:-webkit-autofill:focus {
 }
 
 ::-webkit-scrollbar {
-  height: 10px;           
+  height: 10px;
+  width: 10px;           
 }
 
 ::-webkit-scrollbar-track {
@@ -217,5 +218,9 @@ input:-webkit-autofill:focus {
 @media screen and (max-width: 768px){
   button{
     padding: 12px 16px;
+  }
+  ::-webkit-scrollbar {
+    width: 8px; 
+    height: 6px;
   }
 }
