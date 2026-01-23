@@ -1,24 +1,28 @@
 import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
-import { connectMessage, disconnectTWS } from "./useWebSocket";
+import { connectMessage } from "./useWebSocket";
 import { useState, useEffect } from 'react'
 import { API_BASE_URL } from "../config/api";
-
 import type { User, Contact } from "../types";
+
+// TODO: remove when ws is implemented
+const contloc = [//contacts
+    { lat: 15.135924992274758, lng: 120.58057235415056},
+    { lat: 15.134754688327266, lng: 120.59033559494401}
+];
+const userloc = { //user
+  lat: 15.12080856539815,
+  lng: 120.60186959586032,
+};
 
 export function useDashboard() {
     const navigate = useNavigate();
 
-    const [message, setMessage] = useState("")
     const [user, setUser] = useState<User | null>(null);
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-
-        return () => disconnectTWS();
-    }, []);
+    const [message, setMessage] = useState("")
 
     const getUserInfo = async () => {
         try {
@@ -32,11 +36,10 @@ export function useDashboard() {
                 throw new Error("Not authenticated");
             }
 
-            const firstName = data.user.name?.split(" ")[0] || "User";
-
             setUser({
                 ...data.user,
-                name: firstName,
+                name: data.user.name,
+                location: userloc,
             });
         } catch (err) {
             console.error("Failed to get user info:", err);
@@ -82,18 +85,25 @@ export function useDashboard() {
                 throw new Error(data.message || "Failed to load contacts");
             }
 
-            const formatted: Contact[] = [];
-
-            for (let i = 1; i <= 5; i++) {
-                const name = data[`contact${i}_name`];
-                const email = data[`contact${i}_email`];
-                const phone = data[`contact${i}_phone`];
-
-                if (name && phone) {
-                    formatted.push({ name, email, phone });
-                }
-            }
-
+            const userContacts: Array<{  
+                name: string;  
+                email?: string;  
+                phone_no: string;  
+                image?: string;  
+                role: string;  
+            }> = [  
+                ...(data.emergency_contacts || []),  
+                ...(data.dependent_contacts || []),  
+            ];  
+            
+            const formatted: Contact[] = userContacts.map((user: any, index: number) => ({
+                name: user.name,
+                email: user.email,
+                phone: user.phone_no,
+                image: user.image,
+                role: user.role,
+                location: contloc[index], 
+            }));
             setContacts(formatted);
         } catch (err: any) {
             setError(err.message || "Failed to load contacts");
@@ -112,7 +122,6 @@ export function useDashboard() {
         handleLogout,
         handleSOS,
         message,
-
         contacts,
         loading,
         error,

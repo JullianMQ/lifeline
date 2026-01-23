@@ -1,55 +1,98 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../styles/dashboard.css";
 import { useDashboard } from "../scripts/useDashboard";
 import { useNavigate } from "react-router-dom";
 import DashboardMap from "../components/DashboardMap";
 import DashboardUser from "../components/DashboardUser";
 import DashboardContact from "../components/DashboardContact";
-import type { Contact } from "../types";
-import { API_BASE_URL } from "../config/api";
+import { useMap } from "../scripts/useMap";
+import type { Contact, LatLng } from "../types";
 
 function Dashboard() {
-    const navigate = useNavigate();
-    const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const navigate = useNavigate();
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [location, setLocation] = useState<LatLng | undefined>(undefined);
+  // const [time, setTime] = useState<string>("");
+  const [history, setHistory] = useState<Record<string, { time: string; lat: number; lng: number }[]>>({});
 
-    const {
-        user,
-        handleLogout,
-        contacts,
-    } = useDashboard();
+  const { markers, loading, handleLocation, getGeocode, setAddress, address } = useMap();
+  const { user, handleLogout, contacts } = useDashboard();
+  
+  useEffect(() => {
+    if (!user || !contacts) return;
+    handleLocation(user);
+    contacts.forEach(c => handleLocation(c));
+  }, [user, contacts]);
+   
+  useEffect(() => {
+    if (!selectedContact) return;  
+    if (!selectedContact.location) return;  
+    const lat = selectedContact.location.lat;  
+    const lng = selectedContact.location.lng;
 
-    return (
-        <main className="dashboard">
-            <header>
-                <h2 className="head-title">Lifeline</h2>
-                <button className="logout-btn" onClick={handleLogout}>
-                    LOGOUT
-                </button>
-            </header>
+    const updateAddress = async () => {
+      const res = await getGeocode(lat, lng);
+      const timestamp = new Date().toLocaleTimeString();
+      // setTime(timestamp);
+      setLocation(selectedContact.location);
+      setAddress(res);
+      setHistory(prev => ({
+        ...prev,
+        [selectedContact.phone]: [
+          { time: timestamp, lat, lng },
+          ...(prev[selectedContact.phone] || []),
+        ],
+      }));
+    };
+    
+    updateAddress();
+  
+    const interval = setInterval(() => {
+      updateAddress();
+    }, 5000);
 
-            <section className="dashboard-body">
-                <div className="dashboard-content">
-                    {!selectedContact ? (
-                        <DashboardUser
-                            user={user}
-                            contacts={contacts}
-                            onSelectContact={setSelectedContact}
-                            onAddContact={() => navigate("/addContact")}
-                        />
-                    ) : (
-                        <DashboardContact
-                            contact={selectedContact}
-                            onBack={() => setSelectedContact(null)}
-                        />
-                    )}
-                </div>
+    return () => clearInterval(interval);
+  }, [selectedContact]);
 
-                <div className="map">
-                    <DashboardMap />
-                </div>
-            </section>
-        </main>
-    );
+  return (
+    <main className="dashboard">
+      <header>
+          <h2 className="head-title">Lifeline</h2>
+          <div>
+            <p className="uline-btn" onClick={handleLogout}>
+                LOGOUT
+            </p>
+            <img src={user?.image || "/images/user-example.svg"} alt="user-img" className="dashboard-img"  onClick={() => navigate("/profile")}/>
+          </div>         
+      </header>
+
+      <section className="dashboard-body">
+        <div className="dashboard-content">
+          {!selectedContact ? (
+            <DashboardUser
+              user={user}
+              contacts={contacts}
+              onSelectContact={setSelectedContact}
+              onAddContact={() => navigate("/addContact")}
+            />
+          ) : (
+            <DashboardContact
+              contact={selectedContact}
+              onBack={() => setSelectedContact(null)}
+              geocode={address}
+              location={location}
+              history={history[selectedContact.phone] || []}
+            />
+          )}
+        </div>
+
+        <div className="map">
+          <DashboardMap markers={markers} loading={loading} center={selectedContact?.location || user?.location} />
+        </div>
+      </section>
+      <footer></footer>
+    </main>
+  );
 }
 
 export default Dashboard;

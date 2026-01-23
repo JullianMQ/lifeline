@@ -1,4 +1,4 @@
-# Lifeline Backend Documentation
+# Lifeline Web Documentation
 
 ## Overview
 
@@ -84,3 +84,33 @@ npm install
 - Implemented protected and public routes
 - Added phone number validation for social login
 - Adding contacts now has create new and add existing options
+
+### 2026-01-09
+
+- implemented google maps api on dashboard
+- added marker for dashboard maps(user and contacts)
+- added geocoder for maps
+- added geolocation with time stamp history{under maintenance}
+- added buttons for sensors
+
+### 2026-01-14
+
+- Added profile page
+- added edit profile
+- Added avatar selection modal for edit profile
+
+### 2026-01-15
+
+- Added optimized avatars
+- Improved image responsiveness
+- Display contacts in dashboard as dependent and mutual
+- Added delete contacts
+
+### 2026-01-17
+
+- Added overflow scrolling for contacts
+- Added style for scroll bar
+
+### 2026-01-23
+
+- Mobile and tablet responsiveness for all pages

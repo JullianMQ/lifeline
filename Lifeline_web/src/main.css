@@ -184,10 +184,43 @@ input:invalid, input.invalid, input:not(:placeholder-shown):invalid {
   border:2px solid var(--lifeline-red);
 }
 
+input[type="radio"]:checked {
+  accent-color: var(--lifeline-red)
+}
 
 input:-webkit-autofill, input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 1000px var(--base-white) inset;
 }
 input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 1000px var(--base-white) inset;
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;           
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted-grey); 
+  border-radius: 10px;   
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--lifeline-red);
+  border-radius: 5px;  
+  border: 2px solid var(--muted-grey);
+}
+
+::-webkit-scrollbar-button {
+  display: none;         
+}
+
+@media screen and (max-width: 768px){
+  button{
+    padding: 12px 16px;
+  }
+  ::-webkit-scrollbar {
+    width: 8px; 
+    height: 6px;
+  }
 }
