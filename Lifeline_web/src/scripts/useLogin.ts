@@ -26,26 +26,31 @@ export function useLogin() {
             return null;
         }
 
-        const res = await authClient.signIn.email({
-            email: email,
-            password: password,
-            callbackURL: `${window.location.origin}/dashboard`,
-        })
+        try{
+            const res = await authClient.signIn.email({
+                email: email,
+                password: password,
+                callbackURL: `${window.location.origin}/dashboard`,
+            })
 
-        if (res?.data !== null) {
-            window.location.href = '/dashboard';
-        }
-
-        if (res?.error !== null) {
-            console.error("Login failed:", res?.error);
-            if (res?.error.code === "INVALID_EMAIL_OR_PASSWORD") {
-                setError("Please check your email and password");
-            } else {
-                setError(res?.error.code || "Failed to connect. Please try again later.");
+            if (res?.data !== null) {
+                window.location.href = '/dashboard';
             }
-        }
 
-        setLoading(false);
+            if (res?.error !== null) {
+                console.error("Login failed:", res?.error);
+                if (res?.error.code === "INVALID_EMAIL_OR_PASSWORD") {
+                    setError("Please check your email and password");
+                } else {
+                    setError(res?.error.code || "Failed to connect. Please try again later.");
+                }
+            }
+        }catch (err) {  
+            console.error("Login failed:", err);  
+            setError("Failed to connect. Please try again later.");
+        }finally {
+            setLoading(false);
+        }
     };
 
     return { login, loading, error, invalidFields, setInvalidFields };

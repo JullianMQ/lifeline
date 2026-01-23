@@ -55,6 +55,11 @@ export function useAddContact() {
             if (!createForm.lastName) errors.push("lastName");
             if (!createForm.email) errors.push("email");
 
+            if (!createForm.role) {  
+                errors.push("role");  
+                setError("Please select a role");  
+            }  
+
             if (!createForm.phoneNo || !phoneRegex.test(createForm.phoneNo)) {
                 errors.push("phoneNo");
                 setError(!createForm.phoneNo
@@ -165,9 +170,20 @@ export function useAddContact() {
     }
 
     const handleAdd = async () => {
-        setLoading(true);
-        addEmContact(addForm.phoneNo, fetchedUser.role);
-        setStep(3);
+        try {
+            setLoading(true);
+            await addEmContact(addForm.phoneNo, fetchedUser.role);
+            setStep(3);
+        } catch (err) {
+            console.error(err);
+            setError(
+            err instanceof Error
+                ? err.message
+                : "Failed to add emergency contact"
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     // contact handling

@@ -25,10 +25,11 @@ function Dashboard() {
   }, [user, contacts]);
    
   useEffect(() => {
-    if (!selectedContact) return;
-    const lat = selectedContact.location?.lat!;
-    const lng = selectedContact.location?.lng!;
-    console.log("longlat",markers);
+    if (!selectedContact) return;  
+    if (!selectedContact.location) return;  
+    const lat = selectedContact.location.lat;  
+    const lng = selectedContact.location.lng;
+
     const updateAddress = async () => {
       const res = await getGeocode(lat, lng);
       const timestamp = new Date().toLocaleTimeString();

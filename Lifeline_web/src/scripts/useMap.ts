@@ -8,19 +8,31 @@ export function useMap() {
   
   async function getGeocode(lat: number, lng: number) {
     setLoading(true);
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${import.meta.env.VITE_GEOCODING_API_KEY}`
-    );
 
-    const data = await res.json();
-    if (data.status !== "OK") throw new Error(data.status);
-    setLoading(false);
-    return data.results[0]?.formatted_address || "Unknown location";
+    try {
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${import.meta.env.VITE_GEOCODING_API_KEY}`
+      );
+
+      if (!res.ok) {
+        throw new Error(`Geocoding request failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (data.status !== "OK") {
+        throw new Error(data.error_message || data.status);
+      }
+
+      return data.results?.[0]?.formatted_address ?? "Unknown location";
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleLocation(contact: any) {
     if (!contact?.location){
-      setLoading(true);
+      setLoading(false);
       return;
     };
     const { lat, lng } = contact.location;
@@ -34,7 +46,7 @@ export function useMap() {
   function resetLocations() {
     setMarkers([]);
     setAddress("");
-    setLoading(true);
+    setLoading(false);
   }
 
   useEffect(() => {

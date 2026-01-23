@@ -204,6 +204,15 @@ form.profile-user{
 
 .profile-card{
     gap: var(--space-xxs);
+    min-width: 300px;
+    text-wrap: break-text;
+}
+
+.profile-card p{
+    overflow-wrap: break-word;
+    word-break: break-word;
+    text-wrap: pretty;
+    max-inline-size: 85%;
 }
 
 .profile-card-name{
@@ -261,9 +270,6 @@ form.profile-user{
     .profile-body{
         padding: var(--space-md);
         gap: var(--space-md);
-    }
-    .profile-card{
-        min-width: 300px;
     }
     .profile-edit{
         padding-top: var(--space-sm);

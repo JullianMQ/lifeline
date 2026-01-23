@@ -28,7 +28,7 @@ export default function AvatarModal({
 
         <div className="avatar-grid">
             {avatars.map((avatar) => {
-                const path = `public/avatars/${avatar}.svg`;
+                const path = `/avatars/${avatar}.svg`;
 
                 return (
                     <label key={avatar}  className={`avatar-choice ${value === path ? "selected" : ""}`}>
@@ -39,7 +39,7 @@ export default function AvatarModal({
                         checked={value === path}
                         onChange={onChange}
                         />
-                        <img src={`/avatars/${avatar}.svg`} className="avatar-img"/>
+                        <img src={path} className="avatar-img" alt={avatar}/>
                     </label>
                 );
             })}

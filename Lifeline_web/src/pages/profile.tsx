@@ -16,7 +16,7 @@ function Profile() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [pendingRemove, setPendingRemove] = useState<{
         phone: string;
-        role: "mutual" | "dependent" | "emergency";
+        role: "mutual" | "dependent";
     } | null>(null);
 
     return (
@@ -147,7 +147,7 @@ function Profile() {
                         setPendingRemove(null);
                     }}
                     onConfirm={async () => { 
-                        removeContact(pendingRemove.phone, pendingRemove.role);
+                        await removeContact(pendingRemove.phone, pendingRemove.role);
                         await displayContact();
                         setShowConfirm(false);
                         setPendingRemove(null);

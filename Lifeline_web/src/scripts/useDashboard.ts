@@ -85,10 +85,16 @@ export function useDashboard() {
                 throw new Error(data.message || "Failed to load contacts");
             }
 
-            const userContacts: string[] = [
-                ...(data.emergency_contacts || []),
-                ...(data.dependent_contacts || []),
-            ];
+            const userContacts: Array<{  
+                name: string;  
+                email?: string;  
+                phone_no: string;  
+                image?: string;  
+                role: string;  
+            }> = [  
+                ...(data.emergency_contacts || []),  
+                ...(data.dependent_contacts || []),  
+            ];  
             
             const formatted: Contact[] = userContacts.map((user: any, index: number) => ({
                 name: user.name,
@@ -120,6 +126,5 @@ export function useDashboard() {
         loading,
         error,
         displayContact,
-        history
     };
 }
