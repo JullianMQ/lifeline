@@ -607,7 +607,7 @@ ws.get('/ws', upgradeWebSocket((c) => {
     const clientId = user.id; // Use user ID as client ID
 
     return {
-        onOpen(_event, ws) {
+        async onOpen(_event, ws) {
             const clientInfo: ClientInfo = {
                 id: clientId,
                 ws: ws,
@@ -619,7 +619,7 @@ ws.get('/ws', upgradeWebSocket((c) => {
             clients.set(clientId, clientInfo);
             console.log(`[${new Date().toISOString()}] ${user.name} (${clientId}) connected to WebSocket`);
 
-            autoJoinEmergencyContacts(clientId, clientInfo);
+            await autoJoinEmergencyContacts(clientId, clientInfo);
 
             ws.send(JSON.stringify({
                 type: 'connected',
