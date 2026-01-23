@@ -113,20 +113,39 @@ export function createAuthenticatedWebSocket(cookies: AuthCookies): Promise<WebS
 export function waitForMessage(ws: WebSocket, timeout: number = 5000): Promise<WebSocketMessage> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("Timeout waiting for message")), timeout);
-
-    ws.on("message", (data) => {
+    
+    const messageHandler = (data: MessageEvent) => {
       clearTimeout(timer);
+      ws.removeEventListener("message", messageHandler);
       try {
         const message = JSON.parse(data.toString());
         resolve(message);
       } catch (error) {
         reject(new Error("Failed to parse message"));
       }
-    });
-
-    ws.on("error", (error) => {
+    };
+    
+    const errorHandler = (error: Event) => {
       clearTimeout(timer);
+      ws.removeEventListener("error", errorHandler);
       reject(error);
+    };
+    
+    ws.addEventListener("message", messageHandler);
+    ws.addEventListener("error", errorHandler);
+    
+    // Cleanup on rejection/fulfillment
+    Promise.race([
+      new Promise((_, reject) => {
+        const cleanup = () => {
+          clearTimeout(timer);
+          ws.removeEventListener("message", messageHandler);
+          ws.removeEventListener("error", errorHandler);
+        };
+        reject(new Error("Cleanup called"));
+      })
+    ]).catch(() => {
+      // Silently ignore cleanup race
     });
   });
 }
@@ -146,7 +165,7 @@ export function createMessageCollector(ws: WebSocket): {
 } {
   const messages: WebSocketMessage[] = [];
 
-  const listener = (data: any) => {
+  const listener = (data: MessageEvent) => {
     try {
       const message = JSON.parse(data.toString());
       messages.push(message);
@@ -155,12 +174,12 @@ export function createMessageCollector(ws: WebSocket): {
     }
   };
 
-  ws.on("message", listener);
+  ws.addEventListener("message", listener);
 
   return {
     messages,
     collector: () => {
-      ws.off("message", listener);
+      ws.removeEventListener("message", listener);
     }
   };
 }

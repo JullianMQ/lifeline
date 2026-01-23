@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { upgradeWebSocket, websocket } from "hono/bun";
+import { upgradeWebSocket } from "hono/bun";
 import { auth } from "../lib/auth";
 import type { AuthType } from "../lib/auth";
 import { randomBytes } from "crypto";
@@ -97,7 +97,7 @@ function removeClientFromAllRooms(clientId: string): void {
         }
     });
 
-    console.log(`[${new Date().toISOString()}] Removed ${clientInfo.user.name} (${clientId}) from ${roomIdsArray.length} room(s)`);
+        console.log(`[${new Date().toISOString()}] Removed ${clientInfo.user?.name || "Unknown"} (${clientId}) from ${roomIdsArray.length} room(s)`);
     clients.delete(clientInfo.id);
 }
 
@@ -108,7 +108,7 @@ async function autoJoinEmergencyContacts(clientId: string, clientInfo: ClientInf
 
         rooms.forEach((room, roomId) => {
             const isOwner = room.owner === clientId;
-            const isEmergencyContact = room.emergencyContacts.includes(userPhone);
+            const isEmergencyContact = userPhone && room.emergencyContacts.includes(userPhone);
 
             if (isEmergencyContact && !isOwner && !clientInfo.roomIds.has(roomId)) {
                 try {
@@ -131,15 +131,15 @@ async function autoJoinEmergencyContacts(clientId: string, clientInfo: ClientInf
                         timestamp: new Date().toISOString()
                     }, clientId);
 
-                    console.log(`[${new Date().toISOString()}] ${clientInfo.user.name} (${clientId}) auto-joined room ${roomId} as emergency contact`);
+                    console.log(`[${new Date().toISOString()}] ${clientInfo.user?.name || "Unknown"} (${clientId}) auto-joined room ${roomId} as emergency contact`);
                 } catch (error) {
-                    console.error(`[${new Date().toISOString()}] Error auto-joining room ${roomId} for ${clientInfo.user.name} (${clientId}):`, error);
+                    console.error(`[${new Date().toISOString()}] Error auto-joining room ${roomId} for ${clientInfo.user?.name || "Unknown"} (${clientId}):`, error);
                 }
             }
         });
 
         if (authorizedRooms.length > 0) {
-            console.log(`[${new Date().toISOString()}] ${clientInfo.user.name} (${clientId}) auto-joined ${authorizedRooms.length} room(s) as emergency contact`);
+            console.log(`[${new Date().toISOString()}] ${clientInfo.user?.name || "Unknown"} (${clientId}) auto-joined ${authorizedRooms.length} room(s) as emergency contact`);
             clientInfo.ws.send(JSON.stringify({
                 type: 'auto-join-summary',
                 roomsJoined: authorizedRooms,
@@ -148,7 +148,7 @@ async function autoJoinEmergencyContacts(clientId: string, clientInfo: ClientInf
             }));
         }
     } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error in autoJoinEmergencyContacts for ${clientInfo.user.name} (${clientId}):`, error);
+        console.error(`[${new Date().toISOString()}] Error in autoJoinEmergencyContacts for ${clientInfo.user?.name || "Unknown"} (${clientId}):`, error);
     }
 }
 
@@ -208,7 +208,7 @@ async function handleCreateRoom(clientId: string, clientInfo: ClientInfo, data: 
         room.clients.set(clientId, clientInfo);
         clientInfo.roomIds.add(roomId);
 
-        console.log(`[${new Date().toISOString()}] Room ${roomId} created by ${clientInfo.user.name} (${clientId}) with ${emergencyContacts.length} emergency contacts`);
+        console.log(`[${new Date().toISOString()}] Room ${roomId} created by ${clientInfo.user?.name || "Unknown"} (${clientId}) with ${emergencyContacts.length} emergency contacts`);
 
         ws.send(JSON.stringify({
             type: 'room-created',
@@ -231,7 +231,7 @@ async function handleCreateRoom(clientId: string, clientInfo: ClientInfo, data: 
             timestamp: new Date().toISOString()
         }, clientId);
     } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error creating room for ${clientInfo.user.name} (${clientId}):`, error);
+        console.error(`[${new Date().toISOString()}] Error creating room for ${clientInfo.user?.name || "Unknown"} (${clientId}):`, error);
         ws.send(JSON.stringify({
             type: 'error',
             message: 'Failed to create room',
@@ -245,7 +245,7 @@ function handleJoinRoom(clientId: string, clientInfo: ClientInfo, data: any, ws:
     const room = rooms.get(roomId);
 
     if (!room) {
-        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user.name} (${clientId}): room ${roomId} not found`);
+        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user?.name || "Unknown"} (${clientId}): room ${roomId} not found`);
         ws.send(JSON.stringify({
             type: 'join-denied',
             message: 'Room not found',
@@ -255,7 +255,7 @@ function handleJoinRoom(clientId: string, clientInfo: ClientInfo, data: any, ws:
     }
 
     if (!room.isActive) {
-        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user.name} (${clientId}): room ${roomId} not active`);
+        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user?.name || "Unknown"} (${clientId}): room ${roomId} not active`);
         ws.send(JSON.stringify({
             type: 'join-denied',
             message: 'Room is not active',
@@ -265,10 +265,11 @@ function handleJoinRoom(clientId: string, clientInfo: ClientInfo, data: any, ws:
     }
 
     const isOwner = room.owner === clientId;
-    const isEmergencyContact = room.emergencyContacts.includes(clientInfo.user.phone_no);
+            const userPhone = clientInfo.user.phone_no;
+            const isEmergencyContact = userPhone && room.emergencyContacts.includes(userPhone);
 
     if (!isOwner && !isEmergencyContact) {
-        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user.name} (${clientId}): not authorized to join room ${roomId}`);
+        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user?.name || "Unknown"} (${clientId}): not authorized to join room ${roomId}`);
         ws.send(JSON.stringify({
             type: 'join-denied',
             message: 'Not authorized to join this room',
@@ -278,7 +279,7 @@ function handleJoinRoom(clientId: string, clientInfo: ClientInfo, data: any, ws:
     }
 
     if (clientInfo.roomIds.has(roomId)) {
-        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user.name} (${clientId}): already in room ${roomId}`);
+        console.log(`[${new Date().toISOString()}] Join denied for ${clientInfo.user?.name || "Unknown"} (${clientId}): already in room ${roomId}`);
         ws.send(JSON.stringify({
             type: 'error',
             message: 'Already in room',
@@ -290,7 +291,7 @@ function handleJoinRoom(clientId: string, clientInfo: ClientInfo, data: any, ws:
     room.clients.set(clientId, clientInfo);
     clientInfo.roomIds.add(roomId);
 
-    console.log(`[${new Date().toISOString()}] ${clientInfo.user.name} (${clientId}) joined room ${roomId} as ${isOwner ? 'owner' : 'emergency contact'}`);
+        console.log(`[${new Date().toISOString()}] ${clientInfo.user?.name || "Unknown"} (${clientId}) joined room ${roomId} as ${isOwner ? 'owner' : 'emergency contact'}`);
 
     ws.send(JSON.stringify({
         type: 'join-approved',
@@ -432,7 +433,7 @@ async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, ws: 
         });
 
         if (ownedRooms.length === 0) {
-            console.error(`[${new Date().toISOString()}] Emergency SOS failed for ${user.name} (${clientId}): no owned rooms found`);
+            console.error(`[${new Date().toISOString()}] Emergency SOS failed for ${user?.name || "Unknown"} (${clientId}): no owned rooms found`);
             ws.send(JSON.stringify({
                 type: 'error',
                 message: 'No owned rooms found',
@@ -441,7 +442,7 @@ async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, ws: 
             return;
         }
 
-        console.log(`[${new Date().toISOString()}] EMERGENCY SOS triggered by ${user.name} (${clientId}) for rooms: ${ownedRooms.join(', ')}`);
+        console.log(`[${new Date().toISOString()}] EMERGENCY SOS triggered by ${user?.name || "Unknown"} (${clientId}) for rooms: ${ownedRooms.join(', ')}`);
 
         for (const roomId of ownedRooms) {
             const room = rooms.get(roomId);
@@ -495,7 +496,7 @@ async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, ws: 
             timestamp: new Date().toISOString()
         }));
     } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error processing emergency SOS for ${clientInfo.user.name} (${clientId}):`, error);
+        console.error(`[${new Date().toISOString()}] Error processing emergency SOS for ${clientInfo.user?.name || "Unknown"} (${clientId}):`, error);
         ws.send(JSON.stringify({
             type: 'error',
             message: 'Failed to process emergency SOS',
@@ -603,8 +604,9 @@ ws.use("*", async (c, next) => {
 }
  * */
 ws.get('/ws', upgradeWebSocket((c) => {
-    const user = c.get("user");
-    const clientId = user.id; // Use user ID as client ID
+        const user = c.get("user");
+        if (!user) return c.json({ error: "User not found" }, 401);
+        const clientId = user.id; // Use user ID as client ID
 
     return {
         async onOpen(_event, ws) {
@@ -617,7 +619,7 @@ ws.get('/ws', upgradeWebSocket((c) => {
             };
 
             clients.set(clientId, clientInfo);
-            console.log(`[${new Date().toISOString()}] ${user.name} (${clientId}) connected to WebSocket`);
+            console.log(`[${new Date().toISOString()}] ${user?.name || "Unknown"} (${clientId}) connected to WebSocket`);
 
             await autoJoinEmergencyContacts(clientId, clientInfo);
 
@@ -638,10 +640,10 @@ ws.get('/ws', upgradeWebSocket((c) => {
         async onMessage(e, ws) {
             try {
                 const messageStr = e.data.toString();
-                // console.log(`Received message from ${user.name} (${clientId}):`, messageStr); // Debug log
+                // console.log(`Received message from ${user?.name || "Unknown"} (${clientId}):`, messageStr); // Debug log
 
                 // Check if message looks like JSON before parsing
-                if (!messageStr.trim().startsWith('{') || !messageStr.trim().endsWith('}')) {
+                if (!messageStr.trim() || !messageStr.trim().startsWith('{') || !messageStr.trim().endsWith('}')) {
                     // console.log('Non-JSON message received, ignoring:', messageStr);
                     return; // Silently ignore non-JSON messages
                 }
@@ -692,7 +694,7 @@ ws.get('/ws', upgradeWebSocket((c) => {
                         break;
                 }
             } catch (error) {
-                console.error(`[${new Date().toISOString()}] Error parsing message from ${user.name} (${clientId}):`, error);
+                console.error(`[${new Date().toISOString()}] Error parsing message from ${user?.name || "Unknown"} (${clientId}):`, error);
                 ws.send(JSON.stringify({
                     type: 'error',
                     message: 'Invalid message format',
@@ -701,11 +703,11 @@ ws.get('/ws', upgradeWebSocket((c) => {
             }
         },
         onClose(_event, _ws) {
-            console.log(`[${new Date().toISOString()}] ${user.name} (${clientId}) disconnected from WebSocket`);
+            console.log(`[${new Date().toISOString()}] ${user?.name || "Unknown"} (${clientId}) disconnected from WebSocket`);
             removeClientFromAllRooms(clientId);
         },
         onError(error) {
-            console.error(`[${new Date().toISOString()}] WebSocket error for ${user.name} (${clientId}):`, error);
+            console.error(`[${new Date().toISOString()}] WebSocket error for ${user?.name || "Unknown"} (${clientId}):`, error);
             removeClientFromAllRooms(clientId);
         }
     };
@@ -713,7 +715,15 @@ ws.get('/ws', upgradeWebSocket((c) => {
 
 ws.get('/rooms-info', (c) => {
     try {
-        const roomList = Array.from(rooms.values()).map(room => ({
+        const requestingUserPhone = c.get("user")?.phone_no || "";
+        
+        // Filter rooms to only those where requesting user is a member (by phone number)
+        const userRooms = Array.from(rooms.values()).filter(room => {
+            if (!requestingUserPhone) return false;
+            return room.emergencyContacts.includes(requestingUserPhone);
+        });
+        
+        const roomList = userRooms.map(room => ({
             id: room.id,
             clientCount: room.clients.size,
             clients: Array.from(room.clients.values()).map(client => ({
@@ -722,17 +732,20 @@ ws.get('/rooms-info', (c) => {
                 user: {
                     id: client.user.id,
                     name: client.user.name,
-                    email: client.user.email,
-                    role: client.user.role,
-                    phone_no: client.user.phone_no
+                    // Redact sensitive fields: remove email and phone_no
+                    role: client.user.role
                 }
             }))
         }));
 
+        // Recalculate totals based on filtered list
+        const filteredRoomCount = userRooms.length;
+        const filteredClientCount = userRooms.reduce((total, room) => total + room.clients.size, 0);
+
         return c.json({
             rooms: roomList,
-            totalRooms: rooms.size,
-            totalClients: clients.size
+            totalRooms: filteredRoomCount,
+            totalClients: filteredClientCount
         });
     } catch (error) {
         console.error(`[${new Date().toISOString()}] Error fetching rooms info:`, error);
@@ -741,4 +754,4 @@ ws.get('/rooms-info', (c) => {
 });
 
 export default ws;
-export { websocket, rooms, broadcastToRoom };
+export { rooms, broadcastToRoom };
