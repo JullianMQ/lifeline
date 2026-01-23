@@ -1,12 +1,15 @@
-import React, { createContext, useState } from 'react';
-import { Accelerometer, Gyroscope } from 'expo-sensors';
+import React, { createContext, useRef, useState } from 'react';
+import {
+    accelerometer,
+    gyroscope,
+    SensorTypes,
+    setUpdateIntervalForType,
+} from 'react-native-sensors';
 import { Audio } from 'expo-av';
-import { EventSubscription } from 'expo-modules-core';
-import { sensorLogger } from '../services/sensor_logger';
-import { initCsv, FILE, appendSummaryRow } from '../services/sensor_csv';
+import BackgroundService from 'react-native-background-actions';
+import { initCsv, appendSummaryRow, getUserFile } from '../services/sensor_csv';
 import * as Sharing from 'expo-sharing';
-
-
+import { handleSensorEvent, startNewSession } from '../services/sensor_logger_wrapper';
 
 export const SensorContext = createContext({
     isMonitoring: false,
@@ -16,134 +19,103 @@ export const SensorContext = createContext({
 
 export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
     const [isMonitoring, setIsMonitoring] = useState(false);
-    const [subscriptions, setSubscriptions] = useState<EventSubscription[]>([]);
-    const [recording, setRecording] = useState<Audio.Recording | null>(null);
 
-    const sessionId = Date.now();
+    const accSubRef = useRef<any>(null);
+    const gyroSubRef = useRef<any>(null);
+    const micRecordingRef = useRef<Audio.Recording | null>(null);
+    let sessionEndTime: number | null = null;
+    const requestAudioPermission = async () => {
+        const { status } = await Audio.requestPermissionsAsync();
+        return status === 'granted';
+    };
 
-    const handleSensorEvent = async (
-        event: Parameters<typeof sensorLogger.log>[0]
-    ) => {
-        const fullEvent = { ...event, sessionId };
+    const backgroundTask = async () => {
+        let gravity = { x: 0, y: 0, z: 0 };
+        const ALPHA = 0.8;
 
-        // CSV logging 
-        sensorLogger.log(fullEvent);
+        // Accelerometer
+        setUpdateIntervalForType(SensorTypes.accelerometer, 300);
+        accSubRef.current = accelerometer.subscribe(({ x, y, z }) => {
+            gravity.x = ALPHA * gravity.x + (1 - ALPHA) * x;
+            gravity.y = ALPHA * gravity.y + (1 - ALPHA) * y;
+            gravity.z = ALPHA * gravity.z + (1 - ALPHA) * z;
 
+            const linearX = x - gravity.x;
+            const linearY = y - gravity.y;
+            const linearZ = z - gravity.z;
 
-        // LIVE logging 
-        if (event.sensor === 'accelerometer' && event.magnitude !== undefined) {
-            console.log(`Accel: ${event.magnitude.toFixed(2)}g`);
-            if (event.magnitude > 3.0) console.log(">> IMPACT DETECTED!");
+            const linearMagnitude = Math.sqrt(linearX ** 2 + linearY ** 2 + linearZ ** 2);
+
+            handleSensorEvent({ sensor: 'accelerometer', magnitude: linearMagnitude });
+        });
+
+        // Gyroscope
+        setUpdateIntervalForType(SensorTypes.gyroscope, 300);
+        gyroSubRef.current = gyroscope.subscribe(({ x, y, z }) => {
+            const rotationSpeed = Math.abs(x) + Math.abs(y) + Math.abs(z);
+            handleSensorEvent({ sensor: 'gyroscope', x, y, z, rotationSpeed });
+        });
+
+        // Microphone
+        const { recording } = await Audio.Recording.createAsync(
+            Audio.RecordingOptionsPresets.LOW_QUALITY,
+            status => {
+                if (status.metering !== undefined) {
+                    handleSensorEvent({ sensor: 'microphone', metering: status.metering });
+                }
+            }
+        );
+        micRecordingRef.current = recording;
+
+        // Keep the service alive
+        while (BackgroundService.isRunning()) {
+            await new Promise(res => setTimeout(res, 1000));
         }
-        if (event.sensor === 'gyroscope' && event.rotationSpeed !== undefined) {
-            console.log(`Gyro: ${event.rotationSpeed.toFixed(2)} rad/s`);
-            if (event.rotationSpeed > 2.0) console.log(">> ROTATION THRESHOLD!");
-        }
-        if (event.sensor === 'microphone' && event.metering !== undefined) {
-            console.log(`Mic: ${event.metering.toFixed(2)} dBFS`);
-            if (event.metering > -10) console.log(">> LOUD NOISE!");
-        }
+    };
+
+    const options = {
+        taskName: 'SensorMonitoring',
+        taskTitle: 'Sensors Running',
+        taskDesc: 'Monitoring accelerometer, gyroscope, and microphone',
+        taskIcon: { name: 'ic_launcher', type: 'mipmap' },
+        color: '#FF00FF',
+        parameters: {},
+        foregroundServiceType: ['microphone', 'dataSync'],
     };
 
     const startMonitoring = async () => {
         if (isMonitoring) return;
-        await initCsv(true);
 
-        const { status: accStatus } = await Accelerometer.requestPermissionsAsync();
-        const { status: gyroStatus } = await Gyroscope.requestPermissionsAsync();
-        const { status: micStatus } = await Audio.requestPermissionsAsync();
+        const audioGranted = await requestAudioPermission();
+        if (!audioGranted) return;
 
-        if (accStatus !== 'granted' || gyroStatus !== 'granted' || micStatus !== 'granted') {
-            alert("Accelerometer, Gyroscope and Microphone permissions are required.");
-            return;
-        }
+        await initCsv(false);
+        startNewSession();
 
-        let activeSubs: EventSubscription[] = [];
-        let activeRecording: Audio.Recording | null = null;
-
-        try {
-            // ACCELEROMETER
-            Accelerometer.setUpdateInterval(300);
-            const accSub = Accelerometer.addListener(data => {
-                const magnitude = Math.sqrt(data.x ** 2 + data.y ** 2 + data.z ** 2);
-                handleSensorEvent({
-                    sensor: 'accelerometer',
-                    timestamp: Date.now(),
-                    x: data.x,
-                    y: data.y,
-                    z: data.z,
-                    magnitude,
-                    severity: magnitude > 3 ? 'impact' : 'movement',
-                });
-            });
-            activeSubs.push(accSub);
-
-            // GYROSCOPE
-            Gyroscope.setUpdateInterval(300);
-            const gyroSub = Gyroscope.addListener(gyro => {
-                const rotationSpeed =
-                    Math.abs(gyro.x) + Math.abs(gyro.y) + Math.abs(gyro.z);
-                handleSensorEvent({
-                    sensor: 'gyroscope',
-                    timestamp: Date.now(),
-                    x: gyro.x,
-                    y: gyro.y,
-                    z: gyro.z,
-                    rotationSpeed,
-                    severity: rotationSpeed > 2 ? 'rotation' : 'movement',
-                });
-            });
-            activeSubs.push(gyroSub);
-
-            // MICROPHONE
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-            });
-
-            const { recording: newRecording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.LOW_QUALITY,
-                status => {
-                    if (status.metering !== undefined) {
-                        handleSensorEvent({
-                            sensor: 'microphone',
-                            timestamp: Date.now(),
-                            metering: status.metering,
-                            severity: status.metering > -10 ? 'noise' : 'movement',
-                        });
-                    }
-                },
-                300
-            );
-            activeRecording = newRecording;
-
-            setSubscriptions(activeSubs);
-            setRecording(activeRecording);
-            setIsMonitoring(true);
-        } catch (error) {
-            console.error('Setup failed:', error);
-            activeSubs.forEach(sub => sub.remove());
-            if (activeRecording) await activeRecording.stopAndUnloadAsync().catch(() => { });
-            setIsMonitoring(false);
-        }
+        await BackgroundService.start(backgroundTask, options);
+        setIsMonitoring(true);
     };
 
     const stopMonitoring = async () => {
-        subscriptions.forEach(sub => sub.remove());
-        if (recording) await recording.stopAndUnloadAsync();
+        accSubRef.current?.unsubscribe();
+        gyroSubRef.current?.unsubscribe();
 
-        // Append MAX/MIN summary row
-        await appendSummaryRow();
+        if (micRecordingRef.current) {
+            await micRecordingRef.current.stopAndUnloadAsync();
+            micRecordingRef.current = null;
+        }
 
-        setSubscriptions([]);
-        setRecording(null);
+        await BackgroundService.stop();
+        sessionEndTime = Date.now();
+        // Append summary with user info
+        await appendSummaryRow(sessionEndTime);
+
         setIsMonitoring(false);
-
-        console.log('Sensor stats:', sensorLogger.getStats());
 
         try {
             if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(FILE, {
+                const userFile = await getUserFile();
+                await Sharing.shareAsync(userFile, {
                     mimeType: 'text/csv',
                     dialogTitle: 'Share sensor CSV',
                 });
@@ -153,6 +125,7 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (err) {
             console.error('Failed to share CSV', err);
         }
+
     };
 
 
