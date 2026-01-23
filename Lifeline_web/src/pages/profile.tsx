@@ -133,7 +133,7 @@ function Profile() {
                     </div>
                 </>
                 ) : (
-                <div onClick={() => navigate('/addContact')}>              
+                <div>              
                     <h3>Oops! looks like you don't have any contacts yet</h3>
                     <p><span className="uline-btn" onClick={() => navigate('/addContact')}>Add a contact</span> to get started</p>
                 </div>

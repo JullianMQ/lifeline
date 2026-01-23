@@ -96,12 +96,12 @@ export function useDashboard() {
                 ...(data.dependent_contacts || []),  
             ];  
             
-            const formatted: Contact[] = userContacts.map((user: any, index: number) => ({
+            const formatted: Contact[] = userContacts.map((user, index) => ({
                 name: user.name,
                 email: user.email,
                 phone: user.phone_no,
                 image: user.image,
-                role: user.role,
+                role: user.role as "mutual" | "dependent",
                 location: contloc[index], 
             }));
             setContacts(formatted);

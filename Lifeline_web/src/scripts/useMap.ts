@@ -32,7 +32,6 @@ export function useMap() {
 
   async function handleLocation(contact: any) {
     if (!contact?.location){
-      setLoading(false);
       return;
     };
     const { lat, lng } = contact.location;
@@ -40,7 +39,6 @@ export function useMap() {
       if (prev.some(p => p.lat === lat && p.lng === lng)) return prev;
       return [...prev, { lat, lng }];
     });
-    setLoading(false);
   }
 
   function resetLocations() {

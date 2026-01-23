@@ -115,7 +115,7 @@ export function useAddContact() {
                 const message = error.message?.toLowerCase() || "";
 
                 if (message.includes("phone")) {
-                    setInvalidFields(["phone_no"]);
+                    setInvalidFields(["phoneNo"]);
                     setError("Phone number already exists.");
                 } else if (message.includes("email")) {
                     setInvalidFields(["email"]);
@@ -147,6 +147,7 @@ export function useAddContact() {
                 {
                     method: "POST",
                     credentials: "include",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         email: createForm.email,
                         name: `${createForm.firstName} ${createForm.lastName}`,
