@@ -1,43 +1,55 @@
 import { API_BASE_URL } from "./config";
 
 export interface Contact {
-    id: number;
+    id: string;
     name: string;
+    phone_no: string;
+    email: string;
+    role: "mutual" | "dependent";
+    image: string | null;
+    type: "emergency" | "dependent";
 }
+
+const mapContact = (
+    c: any,
+    index: number,
+    prefix: string,
+    type: "emergency" | "dependent"
+): Contact => ({
+    id: `${prefix}-${index}`,
+    name: String(c.name),
+    phone_no: String(c.phone_no),
+    email: String(c.email),
+    role: c.role,
+    image: c.image,
+    type,
+});
 
 // Fetch contacts
 export const getContacts = async (): Promise<Contact[]> => {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/contacts`, {
+        const res = await fetch(`${API_BASE_URL}/api/contacts/users`, {
             method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             credentials: "include",
         });
 
-        if (!res.ok) {
-            console.warn("Failed to fetch contacts:", res.status);
-            return [];
-        }
+        if (!res.ok) return [];
 
         const data = await res.json();
 
-        const contactsArray: Contact[] = Object.keys(data)
-            .filter((key) => key.startsWith("emergency_contact"))
-            .map((key, idx) => ({
-                id: idx + 1,
-                name: data[key],
-            }))
-            .filter((c) => c.name);
-
-        return contactsArray;
+        const emergencyContacts = (data.emergency_contacts ?? []).map(
+            (c: any, index: number) => mapContact(c, index, "em", "emergency")
+        );
+        const dependentContacts = (data.dependent_contacts ?? []).map(
+            (c: any, index: number) => mapContact(c, index, "dep", "dependent")
+        );
+        return [...emergencyContacts, ...dependentContacts];
     } catch (error) {
         console.error("Error fetching contacts:", error);
         return [];
     }
 };
-
 
 // Save contacts
 export const saveContacts = async (contacts: any) => {
@@ -61,3 +73,96 @@ export const saveContacts = async (contacts: any) => {
         throw new Error("Failed to save contacts: " + err);
     }
 };
+
+// get user by number
+export const getUserByPhone = async (
+    phone: string
+): Promise<Contact | null> => {
+    try {
+        console.log("Fetching user by phone:", phone);
+
+        const res = await fetch(`${API_BASE_URL}/api/contacts/${encodeURIComponent(phone)}`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+        });
+
+        console.log("Fetch response status:", res.status);
+
+        if (res.status === 404) {
+            console.log("User not found (404)");
+            return null;
+        }
+
+        if (!res.ok) {
+            const text = await res.text();
+            console.log("Fetch failed, response:", text);
+            throw new Error("Failed to fetch user");
+        }
+
+        const data = await res.json();
+        console.log("User data received:", data);
+        return data;
+    } catch (err) {
+        console.error("getUserByPhone error:", err);
+        throw err;
+    }
+};
+
+
+
+
+export const generateMagicLinkQr = async ({
+    email,
+    name,
+    callbackURL = "lifeline://landing",
+    newUserCallbackURL = "lifeline://landing",
+    errorCallbackURL = "lifeline://landing",
+}: {
+    email: string;
+    name: string;
+    callbackURL: string;
+    newUserCallbackURL?: string;
+    errorCallbackURL?: string;
+}): Promise<string> => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/magic-link/qr`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email,
+                name,
+                callbackURL,
+                newUserCallbackURL,
+                errorCallbackURL,
+            }),
+        });
+
+        const text = await res.text();
+        console.log("Raw QR API response:", text);
+
+        console.log("Sending QR generate payload:", {
+            email,
+            name,
+            callbackURL,
+            newUserCallbackURL,
+            errorCallbackURL,
+        });
+
+        if (!res.ok) {
+            throw new Error(`Server error: ${text}`);
+        }
+
+        const data = JSON.parse(text);
+
+        if (!data.url) {
+            throw new Error("Failed to generate QR: missing URL");
+        }
+
+        return data.url;
+    } catch (err: any) {
+        console.error("QR generation failed:", err);
+        throw err;
+    }
+};
+

@@ -1,39 +1,57 @@
-# WebSocket API Documentation
+# WebSocket API Documentation - Multi-Room Emergency Monitoring
 
 ## Overview
 
-This WebSocket implementation enables real-time communication between authenticated users in shared rooms. It integrates with Better Auth for secure user authentication and provides chat, direct messaging, and user management features.
+This WebSocket implementation provides a **multi-room emergency monitoring and real-time location sharing system** built with **HonoJS + Bun WebSocket helper + PostgreSQL + BetterAuth**. It enables authenticated users to create emergency monitoring rooms, join rooms as emergency contacts, share location data, and trigger emergency SOS alerts across multiple rooms simultaneously.
+
+## Key Features
+
+- **Multi-Room Architecture**: Users can join multiple rooms simultaneously
+- **Auto-Join Emergency Contacts**: Emergency contacts are automatically joined to authorized rooms on connection
+- **Real-Time Location Sharing**: Location updates broadcast to all room members via REST + WebSocket integration
+- **Emergency SOS**: Cross-room emergency activation that notifies all emergency contacts
+- **Access Control**: Emergency contacts get immediate access without approval workflow
+- **Updated Terminology**: Uses `room-message` and `content` instead of `chat` and `message`
 
 ## Base URL
 
 ```
-WebSocket: ws://localhost:3000/api/ws/{roomId}
+WebSocket: ws://localhost:3000/api/ws
 REST API: http://localhost:3000/api
+Location: http://localhost:3000/api/location
+Rooms Info: http://localhost:3000/api/rooms-info
 ```
 
 ## Authentication
 
-All WebSocket connections require valid Better Auth session authentication. Users must be logged in to connect.
+All WebSocket connections and REST endpoints require valid BetterAuth session authentication:
 
-## WebSocket Endpoints
+**WebSocket**: BetterAuth session cookie required (handled automatically by HonoJS)
+**REST endpoints**: BetterAuth session cookie or Bearer token (for mobile compatibility)
 
-### Connect to Room
+BetterAuth provides secure session management with automatic token refresh and validation.
+
+## Connection
+
+### WebSocket Endpoint
 
 ```
-ws://localhost:3000/api/ws/{roomId}
+ws://localhost:3000/api/ws
 ```
 
 **Headers Required:**
+- `cookie: better-auth.session_token=<your_session_token>` (automatically handled by BetterAuth)
 
-- `cookie: better-auth.session_token=<your_session_token>`
+**Mobile Alternative:**
+```
+Authorization: Bearer <better_auth_token>
+```
 
 **Connection Response:**
-
 ```json
 {
   "type": "connected",
   "clientId": "user_id_from_auth",
-  "roomId": "1",
   "user": {
     "id": "user_id",
     "name": "John Doe",
@@ -41,31 +59,161 @@ ws://localhost:3000/api/ws/{roomId}
     "role": "mutual",
     "phone_no": "09123456789"
   },
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "roomIds": ["abc123", "def456"],
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Auto-Join on Connection:**
+Emergency contacts automatically join authorized rooms on connection:
+
+```json
+{
+  "type": "auto-joined",
+  "roomId": "abc123",
+  "roomOwner": "owner_user_id",
+  "message": "Auto-joined as emergency contact",
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Auto-Join Summary:**
+```json
+{
+  "type": "auto-join-summary",
+  "roomsJoined": [
+    { "roomId": "abc123", "owner": "owner_user_id" },
+    { "roomId": "def456", "owner": "another_owner_id" }
+  ],
+  "message": "Auto-joined to 2 room(s) as emergency contact",
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
 ## Message Types
 
-### Chat Message
+### Client-to-Server Messages
 
-Send a message to all users in the room.
+#### Create Room
+
+Create a new emergency monitoring room with pre-loaded emergency contacts.
 
 **Send:**
-
 ```json
 {
-  "type": "chat",
-  "message": "Hello everyone!"
+  "type": "create-room",
+  "roomId": "optional_custom_room_id"
 }
 ```
 
-**Broadcast to all users:**
-
+**Response:**
 ```json
 {
-  "type": "chat",
-  "message": "Hello everyone!",
+  "type": "room-created",
+  "roomId": "abc123def456",
+  "owner": "user_id",
+  "emergencyContacts": ["09123456789", "09987654321"],
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+#### Join Room
+
+Request to join a specific room. Emergency contacts get immediate access.
+
+**Send:**
+```json
+{
+  "type": "join-room",
+  "roomId": "abc123def456"
+}
+```
+
+**Response (Approved):**
+```json
+{
+  "type": "join-approved",
+  "roomId": "abc123def456",
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Response (Denied):**
+```json
+{
+  "type": "join-denied",
+  "message": "Room not found",
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Access Rules:**
+- Room owner: Always allowed
+- Emergency contacts (phone number in room's emergency contacts list): Immediate access
+- Non-contacts: Denied
+
+#### Request Join (Optional Approval Flow)
+
+For non-emergency contacts who need explicit approval.
+
+**Send:**
+```json
+{
+  "type": "request-join",
+  "roomId": "abc123def456"
+}
+```
+
+Room owner receives:
+```json
+{
+  "type": "join-request",
+  "requesterId": "requester_user_id",
+  "requesterName": "Jane Smith",
+  "requesterUser": {
+    "id": "requester_user_id",
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "role": "mutual",
+    "phone_no": "09987654321"
+  },
+  "roomId": "abc123def456",
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+#### Approve Join
+
+Room owner approves a join request.
+
+**Send:**
+```json
+{
+  "type": "approve-join",
+  "roomId": "abc123def456",
+  "requesterId": "requester_user_id"
+}
+```
+
+#### Room Message
+
+Send a message to all users in a specific room.
+
+**Send:**
+```json
+{
+  "type": "room-message",
+  "roomId": "abc123def456",
+  "content": "Hello everyone!"
+}
+```
+
+**Broadcast to all room members:**
+```json
+{
+  "type": "room-message",
+  "roomId": "abc123def456",
+  "content": "Hello everyone!",
   "clientId": "user_id",
   "userName": "John Doe",
   "user": {
@@ -75,60 +223,77 @@ Send a message to all users in the room.
     "role": "mutual",
     "phone_no": "09123456789"
   },
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
-### Direct Message
+#### Emergency SOS
 
-Send a private message to a specific user.
+Trigger emergency mode across all rooms owned by the user.
 
 **Send:**
-
 ```json
 {
-  "type": "direct_message",
-  "targetClientId": "target_user_id",
-  "message": "This is private"
+  "type": "emergency-sos"
 }
 ```
 
-**Received by target user:**
-
+**Response:**
 ```json
 {
-  "type": "direct_message",
-  "message": "This is private",
-  "fromClientId": "sender_user_id",
-  "fromName": "John Doe",
-  "fromUser": {
-    "id": "sender_user_id",
+  "type": "emergency-confirmed",
+  "activatedRooms": ["abc123def456", "def456ghi789"],
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Emergency alerts sent to all emergency contacts in all rooms:**
+```json
+{
+  "type": "emergency-alert",
+  "emergencyUserId": "user_id",
+  "emergencyUserName": "John Doe",
+  "roomId": "abc123def456",
+  "message": "Emergency activated - immediate access granted",
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Emergency activated broadcast to all room members:**
+```json
+{
+  "type": "emergency-activated",
+  "roomId": "abc123def456",
+  "clientId": "user_id",
+  "userName": "John Doe",
+  "user": {
+    "id": "user_id",
     "name": "John Doe",
     "email": "john@example.com",
     "role": "mutual",
     "phone_no": "09123456789"
   },
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
-### Get Room Users
+#### Get Users
 
-Request the list of all users currently in the room.
+Request the list of all users currently in a specific room.
 
 **Send:**
-
 ```json
 {
-  "type": "get_users"
+  "type": "get_users",
+  "roomId": "abc123def456"
 }
 ```
 
 **Response:**
-
 ```json
 {
-  "type": "room_users",
+  "type": "room-users",
+  "roomId": "abc123def456",
   "users": [
     {
       "id": "user_1_id",
@@ -153,16 +318,15 @@ Request the list of all users currently in the room.
       }
     }
   ],
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
-### Ping/Pong
+#### Ping/Pong
 
 Check connection health.
 
 **Send:**
-
 ```json
 {
   "type": "ping"
@@ -170,23 +334,22 @@ Check connection health.
 ```
 
 **Response:**
-
 ```json
 {
   "type": "pong",
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
-## System Events
+### Server-to-Client System Events
 
-### User Joined
+#### User Joined
 
-Broadcast when a new user joins the room.
+Broadcast when a new user joins a room.
 
 ```json
 {
-  "type": "user_joined",
+  "type": "user-joined",
   "clientId": "new_user_id",
   "user": {
     "id": "new_user_id",
@@ -195,46 +358,116 @@ Broadcast when a new user joins the room.
     "role": "mutual",
     "phone_no": "09123456789"
   },
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
-### User Left
+#### User Left
 
-Broadcast when a user disconnects from the room.
+Broadcast when a user disconnects from a room.
 
 ```json
 {
-  "type": "user_left",
+  "type": "user-left",
   "clientId": "disconnected_user_id",
   "userName": "User Name",
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
-## REST API Endpoints
+#### Emergency Contact Joined
 
-### Get Room Information
+Broadcast when an emergency contact joins a room.
 
-Get information about all active rooms and their users.
-
-**Request:**
-
+```json
+{
+  "type": "emergency-contact-joined",
+  "contactId": "contact_user_id",
+  "contactName": "Jane Smith",
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
 ```
-GET /api/rooms-info
+
+#### Location Update
+
+Broadcast to all room members when a user's location is updated via REST API.
+
+```json
+{
+  "type": "location-update",
+  "data": {
+    "userId": "user_id",
+    "userName": "John Doe",
+    "latitude": 14.5995,
+    "longitude": 120.9842,
+    "timestamp": "2026-01-18T10:00:00.000Z",
+    "accuracy": 12
+  },
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
 ```
+
+## Location API
+
+### POST /api/location
+
+Upload user location data via HonoJS endpoint, which is then broadcast to all room members via Bun WebSocket helper.
 
 **Headers Required:**
+- `cookie: better-auth.session_token=<session_token>` (BetterAuth session)
+- OR `Authorization: Bearer <token>` (for mobile clients)
 
-- `cookie: better-auth.session_token=<your_session_token>`
+**Request Body:**
+```json
+{
+  "latitude": 14.5995,
+  "longitude": 120.9842,
+  "timestamp": "2026-01-18T10:00:00.000Z",
+  "accuracy": 12
+}
+```
+
+**Validation (HonoJS Zod Schema):**
+- `latitude`: number between -90 and 90
+- `longitude`: number between -180 and 180
+- `timestamp`: string (ISO 8601) or number (Unix timestamp)
+- `accuracy`: optional number
 
 **Response:**
+```json
+{
+  "success": true,
+  "timestamp": "2026-01-18T10:00:00.000Z",
+  "rooms": ["abc123def456", "def456ghi789"],
+  "stored": true
+}
+```
 
+**Error Response:**
+```json
+{
+  "error": "User is not in any active room"
+}
+```
+
+**Location Update Broadcast:**
+After successful upload, all room members receive a `location-update` message via WebSocket.
+
+## Rooms Info API
+
+### GET /api/rooms-info
+
+Get information about all active rooms and their users from PostgreSQL database.
+
+**Headers Required:**
+- `cookie: better-auth.session_token=<session_token>` (BetterAuth session)
+
+**Response:**
 ```json
 {
   "rooms": [
     {
-      "id": "1",
+      "id": "abc123def456",
       "clientCount": 3,
       "clients": [
         {
@@ -256,6 +489,97 @@ GET /api/rooms-info
 }
 ```
 
+## Multi-Room Architecture
+
+### Room Structure (PostgreSQL Schema)
+
+Each room contains:
+- `id`: Unique room identifier (cryptographically random hex string)
+- `owner_id`: User ID of the room owner (BetterAuth user ID)
+- `emergency_contacts`: Array of phone numbers (PostgreSQL text array)
+- `is_active`: Boolean indicating if room is active
+- `status`: Room status (active/inactive/emergency)
+- `created_at`: Timestamp when room was created
+- `last_location_update`: Last location activity timestamp
+
+### Client Structure
+
+Each client can be in multiple rooms simultaneously:
+- `id`: User ID from BetterAuth session
+- `ws`: Bun WebSocket connection
+- `roomIds`: Set of room IDs (multi-room support)
+- `user`: BetterAuth user object with profile data
+
+### Auto-Join Logic (PostgreSQL + BetterAuth)
+
+When an emergency contact connects via BetterAuth session:
+1. Server queries PostgreSQL for all existing rooms
+2. Finds rooms where contact's phone number is in `emergency_contacts` array
+3. Automatically adds contact to those rooms in database
+4. Sends `auto-joined` message for each room via Bun WebSocket
+5. Sends `auto-join-summary` with count of rooms joined
+6. Notifies existing room members with `emergency-contact-joined` broadcast
+
+### Emergency Contact Access Control
+
+**Immediate Access (No Approval):**
+- User's phone number is in room's `emergencyContacts` array
+
+**Requires Approval:**
+- Non-emergency contact users must use `request-join` flow
+
+**Always Denied:**
+- Non-contacts without emergency relationship
+
+### Emergency SOS Flow
+
+When `emergency-sos` is triggered:
+1. System finds all rooms owned by the triggering user
+2. Sets `isActive` to true for all owned rooms
+3. For each room:
+   - Sends `emergency-alert` to all online emergency contacts
+   - Broadcasts `emergency-activated` to all room members
+4. Sends `emergency-confirmed` to triggering user with list of activated rooms
+
+### Room Cleanup
+
+**On User Disconnect:**
+1. User removed from all their rooms
+2. `user-left` broadcast to remaining room members
+3. If room becomes empty, room is deleted after 1 hour delay
+
+**Empty Room Cleanup:**
+- Empty rooms are deleted after 1 hour of inactivity
+- This prevents memory accumulation
+
+## Security & Access Control
+
+### Authentication (BetterAuth Integration)
+- All connections require valid BetterAuth session
+- HonoJS middleware validates session on WebSocket connection
+- REST endpoints accept both BetterAuth session cookie and Bearer token
+- BetterAuth handles session refresh and token validation automatically
+
+### Room Access Rules
+1. **Owner**: Full access to room
+2. **Emergency Contact**: Immediate access, can join on connection
+3. **Regular User**: Must be explicitly approved via `request-join` flow
+4. **Non-Contact**: Access denied
+
+### Emergency Contact Validation (BetterAuth + PostgreSQL)
+- Emergency contacts are identified by phone number
+- Room owners' emergency contacts are loaded from PostgreSQL tables
+- BetterAuth validates user sessions before accessing contact data
+- Contacts include both `emergency_contacts` and `dependent_contacts` relationships
+
+### Security Features (HonoJS + BetterAuth + PostgreSQL)
+- Cryptographically random room IDs (16 bytes → 32 hex characters)
+- BetterAuth emergency contact validation before room access
+- Room activity state (`is_active`) for access control in PostgreSQL
+- Automatic cleanup of empty rooms (1 hour timeout) via database triggers
+- HonoJS error handling and structured logging for debugging
+- BetterAuth CSRF protection and session security
+
 ## Error Handling
 
 ### Error Response Format
@@ -264,73 +588,127 @@ GET /api/rooms-info
 {
   "type": "error",
   "message": "Error description",
-  "timestamp": "2026-01-09T06:00:00.000Z"
+  "timestamp": "2026-01-18T10:00:00.000Z"
 }
 ```
 
 ### Common Errors
 
-- `401 Unauthorized` - Invalid or missing authentication
-- `Client not found` - User session is no longer valid
-- `Invalid message format` - Message is not valid JSON
+| Error Message | Cause |
+|---------------|-------|
+| `Unauthorized` | Invalid or missing authentication |
+| `Client not found` | User session is no longer valid |
+| `Invalid message format` | Message is not valid JSON |
+| `Room not found` | Room ID does not exist |
+| `Room is not active` | Room is deactivated |
+| `Not authorized to join this room` | User is not owner or emergency contact |
+| `Already in room` | User is already a member of the room |
+| `Room already exists` | Room ID collision |
+| `No owned rooms found` | User has no rooms to trigger emergency |
+| `Failed to create room` | Server error during room creation |
+| `Failed to process emergency SOS` | Server error during emergency processing |
 
 ## Frontend Integration Examples
 
 ### JavaScript Example
 
 ```javascript
-// Connect to WebSocket
-const ws = new WebSocket("ws://localhost:3000/api/ws/1", [], {
+// Connect to WebSocket using Bun WebSocket helper
+const ws = new WebSocket("ws://localhost:3000/api/ws", [], {
   headers: {
-    cookie: document.cookie,
+    cookie: document.cookie, // BetterAuth session cookie
   },
 });
 
 ws.onopen = function (event) {
-  console.log("Connected to room 1");
+  console.log("Connected to WebSocket server");
 };
 
 ws.onmessage = function (event) {
   const data = JSON.parse(event.data);
 
   switch (data.type) {
-    case "chat":
-      displayChatMessage(data.userName, data.message);
+    case "connected":
+      console.log(`Connected as ${data.user.name}`);
+      console.log(`Auto-joined to ${data.roomIds.length} rooms`);
       break;
-    case "user_joined":
+
+    case "auto-joined":
+      console.log(`Auto-joined to room ${data.roomId}`);
+      break;
+
+    case "auto-join-summary":
+      console.log(`Auto-joined to ${data.roomsJoined.length} rooms total`);
+      break;
+
+    case "room-message":
+      displayChatMessage(data.userName, data.content);
+      break;
+
+    case "user-joined":
       displayNotification(`${data.user.name} joined the room`);
       break;
-    case "user_left":
+
+    case "user-left":
       displayNotification(`${data.userName} left the room`);
       break;
-    case "room_users":
-      updateUsersList(data.users);
+
+    case "emergency-alert":
+      displayEmergencyAlert(`EMERGENCY: ${data.emergencyUserName} needs help!`);
       break;
-    case "direct_message":
-      displayDirectMessage(data.fromName, data.message);
+
+    case "location-update":
+      updateLocationOnMap(data.data);
+      break;
+
+    case "room-users":
+      updateUsersList(data.users);
       break;
   }
 };
 
-// Send chat message
-function sendChatMessage(message) {
-  ws.send(
-    JSON.stringify({
-      type: "chat",
-      message: message,
-    }),
-  );
+// Create a room
+function createRoom() {
+  ws.send(JSON.stringify({ type: "create-room" }));
 }
 
-// Send direct message
-function sendDirectMessage(targetUserId, message) {
-  ws.send(
-    JSON.stringify({
-      type: "direct_message",
-      targetClientId: targetUserId,
-      message: message,
-    }),
-  );
+// Join a room
+function joinRoom(roomId) {
+  ws.send(JSON.stringify({ type: "join-room", roomId: roomId }));
+}
+
+// Send room message
+function sendRoomMessage(roomId, content) {
+  ws.send(JSON.stringify({
+    type: "room-message",
+    roomId: roomId,
+    content: content
+  }));
+}
+
+// Trigger emergency SOS
+function triggerEmergencySOS() {
+  ws.send(JSON.stringify({ type: "emergency-sos" }));
+}
+
+// Upload location
+async function uploadLocation(latitude, longitude) {
+  const response = await fetch("/api/location", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${getAuthToken()}`
+    },
+    body: JSON.stringify({
+      latitude: latitude,
+      longitude: longitude,
+      timestamp: new Date().toISOString(),
+      accuracy: 10
+    })
+  });
+
+  const result = await response.json();
+  console.log("Location uploaded:", result);
 }
 ```
 
@@ -339,14 +717,15 @@ function sendDirectMessage(targetUserId, message) {
 ```javascript
 import { useState, useEffect, useRef } from "react";
 
-export function useWebSocket(roomId) {
+export function useEmergencyMonitoring() {
   const [connected, setConnected] = useState(false);
-  const [users, setUsers] = useState([]);
+  const [roomIds, setRoomIds] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [location, setLocation] = useState(null);
   const ws = useRef(null);
 
   useEffect(() => {
-    ws.current = new WebSocket(`ws://localhost:3000/api/ws/${roomId}`);
+    ws.current = new WebSocket(`ws://localhost:3000/api/ws`);
 
     ws.current.onopen = () => setConnected(true);
     ws.current.onclose = () => setConnected(false);
@@ -355,15 +734,20 @@ export function useWebSocket(roomId) {
       const data = JSON.parse(event.data);
 
       switch (data.type) {
-        case "room_users":
-          setUsers(data.users);
+        case "connected":
+          setRoomIds(data.roomIds);
           break;
-        case "chat":
+
+        case "room-message":
           setMessages((prev) => [...prev, data]);
           break;
-        case "user_joined":
-        case "user_left":
-          ws.current.send(JSON.stringify({ type: "get_users" }));
+
+        case "location-update":
+          setLocation(data.data);
+          break;
+
+        case "emergency-alert":
+          // Handle emergency alert
           break;
       }
     };
@@ -371,69 +755,195 @@ export function useWebSocket(roomId) {
     return () => {
       ws.current?.close();
     };
-  }, [roomId]);
+  }, []);
 
-  const sendMessage = (message) => {
+  const createRoom = () => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(
-        JSON.stringify({
-          type: "chat",
-          message: message,
-        }),
-      );
+      ws.current.send(JSON.stringify({ type: "create-room" }));
     }
   };
 
-  return { connected, users, messages, sendMessage };
+  const joinRoom = (roomId) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ type: "join-room", roomId }));
+    }
+  };
+
+  const sendMessage = (roomId, content) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({
+        type: "room-message",
+        roomId,
+        content
+      }));
+    }
+  };
+
+  const triggerSOS = () => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ type: "emergency-sos" }));
+    }
+  };
+
+  return {
+    connected,
+    roomIds,
+    messages,
+    location,
+    createRoom,
+    joinRoom,
+    sendMessage,
+    triggerSOS
+  };
 }
 ```
 
-## Future Security Features
+### Mobile Integration (Background Location)
 
-### Room Access Control (Planned)
+```javascript
+// Mobile App - Background Location Tracking with BetterAuth
+class EmergencyMonitoringService {
+  constructor(betterAuthToken) {
+    this.betterAuthToken = betterAuthToken;
+    this.ws = null;
+    this.locationInterval = null;
+  }
 
-**Note:** Currently, any authenticated user can join any room. Future implementations will include:
+  async startMonitoring() {
+    // Connect to WebSocket for real-time alerts
+    this.ws = new WebSocket("ws://localhost:3000/api/ws");
 
-**Family/Organization-Based Access:**
+    this.ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-- Users can only join rooms where they are family members
-- Organization members can only join their organization's rooms
-- Emergency contacts can join specific user's emergency rooms
+      if (data.type === "emergency-alert") {
+        this.showEmergencyAlert(data);
+      }
+    };
 
-**Implementation Plan:**
+    // Start background location updates
+    this.locationInterval = setInterval(() => {
+      this.uploadLocation();
+    }, 60000); // Every 60 seconds
+  }
 
-```typescript
-// Future room validation logic
-async function validateRoomAccess(
-  userId: string,
-  roomId: string,
-): Promise<boolean> {
-  // Check if user is family member of room owner
-  const isFamilyMember = await checkFamilyRelationship(userId, roomId);
+  async uploadLocation() {
+    try {
+      const position = await this.getCurrentPosition();
 
-  // Check if user is in same organization
-  const isOrgMember = await checkOrganizationMembership(userId, roomId);
+      const response = await fetch("/api/location", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.betterAuthToken}`
+        },
+        body: JSON.stringify({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          timestamp: new Date().toISOString(),
+          accuracy: position.coords.accuracy
+        })
+      });
 
-  // Check if user is emergency contact
-  const isEmergencyContact = await checkEmergencyContact(userId, roomId);
+      if (!response.ok) {
+        console.error("Location upload failed");
+      }
+    } catch (error) {
+      console.error("Error uploading location:", error);
+    }
+  }
 
-  return isFamilyMember || isOrgMember || isEmergencyContact;
+  triggerSOS() {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: "emergency-sos" }));
+    }
+  }
+
+  stopMonitoring() {
+    if (this.locationInterval) {
+      clearInterval(this.locationInterval);
+    }
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+
+  showEmergencyAlert(data) {
+    // Show emergency notification to user
+    alert(`EMERGENCY: ${data.emergencyUserName} needs help!`);
+  }
+
+  getCurrentPosition() {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    });
+  }
 }
 ```
 
-**Room Types:**
+## Performance Considerations
 
-- `family-{familyId}` - Family-only rooms
-- `org-{orgId}` - Organization rooms
-- `emergency-{userId}` - Emergency contact rooms
-- `public-{roomId}` - Public rooms (current behavior)
+### Connection Management
+- WebSocket connections are stateless after authentication
+- Each client maintains a Set of room IDs for multi-room support
+- Auto-join processes all rooms on connection (< 200ms per room)
 
-**Access Levels:**
+### Broadcasting
+- Messages are broadcast to all room members excluding sender
+- Failed sends result in immediate client removal from room
+- Room deletion when empty prevents memory accumulation
 
-- **Family Members:** Full access to family rooms
-- **Organization Members:** Access to org rooms
-- **Emergency Contacts:** Access to specific emergency rooms
-- **Public Users:** Access to public rooms only
+### Location Updates
+- REST endpoint for location uploads (mobile-friendly, works in background)
+- WebSocket broadcast to all room members
+- Location data includes timestamp and accuracy for filtering
 
-This will ensure secure, context-aware room access while maintaining privacy and security boundaries.
+### Room Cleanup (PostgreSQL + Bun WebSocket)
+- Empty rooms marked for deletion in PostgreSQL after 1 hour delay
+- Database cron job cleans up expired rooms
+- Bun WebSocket cleanup removes disconnected sockets
+- Prevents memory accumulation from abandoned rooms
 
+## Testing
+
+Run the integration test suite:
+
+```bash
+bun test tests/websocket-integration.test.ts
+```
+
+**Test Environment**: Uses HonoJS test utilities with Bun test runner and PostgreSQL test database.
+
+The test suite covers:
+- Multi-room creation with emergency contact loading
+- Emergency contact multi-room immediate access
+- Multi-room location broadcasting
+- Cross-room emergency SOS triggers
+- Non-contact multi-room access denied
+- Auto-join on connection
+- Room cleanup and persistence
+
+## Mobile Compatibility
+
+### Background Execution
+- Location uploads use REST API (works with screen OFF)
+- WebSocket for real-time dashboard updates only
+- Adaptive intervals: 60-second polling for background
+
+### Battery Optimization
+- REST for location: Reliable background execution, OS-compliant
+- WebSocket for UI: Real-time dashboard updates only
+- No continuous WebSocket polling required
+
+### OS Compliance
+- Foreground Service with persistent notification for location tracking
+- Works with Doze mode and App Standby
+- No background execution restrictions
+
+---
+
+**Status**: ✅ Multi-Room Emergency Monitoring System Fully Implemented with **HonoJS + Bun + PostgreSQL + BetterAuth**

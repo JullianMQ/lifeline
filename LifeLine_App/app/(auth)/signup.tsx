@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { signUp } from "@/lib/api/auth";
 import { checkEmail } from "@/lib/api/auth";
-import { API_BASE_URL } from "@/lib/api/config";
+import { signInWithGoogle } from "../../lib/api/auth";
 
 
 interface SignupForm {
@@ -26,6 +26,8 @@ const Signup: React.FC = () => {
         password: "",
         confirmPassword: "",
     });
+    const [googleLoading, setGoogleLoading] = useState(false);
+
 
     const inputClass = "border-2 border-black rounded-full px-4 py-3 mb-4 h-16";
 
@@ -34,37 +36,47 @@ const Signup: React.FC = () => {
 
     const handleNext = async () => {
         const { firstName, lastName, email, phone_no } = form;
-
         if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone_no.trim()) {
             Alert.alert("Error", "Please fill in all fields");
             return;
         }
-
         if (!/\S+@\S+\.\S+/.test(email)) {
             Alert.alert("Error", "Please enter a valid email");
             return;
         }
-
         if (!/^09\d{9}$/.test(phone_no)) {
             Alert.alert("Error", "Please enter a valid Philippine phone number (09XXXXXXXXX)");
             return;
         }
-
         try {
             await checkEmail(email);
-
-
             setStep(2);
-
         } catch (err: any) {
             Alert.alert(
                 "Email Error",
                 err.message || "Unable to verify email"
             );
         }
-
     };
 
+    const handleGoogleSignUp = async () => {
+        setGoogleLoading(true);
+        try {
+            const data = await signInWithGoogle({
+                callbackURL: "lifeline://landing",
+                newUserCallbackURL: "lifeline://add_phone_num",
+                errorCallbackURL: "lifeline://signup",
+                flow: "signup",
+            });
+            if (!data) return;
+
+
+        } catch (err: any) {
+            alert(err.message || "Google signup failed");
+        } finally {
+            setGoogleLoading(false);
+        }
+    };
     const handleSignup = async () => {
         const { password, confirmPassword, firstName, lastName, email, phone_no } = form;
 
@@ -76,7 +88,6 @@ const Signup: React.FC = () => {
             Alert.alert("Error", "Passwords do not match");
             return;
         }
-
         try {
 
             await signUp({
@@ -90,18 +101,12 @@ const Signup: React.FC = () => {
                 "Verify Your Email",
                 "We've sent a verification email. Please check your inbox to activate your account."
             );
-
-
             router.replace("/(auth)/verify-email");
-
         } catch (err: any) {
             console.error("Signup error:", err);
             Alert.alert("Error", err.message || "Signup failed. Please try again.");
         }
     };
-
-
-
     const step1Fields = [
         { placeholder: "First Name", key: "firstName" },
         { placeholder: "Last Name", key: "lastName" },
@@ -160,7 +165,7 @@ const Signup: React.FC = () => {
 
                             {/* sign up with google */}
                             <TouchableOpacity
-                                onPress={() => console.log("Google Signup pressed")}
+                                onPress={handleGoogleSignUp}
                                 className="border-2 border-black py-4 mt-4 rounded-full mb-6 flex-row justify-center items-center"
                             >
                                 <Ionicons name="logo-google" size={24} className="mr-2" />

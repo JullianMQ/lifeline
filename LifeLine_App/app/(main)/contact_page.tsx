@@ -6,6 +6,36 @@ import ScreenWrapper from "../../components/screen_wrapper";
 import { router } from "expo-router";
 import { getContacts, Contact } from "@/lib/api/contact";
 
+const RenderHeader = ({
+    search,
+    setSearch,
+}: {
+    search: string;
+    setSearch: (text: string) => void;
+}) => (
+    <View className="flex-row items-center mb-4 px-5 pt-6">
+        <View className="flex-1 flex-row items-center px-3 py-.5 rounded-full border-2 mr-3">
+            <Ionicons name="search" size={20} color="black" />
+            <TextInput
+                placeholder="Search"
+                value={search}
+                onChangeText={setSearch}
+                className="flex-1 ml-2 text-xl"
+                blurOnSubmit={false}
+                keyboardType="default"
+                returnKeyType="done"
+            />
+        </View>
+
+        <TouchableOpacity
+            onPress={() => router.push("/(auth)/add_member_existing")}
+            className="w-14 h-14 items-center justify-center"
+        >
+            <Ionicons name="add-circle-outline" size={40} color="#404040" />
+        </TouchableOpacity>
+    </View>
+);
+
 const ContactPage = () => {
     const [search, setSearch] = useState("");
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -24,8 +54,10 @@ const ContactPage = () => {
         }, [])
     );
 
-    const filteredContacts = contacts.filter((c) =>
-        c.name.toLowerCase().includes(search.toLowerCase())
+    const filteredContacts = contacts.filter(
+        (c) =>
+            typeof c.name === "string" &&
+            c.name.toLowerCase().includes(search.toLowerCase())
     );
 
     const renderItem = ({ item }: { item: Contact }) => (
@@ -38,27 +70,6 @@ const ContactPage = () => {
         </View>
     );
 
-    const renderHeader = () => (
-        <View className="flex-row items-center mb-4 px-5 pt-6">
-            <View className="flex-1 flex-row items-center px-3 py-.5 rounded-full border-2 mr-3">
-                <Ionicons name="search" size={20} color="black" />
-                <TextInput
-                    placeholder="Search"
-                    value={search}
-                    onChangeText={setSearch}
-                    className="flex-1 ml-2 text-xl"
-                />
-            </View>
-
-            <TouchableOpacity
-                onPress={() => router.push("/add_contact")}
-                className="w-14 h-14 items-center justify-center"
-            >
-                <Ionicons name="add-circle-outline" size={40} color="#404040" />
-            </TouchableOpacity>
-        </View>
-    );
-
     return (
         <ScreenWrapper scrollable={false}>
             {loading ? (
@@ -68,20 +79,18 @@ const ContactPage = () => {
                     data={filteredContacts}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderItem}
-                    ListHeaderComponent={renderHeader}
+                    ListHeaderComponent={<RenderHeader search={search} setSearch={setSearch} />}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="none"
                     contentContainerStyle={{ paddingBottom: 20 }}
                     ListEmptyComponent={
                         <View className="items-center mt-10">
                             <Text className="text-gray-500 text-center">
                                 No contacts found.
                             </Text>
-
-                            <Text className="text-yellow-1000 mt-2">
-                                Add now!
-                            </Text>
+                            <Text className="text-yellow-1000 mt-2">Add now!</Text>
                         </View>
                     }
-
                 />
             )}
         </ScreenWrapper>

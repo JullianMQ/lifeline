@@ -22,6 +22,8 @@ const VerifyEmail = () => {
                     Back to Login
                 </Text>
             </TouchableOpacity>
+
+
         </View>
     );
 };

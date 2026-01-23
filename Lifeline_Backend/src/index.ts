@@ -4,6 +4,7 @@ import { AuthType } from './lib/auth'
 import auth from './routes/auth'
 import contacts from './routes/contacts'
 import webSocket from './routes/websocket'
+import locationRouter from './routes/location'
 import { cors } from 'hono/cors'
 
 const app = new Hono<{ Variables: AuthType }>({
@@ -21,7 +22,7 @@ app.use(
     })
 )
 
-const routes = [auth, contacts, webSocket] as const;
+const routes = [auth, contacts, webSocket, locationRouter] as const;
 
 routes.forEach((route) => {
     app.basePath("/api").route("/", route);

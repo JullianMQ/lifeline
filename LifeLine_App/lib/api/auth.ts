@@ -1,61 +1,99 @@
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { API_BASE_URL } from "./config";
+import { saveUser } from "./storage/user";
+import * as Linking from "expo-linking";
+import { Alert } from "react-native";
+import { jwtDecode } from "jwt-decode";
 
-export async function signInWithGoogle() {
+
+type GoogleSignInCallbacks = {
+    callbackURL?: string;
+    newUserCallbackURL?: string;
+    errorCallbackURL?: string;
+};
+
+export async function signInWithGoogle({
+    callbackURL = "lifeline://landing",
+    newUserCallbackURL = "lifeline://add_phone_num",
+    errorCallbackURL = "lifeline://login",
+    flow = "signup",
+}: GoogleSignInCallbacks & { flow?: "signup" | "login" } = {}) {
     try {
-        // device has Google Play Services 
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-        // sign out previous session to force fresh token
+        await GoogleSignin.signOut().catch(() => { });
+
+        const userInfo: any = await GoogleSignin.signIn();
+        const { idToken } = await GoogleSignin.getTokens();
+
+        if (!idToken) throw new Error("No Google ID token found");
+
+        const decoded: any = jwtDecode(idToken);
+        const email = decoded.email;
+        console.log("Google email from token:", email);
+
+        // Check if user exists
+        let isNewUser = false;
         try {
-            await GoogleSignin.signOut();
-        } catch (err) {
-            console.warn("Google signOut failed, continuing...", err);
-        }
-        const userInfo = await GoogleSignin.signIn();
-
-        // Get fresh tokens
-        const tokens = await GoogleSignin.getTokens();
-
-        if (!tokens.idToken) {
-            throw new Error("No Google ID token found");
+            const checkData = await checkEmail(email);
+            isNewUser = !!checkData.message && checkData.message.includes("available");
+        } catch (err: any) {
+            if (err.message.includes("already in use")) {
+                isNewUser = false;
+            } else {
+                console.warn("Email check failed, assuming existing user", err);
+                isNewUser = false;
+            }
         }
 
-        console.log("Fresh Google ID Token:", tokens.idToken);
+        console.log(isNewUser ? "New user" : "Existing user");
 
-        // Send the ID token to backend
+        // LOGIN FLOW
+        if (flow === "login" && isNewUser) {
+            throw new Error("This email is not registered yet. Please sign up first.");
+        }
+
+        // SIGNUP FLOW 
+        if (flow === "signup" && !isNewUser) {
+            Alert.alert(
+                "Email Already Exists",
+                "This Google account is already registered. Please log in instead."
+            );
+            return null;
+        }
+
+
         const res = await fetch(`${API_BASE_URL}/api/auth/sign-in/social`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Origin": API_BASE_URL,
-            },
-            body: JSON.stringify({
-                provider: "google",
-                idToken: { token: tokens.idToken },
-            }),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: "google", idToken: { token: idToken } }),
             credentials: "include",
         });
 
-        const data = await res.json();
+        const data: any = await res.json();
+        if (!res.ok) throw new Error(data?.message || "Google login failed");
 
-        if (!res.ok) {
-            throw new Error(data.message || "Google login failed");
+        if (data.user) await saveUser(data.user);
+
+        // Redirect based on flow
+        const targetURL =
+            flow === "signup"
+                ? isNewUser
+                    ? newUserCallbackURL
+                    : null
+                : callbackURL;
+
+        if (targetURL) {
+            console.log(`Redirecting to: ${targetURL}`);
+            Linking.openURL(targetURL);
         }
-
         return data;
-
     } catch (err: any) {
         console.error("signInWithGoogle error:", err);
-        if (err.code === "TOKEN_EXPIRED") {
-            throw new Error("Google token expired. Please try logging in again.");
-        }
-        if (err.code === "INTERNAL_ERROR") {
-            throw new Error("Google sign-in failed. Check your device or network.");
-        }
-        throw new Error(err.message || "Google login failed");
+        Linking.openURL(errorCallbackURL);
+        Alert.alert("Google Login Error", err.message || "Failed to log in with Google. Please try again.");
+        throw err;
     }
 }
-
 
 
 // Sign in
@@ -79,6 +117,18 @@ export async function login(email: string, password: string) {
 
     return data;
 }
+
+
+export const loginWithToken = async (token: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/magic-link/verify?token=${token}`, {
+        method: "GET",
+        credentials: "include",
+    });
+
+    if (!res.ok) throw new Error("Magic link verification failed");
+
+    return await res.json();
+};
 
 
 // Sign up
@@ -151,7 +201,7 @@ export async function checkEmail(email: string) {
 // Check session
 export async function checkSession() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/contacts`, {
+        const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, {
             method: "GET",
             credentials: "include",
         });

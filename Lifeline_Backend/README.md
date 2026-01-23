@@ -41,6 +41,17 @@ Open <http://localhost:3000>
 
 ## API Endpoints
 
+### WebSocket
+
+- `GET /api/ws` - WebSocket endpoint for real-time emergency monitoring
+  - Multi-room support
+  - Auto-join for emergency contacts
+  - Emergency SOS triggers
+  - Location broadcasting
+  - See `docs/websocket-api.md` for full WebSocket API documentation
+
+### Authentication
+
 ### Authentication
 
 - `POST /api/auth/sign-up` - User registration (email/password or social)
@@ -85,3 +96,49 @@ Open <http://localhost:3000>
 - Added Google OAuth integration with social providers
 - Fixed various TypeScript and database issues
 - Completed full authentication and contacts management system
+
+### 2026-01-19
+
+- Implemented multi-room WebSocket emergency monitoring system
+- Added location REST endpoint with WebSocket broadcasting
+- Created comprehensive integration test suite
+- Implemented auto-join functionality for emergency contacts
+- Updated all message types and terminology
+- Added complete WebSocket API documentation
+
+## Testing
+
+### Integration Tests
+
+Real integration tests that use actual codebase, database, and WebSocket server:
+
+```bash
+# Option 1: Run tests with server already running
+bun run dev  # Terminal 1
+bun run test:real  # Terminal 2
+
+# Option 2: Automated (starts server, runs tests, stops server)
+bun run test:real:auto
+```
+
+**Test Features:**
+- Real WebSocket connections to actual server
+- Real authentication with Better Auth
+- Real database queries
+- Real message broadcasting
+- Real emergency scenarios
+- Multi-room architecture validation
+
+**Documentation:**
+- `tests/README-REAL-TESTS.md` - Complete testing guide
+- `tests/QUICK-START.md` - Quick start instructions
+- `docs/websocket-api.md` - WebSocket API documentation
+- `docs/websocket-implementation-notes.md` - Implementation details
+
+**Test Users:**
+All test users have password: `password`
+- test1@example.com (mutual, 09123456789)
+- test2@example.com (mutual, 09123456788)
+- test3@example.com (mutual, 09123456787)
+- test4@example.com (dependent, 09123456786)
+- test5@example.com (dependent, 09123456785)
