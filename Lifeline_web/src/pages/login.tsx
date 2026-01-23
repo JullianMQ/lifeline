@@ -3,8 +3,10 @@ import '../styles/login.css';
 import { Link } from "react-router-dom";
 import { useLogin } from '../scripts/useLogin';
 import { googleAuth } from "../scripts/googleAuth";
+import { API_BASE_URL } from '../config/api';
 
 function Login() {
+    console.log(API_BASE_URL)
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const { login, loading, error, invalidFields } = useLogin();
@@ -46,7 +48,7 @@ function Login() {
                             className={invalidFields.includes("password") ? "invalid" : ""}
                         />
 
-                        {error && <p className="error-text">{error}</p>}
+                        {error && <p className="error">{error}</p>}
 
                         <button className='pos-btn' type="submit" disabled={loading}>
                             {loading ? 'Logging in...' : 'Login'}

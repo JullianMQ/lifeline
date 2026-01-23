@@ -1,6 +1,11 @@
 import { Client, SendEmailV3_1, type Contact, type LibraryResponse } from 'node-mailjet';
 import * as fs from 'node:fs';
 
+const inquiryEmail = "inquiry@lifeline-help.me";
+const inquiryName = "Lifeline Inquiry";
+const registrationEmail = "register@lifeline-help.me";
+const registrationName = "Lifeline Registration";
+
 const mailjet = Client.apiConnect(process.env.MJ_APIKEY_PUBLIC as string, process.env.MJ_APIKEY_PRIVATE as string)
 export async function sendVerifyEmail(email: string, url: string) {
     await ensureContact(email)
@@ -9,8 +14,8 @@ export async function sendVerifyEmail(email: string, url: string) {
         Messages: [
             {
                 From: {
-                    Email: "jullianq.dev+mailjet@gmail.com",
-                    Name: "JullianQ"
+                    Email: registrationEmail,
+                    Name: registrationName
                 },
                 To: [
                     {
@@ -103,8 +108,8 @@ export async function sendMagicLinkEmail(email: string, url: string, token: stri
         Messages: [
             {
                 From: {
-                    Email: "jullianq.dev+mailjet@gmail.com",
-                    Name: "JullianQ"
+                    Email: registrationEmail,
+                    Name: registrationName
                 },
                 To: [
                     {

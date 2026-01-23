@@ -15,14 +15,14 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         autoSignIn: false,
-        requireEmailVerification: false,
+        requireEmailVerification: process.env.NODE_ENV === 'production',
         revokeSessionsOnPasswordReset: true,
         // TODO: ADDING PASSWORD RESET WHEN DOMAIN IS READY
         // sendResetPassword
         // onPasswordReset
     },
     emailVerification: {
-        sendOnSignUp: true,
+        sendOnSignUp: process.env.NODE_ENV === 'production',
         sendVerificationEmail: async ({ user, url, token }, request) => {
             // console.log("request", request)
             // console.log("token", token)
@@ -88,12 +88,13 @@ export const auth = betterAuth({
             ipAddressHeaders: ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"],
             disableIpTracking: false
         },
-        defaultCookieAttributes: {
-            httpOnly: false,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "none", // TODO: Turned into none for use in different domains but only on trusted origins
-            partitioned: true
-        }
+        // COMMENTED OUT, DOES MORE WRONG THAN GOOD
+        // defaultCookieAttributes: {
+        //     httpOnly: false,
+        //     secure: process.env.NODE_ENV === "production",
+        //     sameSite: "none", // Turned into none for use in different domains but only on trusted origins
+        //     partitioned: true
+        // }
     },
     plugins: [
         openAPI({
@@ -113,7 +114,7 @@ export const auth = betterAuth({
     ],
     // hooks: {
     //     after: createAuthMiddleware(async (ctx) => {
-    //         if (ctx.path === "/sign-in/magic-link") {
+    //         if (ctx.path === "/sign-in/email") {
     //             console.log("Path is true")
     //             console.log("ctx.body:", ctx.body)
     //             console.log("ctx.context:", ctx.context)
@@ -129,7 +130,7 @@ export const auth = betterAuth({
         user: {
             create: {
                 after: async (user) => {
-                    const result = await dbPool.query('INSERT INTO contacts (user_id) VALUES ($1) RETURNING id', [user.id]);
+                    const result = await dbPool.query('INSERT INTO contacts (user_id, emergency_contacts, dependent_contacts) VALUES ($1, $2, $3) RETURNING id', [user.id, [], []]);
                     const contactId = result.rows[0].id;
                     await dbPool.query('UPDATE "user" SET emergency_contact = $1 WHERE id = $2', [contactId, user.id]);
                 }

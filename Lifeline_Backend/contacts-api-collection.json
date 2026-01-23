@@ -1,0 +1,716 @@
+{
+	"info": {
+		"_postman_id": "lifeline-contacts-api",
+		"name": "Lifeline Contacts API",
+		"description": "Comprehensive test collection for Lifeline contacts management endpoints with array-based storage",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "lifeline-backend"
+	},
+	"item": [
+		{
+			"name": "Contacts",
+			"item": [
+				{
+					"name": "Get User Contacts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has required fields\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('user_id');",
+									"    pm.expect(jsonData).to.have.property('emergency_contacts');",
+									"    pm.expect(jsonData).to.have.property('dependent_contacts');",
+									"});",
+									"",
+									"pm.test(\"Contact arrays are properly formatted\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.emergency_contacts).to.be.a('array');",
+									"    pm.expect(jsonData.dependent_contacts).to.be.a('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/users",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Raw Contacts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains contact data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('emergency_contacts');",
+									"    pm.expect(jsonData).to.have.property('dependent_contacts');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User by Phone",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains user data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('phone_no');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('role');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/09123456789",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"09123456789"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Contacts (POST)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"emergency_contacts\": [\"09123456789\", \"09987654321\"],\n    \"dependent_contacts\": [\"09111222333\"]\n}"
+						},
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Contacts (PUT) - Full Replace",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"emergency_contacts\": [\"09123456789\", \"+639987654321\", \"09155566677\"],\n    \"dependent_contacts\": [\"09111222333\", \"09144556677\"]\n}"
+						},
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clear All Contacts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Emergency Contact by Index",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/emergency/1",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"emergency",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Dependent Contact by Index",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/dependent/0",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"dependent",
+								"0"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Contact management endpoints with array-based storage for emergency and dependent contacts"
+		},
+		{
+			"name": "Validation Tests",
+			"item": [
+				{
+					"name": "Invalid Phone Numbers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"Error message about invalid phone numbers\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('error');",
+									"    pm.expect(jsonData.error).to.include('Invalid Philippine phone numbers');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"emergency_contacts\": [\"123\", \"invalid-phone\", \"091234567\"],\n    \"dependent_contacts\": [\"abc123\"]\n}"
+						},
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Empty Request Body",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"Error message about no fields to update\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('error');",
+									"    pm.expect(jsonData.error).to.include('No fields to update');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Invalid Contact Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"Error message about invalid contact type\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('error');",
+									"    pm.expect(jsonData.error).to.include('Invalid contact type');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/invalid/0",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"invalid",
+								"0"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Invalid Contact Index",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"Error message about invalid index\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('error');",
+									"    pm.expect(jsonData.error).to.include('Invalid contact index');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/emergency/-1",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"emergency",
+								"-1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Contact Index Out of Bounds",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"Error message about out of bounds\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('error');",
+									"    pm.expect(jsonData.error).to.include('Contact index out of bounds');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/emergency/999",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"emergency",
+								"999"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Test cases for API validation and error handling"
+		},
+		{
+			"name": "Edge Cases",
+			"item": [
+				{
+					"name": "Empty Arrays",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"emergency_contacts\": [],\n    \"dependent_contacts\": []\n}"
+						},
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Duplicate Phone Numbers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"emergency_contacts\": [\"09123456789\", \"09123456789\", \"09123456789\"],\n    \"dependent_contacts\": [\"09111222333\", \"09111222333\"]\n}"
+						},
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Single Contact Array",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"emergency_contacts\": [\"09123456789\"]\n}"
+						},
+						"url": {
+							"raw": "{{localURL}}contacts",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Non-existent User by Phone",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									"",
+									"pm.test(\"Error message about contacts not found\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('error');",
+									"    pm.expect(jsonData.error).to.include('Contacts not found');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{localURL}}contacts/09999999999",
+							"host": [
+								"{{localURL}}"
+							],
+							"path": [
+								"09999999999"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Edge case testing for array operations and boundary conditions"
+		}
+	],
+	"variable": [
+		{
+			"key": "localURL",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}

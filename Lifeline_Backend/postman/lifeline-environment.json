@@ -1,0 +1,70 @@
+{
+	"id": "lifeline-test-env",
+	"name": "Lifeline Test Environment",
+	"values": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000/api",
+			"type": "default",
+			"enabled": true,
+			"description": "Base URL for API endpoints"
+		},
+		{
+			"key": "ws_url",
+			"value": "ws://localhost:3000/api/ws",
+			"type": "default",
+			"enabled": true,
+			"description": "WebSocket endpoint URL"
+		},
+		{
+			"key": "better_auth_token",
+			"value": "",
+			"type": "secret",
+			"enabled": true,
+			"description": "Better Auth session token (auto-populated from sign-in response)"
+		},
+		{
+			"key": "test2_token",
+			"value": "",
+			"type": "secret",
+			"enabled": true,
+			"description": "Test User 2 session token"
+		},
+		{
+			"key": "test3_token",
+			"value": "",
+			"type": "secret",
+			"enabled": true,
+			"description": "Test User 3 session token"
+		},
+		{
+			"key": "emergency_contact_phones",
+			"value": "",
+			"type": "default",
+			"enabled": true,
+			"description": "JSON array of emergency contact phone numbers"
+		},
+		{
+			"key": "test_room_id",
+			"value": "",
+			"type": "default",
+			"enabled": true,
+			"description": "Room ID for testing (auto-populated from WebSocket messages)"
+		},
+		{
+			"key": "test_user_id",
+			"value": "vM2AijO3q38WcXOUi62UXYBzb4yxAKY5",
+			"type": "default",
+			"enabled": true,
+			"description": "Test User 1 ID"
+		},
+		{
+			"key": "test_user_phone",
+			"value": "09123456789",
+			"type": "default",
+			"enabled": true,
+			"description": "Test User 1 phone number"
+		}
+	],
+	"_postman_variable_scope": "environment"
+}

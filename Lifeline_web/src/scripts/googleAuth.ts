@@ -6,7 +6,7 @@ export function googleAuth() {
         try {
             await signInWithGoogle();
         } catch (err: any) {
-                console.error("Google login failed:", err.message);
+            console.error("Google login failed:", err.message);
         }
     };
 
@@ -16,12 +16,12 @@ export function googleAuth() {
                 provider: "google",
                 callbackURL: `${window.location.origin}/dashboard`,
                 newUserCallbackURL: `${window.location.origin}/addContact`,
-                disableRedirect: false, 
+                disableRedirect: false,
             });
             console.log("Data:", data)
-            const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, {credentials: "include",});
+            const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, { credentials: "include", });
             const session = await res.json();
-            
+
             return session;
         } catch (err: any) {
             console.error("Google login failed:", err.message);
@@ -30,5 +30,5 @@ export function googleAuth() {
     return {
         handleGoogleLogin,
     };
-    
+
 }

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lifeline WebSocket Test Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .section h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        button.disconnect {
+            background: #e74c3c;
+        }
+
+        button.connect {
+            background: #27ae60;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeaa7;
+        }
+
+        .logs {
+            grid-column: 1 / -1;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            background: white;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .log-entry.sent {
+            border-left-color: #27ae60;
+        }
+
+        .log-entry.received {
+            border-left-color: #667eea;
+        }
+
+        .log-entry.error {
+            border-left-color: #e74c3c;
+            background: #fee;
+        }
+
+        .timestamp {
+            color: #999;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+
+        .message-type {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Lifeline WebSocket Test Client</h1>
+            <p>Test the multi-room WebSocket emergency monitoring system</p>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>🔌 Connection</h2>
+                
+                <div id="connectionStatus" class="status disconnected">
+                    ❌ Disconnected
+                </div>
+
+                <div class="form-group">
+                    <label>WebSocket URL:</label>
+                    <input type="text" id="wsUrl" value="ws://localhost:3000/api/ws" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label>Session Token (Cookie):</label>
+                    <input type="password" id="sessionToken" placeholder="Paste your better-auth session token here">
+                </div>
+
+                <button id="connectBtn" class="connect">🔗 Connect</button>
+                <button id="disconnectBtn" class="disconnect" disabled>🔌 Disconnect</button>
+            </div>
+
+            <div class="section">
+                <h2>📨 Send Messages</h2>
+
+                <div class="form-group">
+                    <label>Message Type:</label>
+                    <select id="messageType">
+                        <option value="create-room">Create Room</option>
+                        <option value="join-room">Join Room</option>
+                        <option value="room-message">Send Room Message</option>
+                        <option value="get_users">Get Room Users</option>
+                        <option value="emergency-sos">Emergency SOS</option>
+                        <option value="ping">Ping</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="roomIdGroup">
+                    <label>Room ID:</label>
+                    <input type="text" id="roomId" placeholder="Enter room ID (from connected message)">
+                </div>
+
+                <div class="form-group" id="contentGroup">
+                    <label>Message Content:</label>
+                    <input type="text" id="messageContent" placeholder="Enter message content">
+                </div>
+
+                <button id="sendBtn" disabled>📤 Send Message</button>
+            </div>
+
+            <div class="section logs">
+                <h2>📋 Message Logs</h2>
+                <div id="logs"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+        let currentRoomId = null;
+
+        const wsUrlInput = document.getElementById('wsUrl');
+        const sessionTokenInput = document.getElementById('sessionToken');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const messageTypeSelect = document.getElementById('messageType');
+        const roomIdInput = document.getElementById('roomId');
+        const messageContentInput = document.getElementById('messageContent');
+        const roomIdGroup = document.getElementById('roomIdGroup');
+        const contentGroup = document.getElementById('contentGroup');
+        const logsDiv = document.getElementById('logs');
+        const connectionStatusDiv = document.getElementById('connectionStatus');
+
+        function updateConnectionStatus(status) {
+            connectionStatusDiv.className = `status ${status}`;
+            if (status === 'connected') {
+                connectionStatusDiv.innerHTML = '✅ Connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                sendBtn.disabled = false;
+                isConnected = true;
+            } else if (status === 'disconnected') {
+                connectionStatusDiv.innerHTML = '❌ Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+                isConnected = false;
+            } else {
+                connectionStatusDiv.innerHTML = '⏳ Connecting...';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+            }
+        }
+
+        function addLog(message, type = 'received') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            
+            const messageHtml = typeof message === 'object' 
+                ? `<span class="message-type">${message.type || 'Unknown'}</span><br>` + JSON.stringify(message, null, 2)
+                : message;
+            
+            logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${messageHtml}`;
+            logsDiv.insertBefore(logEntry, logsDiv.firstChild);
+
+            if (logsDiv.children.length > 100) {
+                logsDiv.removeChild(logsDiv.lastChild);
+            }
+        }
+
+        function connect() {
+            const url = wsUrlInput.value;
+            const token = sessionTokenInput.value;
+
+            if (!token) {
+                alert('Please enter your session token first!');
+                return;
+            }
+
+            updateConnectionStatus('connecting');
+            addLog('Connecting to WebSocket...', 'received');
+
+            ws = new WebSocket(url, {
+                headers: {
+                    'Cookie': `better-auth.session_token=${token}`
+                }
+            });
+
+            ws.onopen = () => {
+                updateConnectionStatus('connected');
+                addLog('✅ WebSocket connection established', 'received');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    addLog(message, 'received');
+
+                    if (message.type === 'room-created' && message.roomId) {
+                        currentRoomId = message.roomId;
+                        roomIdInput.value = currentRoomId;
+                        addLog(`💾 Room ID saved: ${currentRoomId}`, 'received');
+                    }
+
+                    if (message.type === 'connected' && message.roomIds) {
+                        if (message.roomIds.length > 0) {
+                            currentRoomId = message.roomIds[0];
+                            roomIdInput.value = currentRoomId;
+                            addLog(`💾 Auto-joined to room: ${currentRoomId}`, 'received');
+                        }
+                    }
+
+                    if (message.type === 'auto-joined' && message.roomId) {
+                        currentRoomId = message.roomId;
+                        roomIdInput.value = currentRoomId;
+                        addLog(`💾 Auto-joined room ID saved: ${currentRoomId}`, 'received');
+                    }
+                } catch (error) {
+                    addLog(`❌ Error parsing message: ${error.message}`, 'error');
+                }
+            };
+
+            ws.onerror = (error) => {
+                updateConnectionStatus('disconnected');
+                addLog(`❌ WebSocket error: ${error}`, 'error');
+            };
+
+            ws.onclose = () => {
+                updateConnectionStatus('disconnected');
+                addLog('🔌 WebSocket connection closed', 'received');
+                ws = null;
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function sendMessage() {
+            if (!isConnected || !ws) {
+                alert('Please connect to WebSocket first!');
+                return;
+            }
+
+            const type = messageTypeSelect.value;
+            let message = { type };
+
+            if (type === 'join-room') {
+                const roomId = roomIdInput.value;
+                if (!roomId) {
+                    alert('Please enter a Room ID!');
+                    return;
+                }
+                message.roomId = roomId;
+            }
+
+            if (type === 'room-message') {
+                const roomId = roomIdInput.value;
+                const content = messageContentInput.value;
+                if (!roomId || !content) {
+                    alert('Please enter Room ID and Message Content!');
+                    return;
+                }
+                message.roomId = roomId;
+                message.content = content;
+            }
+
+            if (type === 'get_users') {
+                const roomId = roomIdInput.value;
+                if (!roomId) {
+                    alert('Please enter a Room ID!');
+                    return;
+                }
+                message.roomId = roomId;
+            }
+
+            ws.send(JSON.stringify(message));
+            addLog(message, 'sent');
+        }
+
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendBtn.addEventListener('click', sendMessage);
+
+        messageTypeSelect.addEventListener('change', () => {
+            const type = messageTypeSelect.value;
+            if (type === 'join-room' || type === 'room-message' || type === 'get_users') {
+                roomIdGroup.style.display = 'block';
+            } else {
+                roomIdGroup.style.display = 'none';
+            }
+
+            if (type === 'room-message') {
+                contentGroup.style.display = 'block';
+            } else {
+                contentGroup.style.display = 'none';
+            }
+        });
+
+        // Initialize
+        roomIdGroup.style.display = 'none';
+        contentGroup.style.display = 'none';
+
+        // Help tip
+        addLog('👋 Welcome! To get started:', 'received');
+        addLog('1. Sign in via the API or use Postman authentication tests', 'received');
+        addLog('2. Copy your better-auth.session_token from cookies', 'received');
+        addLog('3. Paste the token in the Session Token field', 'received');
+        addLog('4. Click Connect to establish WebSocket connection', 'received');
+    </script>
+</body>
+</html>

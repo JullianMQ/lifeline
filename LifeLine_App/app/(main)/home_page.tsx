@@ -15,7 +15,7 @@ import {
 
 
 const HomePage = () => {
-    const { isMonitoring, stopMonitoring } = useContext(SensorContext);
+    const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
     const [serverTime, setServerTime] = useState("");
     const [messageReply, setMessageReply] = useState("");
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -189,16 +189,20 @@ const HomePage = () => {
                         Server reply: {messageReply}
                     </Text>
                 ) : null}
-
-                {isMonitoring && (
-                    <TouchableOpacity
-                        className="mt-6 mb-8 px-6 py-3 rounded-full border-2 flex-row items-center h-20 w-48 justify-center"
-                        onPress={stopMonitoring}
-                    >
-                        {/* <Ionicons name="stop-circle-outline" size={20} color="#4b5563" /> */}
-                        <Text className=" font-bold ml-2 text-2xl">STOP</Text>
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                    className="mt-6 mb-8 px-6 py-3 rounded-full border-2 flex-row items-center h-20 w-48 justify-center"
+                    onPress={() => {
+                        if (isMonitoring) {
+                            stopMonitoring();
+                        } else {
+                            startMonitoring();
+                        }
+                    }}
+                >
+                    <Text className="font-bold ml-2 text-2xl">
+                        {isMonitoring ? "STOP" : "START"}
+                    </Text>
+                </TouchableOpacity>
             </View>
         </ScreenWrapper>
     );

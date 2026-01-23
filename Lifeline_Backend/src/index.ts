@@ -4,16 +4,17 @@ import { AuthType } from './lib/auth'
 import auth from './routes/auth'
 import contacts from './routes/contacts'
 import webSocket from './routes/websocket'
+import locationRouter from './routes/location'
 import { cors } from 'hono/cors'
 
 const app = new Hono<{ Variables: AuthType }>({
     strict: false,
 })
 
-app.use( 
+app.use(
     cors({
         origin: process.env.ALLOWED_ORIGINS!.split(','),
-        allowHeaders: ['Content-Type','X-Custom-Header', 'Upgrade-Insecure-Request'],
+        allowHeaders: ['Content-Type', 'X-Custom-Header', 'Upgrade-Insecure-Request'],
         allowMethods: ['POST', 'GET', 'OPTIONS'],
         exposeHeaders: ['Content-length', 'X-Kuma-Revision'],
         maxAge: 600,
@@ -21,7 +22,7 @@ app.use(
     })
 )
 
-const routes = [auth, contacts, webSocket] as const;
+const routes = [auth, contacts, webSocket, locationRouter] as const;
 
 routes.forEach((route) => {
     app.basePath("/api").route("/", route);

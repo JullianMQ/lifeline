@@ -33,7 +33,6 @@ const AddContact = ({ onSaved }: { onSaved?: () => void }) => {
                 return;
             }
 
-            // phone number lang ma add since eto lang nasa backend
             const payload = { [fieldToUpdate]: trimmedPhone };
 
             const result = await saveContacts(payload);

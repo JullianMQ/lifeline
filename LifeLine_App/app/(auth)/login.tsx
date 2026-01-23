@@ -2,9 +2,10 @@ import { View, Text, TextInput, TouchableOpacity, Image } from "react-native";
 import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { login, signInWithGoogle } from "../../lib/api/auth";
+import { login, signInWithGoogle, loginWithToken } from "../../lib/api/auth";
 import { saveUser } from "@/lib/api/storage/user";
 import QRScanner from "@/components/QRScanner";
+import * as Linking from "expo-linking";
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -43,10 +44,13 @@ const Login = () => {
     const handleGoogleLogin = async () => {
         setGoogleLoading(true);
         try {
-            const data = await signInWithGoogle();
+            const data = await signInWithGoogle({
+                callbackURL: "lifeline://landing",
+                errorCallbackURL: "lifeline://login",
+                flow: "login",
+            });
             if (!data) return;
-            await saveUser(data.user);
-            router.replace("/(main)/landing");
+
         } catch (err: any) {
             alert(err.message || "Google login failed");
         } finally {
@@ -54,18 +58,67 @@ const Login = () => {
         }
     };
 
+
+
     // QR Scanner success
-    const handleQRScanSuccess = async (data: string) => {
+
+ const handleQRScanSuccess = async (data: string) => {
         setShowScanner(false);
+
         try {
-            const qrData = JSON.parse(data);
-            const response = await login(qrData.email, qrData.token);
-            await saveUser(response.user);
-            router.replace("/(main)/landing");
-        } catch {
+            if (!data) return;
+            if (
+                data.startsWith("http://") ||
+                data.startsWith("https://") ||
+                data.startsWith("lifeline://")
+            ) {
+                const { path, queryParams } = Linking.parse(data);
+                const { token, ...restParams } = queryParams ?? {};
+                console.log("Scanned deep link:", path, restParams);
+
+                if (!path && !queryParams?.token && !queryParams?.error) return;
+
+
+                if (queryParams?.error) {
+                    alert(
+                        "This magic link has already been used or has expired. Please generate a new QR code."
+                    );
+                    return;
+                }
+                if (queryParams?.token) {
+                    try {
+                        const response = await loginWithToken(queryParams.token as string);
+                        await saveUser(response.user);
+                        router.replace("/(main)/landing");
+                    } catch (err: any) {
+                        console.log("Caught magic link error:", err.message);
+
+                        alert(
+                            "This magic link has already been used or has expired."
+                        );
+                        router.replace("/(auth)/login");
+                    }
+                }
+
+                return;
+            }
+
+
+            if (data.trim().startsWith("{")) {
+                const qrData = JSON.parse(data);
+                const response = await login(qrData.email, qrData.token);
+                await saveUser(response.user);
+                router.replace("/(main)/landing");
+            } else {
+                console.warn("QR data not recognized:", data);
+            }
+        } catch (err: any) {
+            console.error("QR handling failed:", err);
             alert("Invalid QR code or login failed");
         }
     };
+
+
 
     const handleQRScanCancel = () => {
         setShowScanner(false);

@@ -1,0 +1,145 @@
+{
+	"info": {
+		"_postman_id": "lifeline-websocket-tests",
+		"name": "Lifeline WebSocket Tests",
+		"description": "WebSocket message collection for testing Lifeline WebSocket Emergency Monitoring System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "lifeline-websocket"
+	},
+	"item": [
+		{
+			"name": "Connect to WebSocket",
+			"request": {
+				"method": "WS",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "better-auth.session_token={{better_auth_token}}"
+					}
+				],
+				"url": {
+					"raw": "{{ws_url}}",
+					"host": ["{{ws_url}}"]
+				},
+				"description": "Connect to WebSocket endpoint with authentication cookie"
+			},
+			"response": []
+		},
+		{
+			"name": "Create Room",
+			"request": {
+				"method": "WSS",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"type\": \"create-room\"}"
+				},
+				"url": {
+					"raw": "{{ws_url}}",
+					"host": ["{{ws_url}}"]
+				},
+				"description": "Create a new room and auto-load emergency contacts"
+			},
+			"response": []
+		},
+		{
+			"name": "Join Room (Emergency Contact)",
+			"request": {
+				"method": "WSS",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"type\": \"join-room\", \"roomId\": \"{{test_room_id}}\"}"
+				},
+				"url": {
+					"raw": "{{ws_url}}",
+					"host": ["{{ws_url}}"]
+				},
+				"description": "Emergency contact joins room (immediate access, no approval)"
+			},
+			"response": []
+		},
+		{
+			"name": "Send Room Message",
+			"request": {
+				"method": "WSS",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"type\": \"room-message\", \"roomId\": \"{{test_room_id}}\", \"content\": \"Hello from Postman!\"}"
+				},
+				"url": {
+					"raw": "{{ws_url}}",
+					"host": ["{{ws_url}}"]
+				},
+				"description": "Send message to all room members"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Room Users",
+			"request": {
+				"method": "WSS",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"type\": \"get_users\", \"roomId\": \"{{test_room_id}}\"}"
+				},
+				"url": {
+					"raw": "{{ws_url}}",
+					"host": ["{{ws_url}}"]
+				},
+				"description": "Get list of users in the room"
+			},
+			"response": []
+		},
+		{
+			"name": "Trigger Emergency SOS",
+			"request": {
+				"method": "WSS",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"type\": \"emergency-sos\"}"
+				},
+				"url": {
+					"raw": "{{ws_url}}",
+					"host": ["{{ws_url}}"]
+				},
+				"description": "Trigger emergency SOS - notifies all emergency contacts across all rooms"
+			},
+			"response": []
+		},
+		{
+			"name": "Ping (Keep-Alive)",
+			"request": {
+				"method": "WSS",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"type\": \"ping\"}"
+				},
+				"url": {
+					"raw": "{{ws_url}}",
+					"host": ["{{ws_url}}"]
+				},
+				"description": "Send ping for connection health check"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Ensure test_room_id is set before WebSocket messages",
+					"if (!pm.environment.get(\"test_room_id\")) {",
+					"    console.log(\"⚠️  Warning: test_room_id not set. Create a room first.\");",
+					"}"
+				]
+			}
+		}
+	]
+}
