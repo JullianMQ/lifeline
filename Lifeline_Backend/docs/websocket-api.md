@@ -2,7 +2,7 @@
 
 ## Overview
 
-This WebSocket implementation provides a **multi-room emergency monitoring and real-time location sharing system**. It enables authenticated users to create emergency monitoring rooms, join rooms as emergency contacts, share location data, and trigger emergency SOS alerts across multiple rooms simultaneously.
+This WebSocket implementation provides a **multi-room emergency monitoring and real-time location sharing system** built with **HonoJS + Bun WebSocket helper + PostgreSQL + BetterAuth**. It enables authenticated users to create emergency monitoring rooms, join rooms as emergency contacts, share location data, and trigger emergency SOS alerts across multiple rooms simultaneously.
 
 ## Key Features
 
@@ -24,10 +24,12 @@ Rooms Info: http://localhost:3000/api/rooms-info
 
 ## Authentication
 
-All WebSocket connections and REST endpoints require valid Better Auth session authentication:
+All WebSocket connections and REST endpoints require valid BetterAuth session authentication:
 
-**WebSocket**: Session cookie required
-**REST endpoints**: Session cookie or Bearer token (for mobile compatibility)
+**WebSocket**: BetterAuth session cookie required (handled automatically by HonoJS)
+**REST endpoints**: BetterAuth session cookie or Bearer token (for mobile compatibility)
+
+BetterAuth provides secure session management with automatic token refresh and validation.
 
 ## Connection
 
@@ -38,7 +40,12 @@ ws://localhost:3000/api/ws
 ```
 
 **Headers Required:**
-- `cookie: better-auth.session_token=<your_session_token>`
+- `cookie: better-auth.session_token=<your_session_token>` (automatically handled by BetterAuth)
+
+**Mobile Alternative:**
+```
+Authorization: Bearer <better_auth_token>
+```
 
 **Connection Response:**
 ```json
@@ -404,10 +411,11 @@ Broadcast to all room members when a user's location is updated via REST API.
 
 ### POST /api/location
 
-Upload user location data, which is then broadcast to all room members.
+Upload user location data via HonoJS endpoint, which is then broadcast to all room members via Bun WebSocket helper.
 
 **Headers Required:**
-- `cookie: better-auth.session_token=<session_token>` or `Authorization: Bearer <token>`
+- `cookie: better-auth.session_token=<session_token>` (BetterAuth session)
+- OR `Authorization: Bearer <token>` (for mobile clients)
 
 **Request Body:**
 ```json
@@ -419,7 +427,7 @@ Upload user location data, which is then broadcast to all room members.
 }
 ```
 
-**Validation:**
+**Validation (HonoJS Zod Schema):**
 - `latitude`: number between -90 and 90
 - `longitude`: number between -180 and 180
 - `timestamp`: string (ISO 8601) or number (Unix timestamp)
@@ -430,7 +438,8 @@ Upload user location data, which is then broadcast to all room members.
 {
   "success": true,
   "timestamp": "2026-01-18T10:00:00.000Z",
-  "rooms": ["abc123def456", "def456ghi789"]
+  "rooms": ["abc123def456", "def456ghi789"],
+  "stored": true
 }
 ```
 
@@ -448,10 +457,10 @@ After successful upload, all room members receive a `location-update` message vi
 
 ### GET /api/rooms-info
 
-Get information about all active rooms and their users.
+Get information about all active rooms and their users from PostgreSQL database.
 
 **Headers Required:**
-- `cookie: better-auth.session_token=<session_token>`
+- `cookie: better-auth.session_token=<session_token>` (BetterAuth session)
 
 **Response:**
 ```json
@@ -482,32 +491,34 @@ Get information about all active rooms and their users.
 
 ## Multi-Room Architecture
 
-### Room Structure
+### Room Structure (PostgreSQL Schema)
 
 Each room contains:
 - `id`: Unique room identifier (cryptographically random hex string)
-- `clients`: Map of client IDs to ClientInfo
-- `owner`: User ID of the room owner
-- `emergencyContacts`: Array of phone numbers (strings)
-- `isActive`: Boolean indicating if room is active
+- `owner_id`: User ID of the room owner (BetterAuth user ID)
+- `emergency_contacts`: Array of phone numbers (PostgreSQL text array)
+- `is_active`: Boolean indicating if room is active
+- `status`: Room status (active/inactive/emergency)
+- `created_at`: Timestamp when room was created
+- `last_location_update`: Last location activity timestamp
 
 ### Client Structure
 
 Each client can be in multiple rooms simultaneously:
-- `id`: User ID from auth
-- `ws`: WebSocket connection
+- `id`: User ID from BetterAuth session
+- `ws`: Bun WebSocket connection
 - `roomIds`: Set of room IDs (multi-room support)
-- `user`: User object from auth
+- `user`: BetterAuth user object with profile data
 
-### Auto-Join Logic
+### Auto-Join Logic (PostgreSQL + BetterAuth)
 
-When an emergency contact connects:
-1. Server checks all existing rooms
-2. Finds rooms where contact's phone number is in `emergencyContacts` array
-3. Automatically adds contact to those rooms
-4. Sends `auto-joined` message for each room
+When an emergency contact connects via BetterAuth session:
+1. Server queries PostgreSQL for all existing rooms
+2. Finds rooms where contact's phone number is in `emergency_contacts` array
+3. Automatically adds contact to those rooms in database
+4. Sends `auto-joined` message for each room via Bun WebSocket
 5. Sends `auto-join-summary` with count of rooms joined
-6. Notifies existing room members with `emergency-contact-joined`
+6. Notifies existing room members with `emergency-contact-joined` broadcast
 
 ### Emergency Contact Access Control
 
@@ -543,10 +554,11 @@ When `emergency-sos` is triggered:
 
 ## Security & Access Control
 
-### Authentication
-- All connections require valid Better Auth session
-- Middleware validates session on WebSocket connection
-- REST endpoints accept both session cookie and Bearer token
+### Authentication (BetterAuth Integration)
+- All connections require valid BetterAuth session
+- HonoJS middleware validates session on WebSocket connection
+- REST endpoints accept both BetterAuth session cookie and Bearer token
+- BetterAuth handles session refresh and token validation automatically
 
 ### Room Access Rules
 1. **Owner**: Full access to room
@@ -554,17 +566,19 @@ When `emergency-sos` is triggered:
 3. **Regular User**: Must be explicitly approved via `request-join` flow
 4. **Non-Contact**: Access denied
 
-### Emergency Contact Validation
+### Emergency Contact Validation (BetterAuth + PostgreSQL)
 - Emergency contacts are identified by phone number
-- Room owners' emergency contacts are loaded from `/api/contacts/contacts/users?phone={userId}`
-- Contacts include both `emergency_contacts` and `dependent_contacts`
+- Room owners' emergency contacts are loaded from PostgreSQL tables
+- BetterAuth validates user sessions before accessing contact data
+- Contacts include both `emergency_contacts` and `dependent_contacts` relationships
 
-### Security Features
+### Security Features (HonoJS + BetterAuth + PostgreSQL)
 - Cryptographically random room IDs (16 bytes → 32 hex characters)
-- Emergency contact validation before room access
-- Room activity state (`isActive`) for access control
-- Aggressive cleanup of empty rooms (1 hour timeout)
-- Error handling and logging for debugging
+- BetterAuth emergency contact validation before room access
+- Room activity state (`is_active`) for access control in PostgreSQL
+- Automatic cleanup of empty rooms (1 hour timeout) via database triggers
+- HonoJS error handling and structured logging for debugging
+- BetterAuth CSRF protection and session security
 
 ## Error Handling
 
@@ -599,10 +613,10 @@ When `emergency-sos` is triggered:
 ### JavaScript Example
 
 ```javascript
-// Connect to WebSocket
+// Connect to WebSocket using Bun WebSocket helper
 const ws = new WebSocket("ws://localhost:3000/api/ws", [], {
   headers: {
-    cookie: document.cookie,
+    cookie: document.cookie, // BetterAuth session cookie
   },
 });
 
@@ -787,10 +801,10 @@ export function useEmergencyMonitoring() {
 ### Mobile Integration (Background Location)
 
 ```javascript
-// Mobile App - Background Location Tracking
+// Mobile App - Background Location Tracking with BetterAuth
 class EmergencyMonitoringService {
-  constructor(authToken) {
-    this.authToken = authToken;
+  constructor(betterAuthToken) {
+    this.betterAuthToken = betterAuthToken;
     this.ws = null;
     this.locationInterval = null;
   }
@@ -821,7 +835,7 @@ class EmergencyMonitoringService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.authToken}`
+          "Authorization": `Bearer ${this.betterAuthToken}`
         },
         body: JSON.stringify({
           latitude: position.coords.latitude,
@@ -888,10 +902,11 @@ class EmergencyMonitoringService {
 - WebSocket broadcast to all room members
 - Location data includes timestamp and accuracy for filtering
 
-### Room Cleanup
-- Empty rooms deleted after 1 hour delay
+### Room Cleanup (PostgreSQL + Bun WebSocket)
+- Empty rooms marked for deletion in PostgreSQL after 1 hour delay
+- Database cron job cleans up expired rooms
+- Bun WebSocket cleanup removes disconnected sockets
 - Prevents memory accumulation from abandoned rooms
-- Graceful cleanup on disconnect
 
 ## Testing
 
@@ -900,6 +915,8 @@ Run the integration test suite:
 ```bash
 bun test tests/websocket-integration.test.ts
 ```
+
+**Test Environment**: Uses HonoJS test utilities with Bun test runner and PostgreSQL test database.
 
 The test suite covers:
 - Multi-room creation with emergency contact loading
@@ -929,4 +946,4 @@ The test suite covers:
 
 ---
 
-**Status**: ✅ Multi-Room Emergency Monitoring System Fully Implemented
+**Status**: ✅ Multi-Room Emergency Monitoring System Fully Implemented with **HonoJS + Bun + PostgreSQL + BetterAuth**

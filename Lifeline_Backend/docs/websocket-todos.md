@@ -320,7 +320,8 @@ case 'join-room': {
 ```typescript
 async function getEmergencyContacts(userId: string): Promise<string[]> {
   try {
-    const contactsResponse = await fetch(`/api/contacts/users?phone=${userId}`);
+    // Use user_id instead of phone for actual implementation
+    const contactsResponse = await fetch(`/api/contacts/users?user_id=${userId}`);
     if (!contactsResponse.ok) return [];
 
     const contacts = await contactsResponse.json();

@@ -8,6 +8,13 @@
 
 ## 🎯 CORE ARCHITECTURE
 
+### **Technology Stack**
+- **Backend Framework**: HonoJS with Bun runtime
+- **WebSocket Implementation**: Bun WebSocket helper
+- **Database**: PostgreSQL with connection pooling
+- **Authentication**: BetterAuth framework for session management
+- **Deployment**: Bun runtime for optimal performance
+
 ### **Simple Principle: Active/Inactive Rooms**
 **YES** - Even when the mobile user disconnects from WebSocket, the room stays active for emergency contacts to continue monitoring through location REST uploads.
 
@@ -56,8 +63,8 @@ class LocationTracker {
         // Start foreground service for Android background execution
         await this.startForegroundService('Lifeline Monitoring Active');
         
-        // Establish WebSocket connection
-        this.websocket = new WebSocket('ws://api.lifeline.com/ws');
+        // Establish WebSocket connection using Bun WebSocket helper
+        this.websocket = new WebSocket('ws://api.lifeline.com/api/ws');
         await this.setupWebSocketHandlers();
         
         // Create monitoring room with emergency contacts pre-loaded
@@ -138,10 +145,14 @@ class LocationTracker {
 
 #### **2.1 Room State Management**
 ```typescript
-// Backend - Simple Room Manager
+// Backend - HonoJS Room Manager with PostgreSQL
+import { Hono } from 'hono';
+import { getDatabase } from '../db/database';
+
 class RoomManager {
     private rooms = new Map<string, Room>();
     private userRooms = new Map<string, string>(); // userId -> roomId
+    private db = getDatabase();
     
     // Simple room creation with pre-loaded emergency contacts
     async createRoom(userId: string, emergencyContacts: string[]): Promise<string> {
@@ -246,9 +257,24 @@ class RoomManager {
 
 #### **2.2 Location Ingestion & Room Bridging**
 ```typescript
-// Backend - Location REST Endpoint
-app.post('/api/location', async (req, res) => {
-    const user = req.user; // From auth middleware
+// Backend - HonoJS Location Endpoint with BetterAuth
+import { auth } from '../lib/auth';
+
+const locationRoutes = new Hono<{ Variables: { user: any } }>();
+
+locationRoutes.use('*', async (c, next) => {
+    const session = await auth.api.getSession({
+        headers: c.req.header()
+    });
+    if (!session) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+    c.set('user', session.user);
+    await next();
+});
+
+locationRoutes.post('/api/location', async (c) => {
+    const user = c.get('user'); // From BetterAuth middleware
     const { latitude, longitude, timestamp, accuracy } = req.body;
     
     // Validate input
@@ -266,13 +292,13 @@ app.post('/api/location', async (req, res) => {
         receivedAt: new Date()
     };
     
-    // Find or create user's monitoring room
-    let roomId = roomManager.getUserRoom(user.id);
-    if (!roomId) {
-        // Auto-create room if user uploads location without WebSocket
-        const emergencyContacts = await user.getEmergencyContacts();
-        roomId = await roomManager.createRoom(user.id, emergencyContacts);
-    }
+        // Find or create user's monitoring room
+        let roomId = roomManager.getUserRoom(user.id);
+        if (!roomId) {
+            // Auto-create room if user uploads location without WebSocket
+            const emergencyContacts = await getEmergencyContacts(user.id);
+            roomId = await roomManager.createRoom(user.id, emergencyContacts);
+        }
     
     // Bridge REST location to WebSocket room
     roomManager.handleLocationUpdate(user.id, locationData);
@@ -305,8 +331,12 @@ class EmergencyDashboard {
     
     async startMonitoring(userPhoneOrEmail) {
         try {
-            // Find the user to monitor
-            const userResponse = await fetch(`/api/contacts/users?phone=${userPhoneOrEmail}`);
+            // Find the user to monitor via HonoJS API
+            const userResponse = await fetch(`/api/contacts/users?phone=${userPhoneOrEmail}`, {
+                headers: {
+                    'Authorization': `Bearer ${await getAuthToken()}`
+                }
+            });
             const userData = await userResponse.json();
             
             if (!userData.user) {
@@ -315,8 +345,8 @@ class EmergencyDashboard {
             
             this.monitoredUser = userData.user;
             
-            // Connect to WebSocket
-            this.websocket = new WebSocket('ws://api.lifeline.com/ws');
+            // Connect to WebSocket using Bun WebSocket helper
+            this.websocket = new WebSocket('ws://api.lifeline.com/api/ws');
             await this.setupWebSocketHandlers();
             
             // Join monitoring room immediately (no approval needed)
@@ -525,6 +555,61 @@ sequenceDiagram
 
 ## 🔧 TECHNICAL IMPLEMENTATION DETAILS
 
+### **5. HonoJS + PostgreSQL Implementation**
+
+#### **5.1 Database Schema**
+```sql
+-- PostgreSQL tables for persistent room management
+CREATE TABLE rooms (
+    id VARCHAR(32) PRIMARY KEY,
+    owner_id VARCHAR(255) NOT NULL,
+    emergency_contacts TEXT[] NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT NOW(),
+    last_location_update TIMESTAMP,
+    expires_at TIMESTAMP
+);
+
+CREATE TABLE room_members (
+    room_id VARCHAR(32) REFERENCES rooms(id) ON DELETE CASCADE,
+    user_id VARCHAR(255) NOT NULL,
+    joined_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (room_id, user_id)
+);
+
+CREATE TABLE location_updates (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    room_id VARCHAR(32) REFERENCES rooms(id),
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    accuracy INTEGER,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### **5.2 BetterAuth Integration**
+```typescript
+// BetterAuth configuration for HonoJS
+import { betterAuth } from "better-auth";
+import { postgresAdapter } from "better-auth/adapters/postgres";
+
+export const auth = betterAuth({
+  database: postgresAdapter({
+    url: process.env.DATABASE_URL!,
+  }),
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24, // 1 day
+  },
+  socialProviders: {
+    // Configure social providers as needed
+  },
+});
+```
+
 ### **5. Simple Room Persistence Rules**
 
 #### **5.1 When Rooms Stay Active**
@@ -611,37 +696,55 @@ class AndroidLocationOptimizer {
 
 #### **7.1 WebSocket Scaling**
 ```typescript
-// Handle thousands of simultaneous monitoring sessions
-const wsCluster = new Cluster({
-    workers: require('os').cpus().length,
-    sticky: true // Essential for WebSocket rooms
+// Handle thousands of simultaneous monitoring sessions with Bun
+const server = Bun.serve({
+    port: 3000,
+    fetch: app.fetch,
+    websocket: {
+        open: handleWebSocketOpen,
+        message: handleWebSocketMessage,
+        close: handleWebSocketClose,
+        error: handleWebSocketError,
+    },
 });
 
-// Use Redis for room state across instances
-const redis = new Redis(process.env.REDIS_URL);
-await redis.set(`room:${roomId}`, JSON.stringify(roomData));
+// Use PostgreSQL for room state across instances
+const roomData = await db.query(
+    'SELECT * FROM rooms WHERE id = $1',
+    [roomId]
+);
 ```
 
 #### **7.2 Location Data Processing**
 ```typescript
-// High-volume location ingestion
-const locationQueue = new Bull('location-updates');
+// High-volume location ingestion with Bun queue
+import { Queue } from 'bun-queue';
+
+const locationQueue = new Queue('location-updates', {
+    concurrency: 10,
+    maxRetries: 3,
+});
 
 locationQueue.process(async (job) => {
     const { userId, location } = job.data;
     
-    // Process location update
+    // Process location update with PostgreSQL
     await processLocationUpdate(userId, location);
     
-    // Broadcast to WebSocket rooms
+    // Broadcast to WebSocket rooms via Bun helper
     await broadcastLocationToRooms(userId, location);
 });
 
-// Rate limiting to prevent abuse
-const rateLimiter = new RateLimit({
+// Rate limiting to prevent abuse with HonoJS middleware
+import { rateLimiter } from 'hono/rate-limiter';
+
+const app = new Hono();
+
+app.use('*', rateLimiter({
     windowMs: 60 * 1000, // 1 minute
-    max: 30 // max 30 location updates per minute per user
-});
+    max: 30, // max 30 location updates per minute per user
+    message: 'Too many location updates',
+}));
 ```
 
 ---
@@ -749,4 +852,4 @@ This simplified architecture ensures that **rooms stay active for emergency moni
 ✅ **Real-time Updates**: Emergency contacts receive live location via WebSocket broadcasting  
 ✅ **Scalable Design**: Handles thousands of simultaneous monitoring sessions  
 
-The system successfully balances **simplicity for capstone students** with **life-critical emergency functionality**, creating a robust emergency monitoring platform that's easy to understand and implement.
+The system successfully balances **simplicity for capstone students** with **life-critical emergency functionality**, creating a robust emergency monitoring platform that's easy to understand and implement using **HonoJS + Bun + PostgreSQL + BetterAuth** for optimal performance and developer experience.

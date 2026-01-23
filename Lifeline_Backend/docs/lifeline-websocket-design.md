@@ -13,6 +13,8 @@ When a user clicks "Start Monitoring", they've already given consent to be monit
 
 **Core Insight**: Consent is implied when starting monitoring. Emergency contacts get immediate access.
 
+**Technology Stack**: Built with **HonoJS + Bun WebSocket helper + PostgreSQL + BetterAuth** for optimal performance and simplicity.
+
 ---
 
 ## 2. System Goals (Simplified)
@@ -44,8 +46,8 @@ POST /api/location
 **Why**: Real-time updates for web dashboards
 
 ```javascript
-// Single WebSocket endpoint
-ws://api.example.com/ws
+// Single WebSocket endpoint with Bun WebSocket helper
+ws://api.example.com/api/ws
 ```
 
 ### 3.3 Room Model: Simple & Effective
@@ -104,11 +106,14 @@ ACTIVE → INACTIVE (when user clicks "Stop Monitoring")
 ## 6. WebSocket Events (Simplified)
 
 ### 6.1 Connection & Authentication
-All WebSocket and REST requests use JWT authentication. The token is passed via query parameter for WebSocket connections and via Authorization header for REST APIs.
+All WebSocket and REST requests use BetterAuth session authentication. BetterAuth handles session cookies automatically for both WebSocket and REST APIs.
 
 ```javascript
-// Connect with JWT token
-ws://api.example.com/ws?token=<jwt>
+// Connect with BetterAuth session
+ws://api.example.com/api/ws
+
+// OR with Bearer token for mobile
+Authorization: Bearer <better_auth_token>
 ```
 
 ### 6.2 Core Events
@@ -166,18 +171,40 @@ When user taps "Start Monitoring":
 
 ### 7.2 Server Location Handling
 ```javascript
-// POST /api/location
-app.post('/api/location', (req, res) => {
-    // 1. Validate JWT token
-    // 2. Find user's active room
-    // 3. Store location (optional)
-    // 4. Auto-join authorized emergency contacts to the room
-    await autoJoinEmergencyContacts(roomId, userId);
-    // 5. Broadcast to WebSocket room
-    broadcastToRoom(roomId, {
-        type: 'location-update',
-        data: req.body
+// HonoJS + BetterAuth Location Endpoint
+import { Hono } from 'hono';
+import { auth } from '../lib/auth';
+
+const app = new Hono();
+
+app.post('/api/location', async (c) => {
+    // 1. BetterAuth session validation
+    const session = await auth.api.getSession({
+        headers: c.req.header()
     });
+    if (!session) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // 2. Find user's active room from PostgreSQL
+    const room = await findActiveRoom(session.user.id);
+    
+    // 3. Store location in PostgreSQL
+    await db.query(
+        'INSERT INTO location_updates (user_id, latitude, longitude, timestamp) VALUES ($1, $2, $3, $4)',
+        [session.user.id, c.req.body.latitude, c.req.body.longitude, c.req.body.timestamp]
+    );
+    
+    // 4. Auto-join authorized emergency contacts
+    await autoJoinEmergencyContacts(room.id, session.user.id);
+    
+    // 5. Broadcast via Bun WebSocket helper
+    broadcastToRoom(room.id, {
+        type: 'location-update',
+        data: c.req.body
+    });
+    
+    return c.json({ success: true });
 });
 ```
 
@@ -205,6 +232,64 @@ broadcastToRoom(roomId, {
 ```
 
 **No More**: Complex anomaly detection, multi-step escalation, automated alerts.
+
+---
+
+## 8.3 User Information Broadcasting (Privacy Design)
+
+**Important Design Decision**: When users are connected in the same room, their user information (id, name, email, phone, role) is intentionally broadcast to all room members. This is by design for emergency monitoring transparency.
+
+### **Why User Information is Shared**
+
+In an emergency monitoring system, all participants in a room need to know who they are connected to for safety and coordination:
+
+```javascript
+// From src/routes/websocket.ts lines 221-231
+broadcastToRoom(roomId, {
+    type: 'user-joined',
+    clientId: clientId,
+    user: {
+        id: clientInfo.user.id,        // User identifier
+        name: clientInfo.user.name,      // Display name
+        email: clientInfo.user.email,    // Contact email
+        role: clientInfo.user.role,      // User role (mutual/dependent)
+        phone_no: clientInfo.user.phone_no // Emergency contact phone
+    },
+    timestamp: new Date().toISOString()
+}, clientId);
+```
+
+### **Shared Information Includes**:
+- **ID**: Unique user identifier for system tracking
+- **Name**: Human-readable name for display and identification
+- **Email**: Contact information for emergency outreach
+- **Role**: User classification (mutual/dependent) for context
+- **Phone**: Emergency contact number for urgent situations
+
+### **Emergency Context Justification**
+
+This information sharing is critical for:
+1. **Emergency Identification**: Knowing exactly who is in the monitoring room
+2. **Contact Information**: Multiple ways to reach participants in emergencies
+3. **Role Clarity**: Understanding who is the monitored user vs emergency contacts
+4. **Coordination**: Emergency contacts can coordinate using proper identification
+
+### **Privacy Considerations**
+
+- Users consent to monitoring by creating/joining rooms
+- Emergency relationships are pre-established and verified
+- Information is limited to essential emergency contact details
+- No sensitive personal data beyond emergency contact information
+- Room access is controlled by emergency contact relationships
+
+### **Comparison to Private Systems**
+
+Unlike private chat systems where anonymity is preserved, emergency monitoring requires:
+- **Transparency**: All room members must know who they're connected to
+- **Accountability**: Clear identification in emergency situations
+- **Rapid Access**: No delays to identify participants during emergencies
+
+This design choice prioritizes **emergency response effectiveness** over **individual privacy** within monitoring rooms.
 
 ---
 
@@ -277,19 +362,19 @@ Each emergency contact can be in a different state for each room they're monitor
 ## 10. Implementation Priority (1-2 Days)
 
 ### Day 1 (6-8 hours):
-1. **REST Location API** (2 hours)
-   - POST /api/location endpoint
-   - JWT authentication
-   - Basic validation
+1. **HonoJS REST Location API** (2 hours)
+   - POST /api/location endpoint with BetterAuth middleware
+   - PostgreSQL integration for location storage
+   - Validation and error handling
 
-2. **WebSocket Server** (3 hours)
-   - Socket connection handling
-   - Room management (Map<roomId, Set<socket>>)
+2. **Bun WebSocket Server** (3 hours)
+   - Bun WebSocket helper setup
+   - PostgreSQL-backed room management
    - Basic events (join, leave, message)
 
-3. **Room Creation** (1-2 hours)
-   - start-monitoring event
-   - Emergency contact validation
+3. **Room Creation with BetterAuth** (1-2 hours)
+   - start-monitoring event with session validation
+   - Emergency contact validation via database
    - Auto-join for emergency contacts
    - Multi-room support for emergency contacts
 
@@ -317,32 +402,34 @@ Each emergency contact can be in a different state for each room they're monitor
 
 ## 11. Security (Simplified but Essential)
 
-1. **JWT Authentication**: All API calls require valid token
-2. **Emergency Contact Validation**: Only pre-approved emergency contacts can join. Emergency contacts are pre-defined in the database during user setup and validated server-side when joining a room.
-3. **Room ID Security**: UUID-based room IDs (unguessable)
-4. **Rate Limiting**: Prevent abuse of join requests
+1. **BetterAuth Authentication**: All API calls require valid BetterAuth session
+2. **Emergency Contact Validation**: Only pre-approved emergency contacts can join. Emergency contacts are pre-defined in PostgreSQL during user setup and validated server-side when joining a room.
+3. **Room ID Security**: Cryptographically random room IDs (unguessable)
+4. **Rate Limiting**: HonoJS rate limiting middleware to prevent abuse
 
 ---
 
 ## 12. Technical Architecture Summary
 
 ```
-Mobile App (REST) → Backend → WebSocket → Dashboard Web App
-                     ↓
-               Database (locations, users, contacts)
+Mobile App (REST) → HonoJS Backend → Bun WebSocket → Dashboard Web App
+                     ↓                ↓
+                BetterAuth          PostgreSQL Database
+                Authentication      (rooms, locations, users, contacts)
 ```
 
 **Key Components**:
-- Express.js server with Socket.io
-- JWT authentication
-- In-memory room storage (sufficient for capstone)
-- Simple database (SQLite/PostgreSQL)
+- **HonoJS**: Fast web framework with TypeScript support
+- **Bun WebSocket Helper**: High-performance WebSocket implementation
+- **BetterAuth**: Modern authentication framework with session management
+- **PostgreSQL**: Persistent database for rooms, users, and location data
+- **Bun Runtime**: Optimal JavaScript runtime for performance
 
 ---
 
 ## 13. One-Sentence Summary
 
-"The system uses REST-based background location uploads from mobile devices combined with simple WebSocket rooms for real-time emergency monitoring, where clicking 'Start Monitoring' gives immediate access to emergency contacts."
+"The system uses HonoJS REST endpoints for background location uploads from mobile devices, combined with Bun WebSocket rooms for real-time emergency monitoring, where BetterAuth manages authentication and clicking 'Start Monitoring' gives immediate access to emergency contacts."
 
 ---
 
