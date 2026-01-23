@@ -118,16 +118,16 @@ Authorization: Bearer <better_auth_token>
 
 ### 6.2 Core Events
 
-**start-monitoring** (User creates room)
+**create-room** (User creates room)
 ```json
 {
-  "type": "start-monitoring"
+  "type": "create-room"
 }
 ```
 Server response:
 ```json
 {
-  "type": "monitoring-started",
+  "type": "room-created",
   "roomId": "abc-123-def",
   "shareWithEmergencyContacts": true
 }
@@ -373,7 +373,7 @@ Each emergency contact can be in a different state for each room they're monitor
    - Basic events (join, leave, message)
 
 3. **Room Creation with BetterAuth** (1-2 hours)
-   - start-monitoring event with session validation
+   - create-room event with session validation
    - Emergency contact validation via database
    - Auto-join for emergency contacts
    - Multi-room support for emergency contacts

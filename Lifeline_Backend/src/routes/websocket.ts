@@ -210,6 +210,42 @@ async function handleCreateRoom(clientId: string, clientInfo: ClientInfo, data: 
 
         console.log(`[${new Date().toISOString()}] Room ${roomId} created by ${clientInfo.user?.name || "Unknown"} (${clientId}) with ${emergencyContacts.length} emergency contacts`);
 
+        // Auto-add connected emergency contacts to the room
+        for (const emergencyContactPhone of emergencyContacts) {
+            const connectedClient = Array.from(clients.values()).find(
+                client => client.user?.phone_no === emergencyContactPhone
+            );
+            
+            if (connectedClient && connectedClient.id !== clientId) {
+                try {
+                    // Add emergency contact to the room
+                    room.clients.set(connectedClient.id, connectedClient);
+                    connectedClient.roomIds.add(roomId);
+                    
+                    // Send notification to the emergency contact
+                    connectedClient.ws.send(JSON.stringify({
+                        type: 'auto-joined',
+                        roomId: roomId,
+                        roomOwner: clientId,
+                        message: 'Auto-joined as emergency contact',
+                        timestamp: new Date().toISOString()
+                    }));
+                    
+                    // Broadcast to room that emergency contact joined
+                    broadcastToRoom(roomId, {
+                        type: 'emergency-contact-joined',
+                        contactId: connectedClient.id,
+                        contactName: connectedClient.user.name,
+                        timestamp: new Date().toISOString()
+                    }, connectedClient.id);
+                    
+                    console.log(`[${new Date().toISOString()}] Emergency contact ${connectedClient.user?.name || "Unknown"} (${connectedClient.id}) auto-joined room ${roomId}`);
+                } catch (error) {
+                    console.error(`[${new Date().toISOString()}] Error auto-joining emergency contact ${connectedClient.id} to room ${roomId}:`, error);
+                }
+            }
+        }
+
         ws.send(JSON.stringify({
             type: 'room-created',
             roomId: roomId,
@@ -717,10 +753,23 @@ ws.get('/rooms-info', (c) => {
     try {
         const requestingUserPhone = c.get("user")?.phone_no || "";
         
-        // Filter rooms to only those where requesting user is a member (by phone number)
+        // Filter rooms to only those where requesting user is a member (by phone number) or owner
         const userRooms = Array.from(rooms.values()).filter(room => {
             if (!requestingUserPhone) return false;
-            return room.emergencyContacts.includes(requestingUserPhone);
+            
+            // Check if user is an emergency contact
+            const isEmergencyContact = room.emergencyContacts.includes(requestingUserPhone);
+            
+            // Check if user is the owner (by finding owner's client info and comparing phone)
+            const ownerClientInfo = clients.get(room.owner);
+            const isOwner = ownerClientInfo?.user?.phone_no === requestingUserPhone;
+            
+            // Check if user is already a current member in the room
+            const isCurrentMember = Array.from(room.clients.values()).some(
+                client => client.user?.phone_no === requestingUserPhone
+            );
+            
+            return isEmergencyContact || isOwner || isCurrentMember;
         });
         
         const roomList = userRooms.map(room => ({
