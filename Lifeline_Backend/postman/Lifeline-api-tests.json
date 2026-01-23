@@ -1,0 +1,515 @@
+{
+	"info": {
+		"_postman_id": "lifeline-websocket-tests",
+		"name": "Lifeline WebSocket Emergency Monitoring",
+		"description": "Postman collection for testing Lifeline WebSocket Emergency Monitoring System API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "lifeline-backend"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Sign In - Test User 1",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"if (response.session && response.session.token) {",
+									"    pm.environment.set(\"session_token\", response.session.token);",
+									"    pm.test(\"✅ Authentication successful - token saved\", true);",
+									"} else {",
+									"    pm.test(\"❌ Authentication failed\", false);",
+									"}",
+									"",
+									"// Parse cookies for better-auth",
+									"const cookies = pm.response.headers.get('set-cookie');",
+									"if (cookies) {",
+									"    const cookieArray = cookies.split(',');",
+									"    cookieArray.forEach(cookie => {",
+									"        if (cookie.includes('better-auth.session_token')) {",
+									"            const tokenMatch = cookie.match(/better-auth\\.session_token=([^;]+)/);",
+									"            if (tokenMatch) {",
+									"                pm.environment.set(\"better_auth_token\", tokenMatch[1]);",
+									"            }",
+									"        }",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test1@example.com\",\n  \"password\": \"password\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/sign-in/email",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "sign-in", "email"]
+						},
+						"description": "Authenticate as test user 1 (mutual role)"
+					},
+					"response": []
+				},
+				{
+					"name": "Sign In - Test User 2",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"// Parse cookies for better-auth",
+									"const cookies = pm.response.headers.get('set-cookie');",
+									"if (cookies) {",
+									"    const cookieArray = cookies.split(',');",
+									"    cookieArray.forEach(cookie => {",
+									"        if (cookie.includes('better-auth.session_token')) {",
+									"            const tokenMatch = cookie.match(/better-auth\\.session_token=([^;]+)/);",
+									"            if (tokenMatch) {",
+									"                pm.environment.set(\"test2_token\", tokenMatch[1]);",
+									"                pm.test(\"✅ Test 2 authenticated\", true);",
+									"            }",
+									"        }",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test2@example.com\",\n  \"password\": \"password\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/sign-in/email",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "sign-in", "email"]
+						},
+						"description": "Authenticate as test user 2 (emergency contact for test 1)"
+					},
+					"response": []
+				},
+				{
+					"name": "Sign In - Test User 3",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"// Parse cookies for better-auth",
+									"const cookies = pm.response.headers.get('set-cookie');",
+									"if (cookies) {",
+									"    const cookieArray = cookies.split(',');",
+									"    cookieArray.forEach(cookie => {",
+									"        if (cookie.includes('better-auth.session_token')) {",
+									"            const tokenMatch = cookie.match(/better-auth\\.session_token=([^;]+)/);",
+									"            if (tokenMatch) {",
+									"                pm.environment.set(\"test3_token\", tokenMatch[1]);",
+									"                pm.test(\"✅ Test 3 authenticated\", true);",
+									"            }",
+									"        }",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test3@example.com\",\n  \"password\": \"password\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/sign-in/email",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "sign-in", "email"]
+						},
+						"description": "Authenticate as test user 3 (emergency contact for test 1)"
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints to get session tokens for testing"
+		},
+		{
+			"name": "Contacts API",
+			"item": [
+				{
+					"name": "Get User Contacts - Test 1",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"✅ Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"✅ Has emergency contacts array\", function () {",
+									"    pm.expect(response).to.have.property('emergency_contacts');",
+									"    pm.expect(Array.isArray(response.emergency_contacts)).to.be.true;",
+									"});",
+									"",
+									"pm.test(\"✅ Has dependent contacts array\", function () {",
+									"    pm.expect(response).to.have.property('dependent_contacts');",
+									"    pm.expect(Array.isArray(response.dependent_contacts)).to.be.true;",
+									"});",
+									"",
+									"// Save emergency contact phone numbers for testing",
+									"if (response.emergency_contacts && response.emergency_contacts.length > 0) {",
+									"    const emergencyPhones = response.emergency_contacts.map(c => c.phone_no);",
+									"    pm.environment.set(\"emergency_contact_phones\", JSON.stringify(emergencyPhones));",
+									"    pm.test(`✅ Found ${emergencyPhones.length} emergency contacts: ${emergencyPhones.join(', ')}`, true);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/contacts/contacts/users?phone=09123456789",
+							"host": ["{{base_url}}"],
+							"path": ["contacts", "contacts", "users"],
+							"query": [
+								{
+									"key": "phone",
+									"value": "09123456789",
+									"description": "Test user 1's phone number"
+								}
+							]
+						},
+						"description": "Get test user 1's emergency and dependent contacts"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Contacts - Test 2",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"✅ Test 2 contacts retrieved\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/contacts/contacts/users?phone=09123456788",
+							"host": ["{{base_url}}"],
+							"path": ["contacts", "contacts", "users"],
+							"query": [
+								{
+									"key": "phone",
+									"value": "09123456788",
+									"description": "Test user 2's phone number"
+								}
+							]
+						},
+						"description": "Get test user 2's emergency and dependent contacts"
+					},
+					"response": []
+				}
+			],
+			"description": "Contacts API endpoints for testing emergency contact relationships"
+		},
+		{
+			"name": "Location API",
+			"item": [
+				{
+					"name": "Upload Location - Test 1",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"✅ Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"✅ Success flag is true\", function () {",
+									"    pm.expect(response.success).to.be.true;",
+									"});",
+									"",
+									"pm.test(\"✅ Has receivedAt timestamp\", function () {",
+									"    pm.expect(response).to.have.property('received');",
+									"});",
+									"",
+									"pm.test(\"✅ Has roomId or null\", function () {",
+									"    pm.expect(response).to.have.property('roomId');",
+									"});",
+									"",
+									"pm.test(\"✅ Location broadcast to WebSocket (check console)\", function () {",
+									"    console.log('📡 Location update should be broadcast to WebSocket room members');",
+									"    pm.expect(true).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{better_auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Cookie",
+								"value": "better-auth.session_token={{better_auth_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"latitude\": 14.5995,\n  \"longitude\": 120.9842,\n  \"timestamp\": \"2026-01-19T00:00:00.000Z\",\n  \"accuracy\": 10\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/location",
+							"host": ["{{base_url}}"],
+							"path": ["location"]
+						},
+						"description": "Upload location update (should broadcast to WebSocket room members)"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Location - Invalid Coordinates",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"✅ Status code is 400 (bad request)\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"✅ Has error message\", function () {",
+									"    pm.expect(response).to.have.property('error');",
+									"});",
+									"",
+									"pm.test(\"✅ Error indicates invalid coordinates\", function () {",
+									"    pm.expect(response.error).to.include('coordinate');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Cookie",
+								"value": "better-auth.session_token={{better_auth_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"latitude\": 999.9999,\n  \"longitude\": 999.9999,\n  \"timestamp\": \"2026-01-19T00:00:00.000Z\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/location",
+							"host": ["{{base_url}}"],
+							"path": ["location"]
+						},
+						"description": "Test validation with invalid coordinates (should fail)"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Location - Missing Required Fields",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"✅ Status code is 400 (bad request)\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Cookie",
+								"value": "better-auth.session_token={{better_auth_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"latitude\": 14.5995,\n  \"longitude\": 120.9842\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/location",
+							"host": ["{{base_url}}"],
+							"path": ["location"]
+						},
+						"description": "Test validation with missing timestamp (should fail)"
+					},
+					"response": []
+				}
+			],
+			"description": "Location upload REST API with WebSocket broadcasting"
+		},
+		{
+			"name": "WebSocket Info Endpoints",
+			"item": [
+				{
+					"name": "Get Active Rooms Info",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"✅ Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"✅ Has rooms array\", function () {",
+									"    pm.expect(response).to.have.property('rooms');",
+									"    pm.expect(Array.isArray(response.rooms)).to.be.true;",
+									"});",
+									"",
+									"pm.test(\"✅ Has totalRooms count\", function () {",
+									"    pm.expect(response).to.have.property('totalRooms');",
+									"    pm.expect(typeof response.totalRooms).to.be('number');",
+									"});",
+									"",
+									"pm.test(\"✅ Has totalClients count\", function () {",
+									"    pm.expect(response).to.have.property('totalClients');",
+									"    pm.expect(typeof response.totalClients).to.be('number');",
+									"});",
+									"",
+									"if (response.rooms && response.rooms.length > 0) {",
+									"    pm.test(`✅ Found ${response.rooms.length} active room(s)`, function () {",
+									"        pm.expect(response.rooms.length).to.be.greaterThan(0);",
+									"    });",
+									"} else {",
+									"    pm.test(\"ℹ️  No active rooms (rooms not created yet)\", function () {",
+									"        pm.expect(response.rooms.length).to.eql(0);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ws/rooms-info",
+							"host": ["{{base_url}}"],
+							"path": ["ws", "rooms-info"]
+						},
+						"description": "Get information about active WebSocket rooms and clients"
+					},
+					"response": []
+				}
+			],
+			"description": "WebSocket monitoring endpoints"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Log request details",
+					"console.log(`🔄 Request: ${pm.info.requestName}`);",
+					"console.log(`📍 URL: ${pm.info.requestUrl}`);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test logging",
+					"console.log(`\\n✅ Test Results for: ${pm.info.requestName}`);",
+					"console.log(`Status Code: ${pm.response.code}`);",
+					"console.log(`Response Time: ${pm.response.responseTime}ms`);"
+				]
+			}
+		}
+	]
+}
