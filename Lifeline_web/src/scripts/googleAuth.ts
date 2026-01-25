@@ -18,7 +18,8 @@ export function googleAuth() {
                 newUserCallbackURL: `${window.location.origin}/addContact`,
                 disableRedirect: false,
             });
-            console.log("Data:", data)
+            // TODO: DELETE CONSOLE LOGS
+            // console.log("Data:", data)
             const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, { credentials: "include", });
             const session = await res.json();
 

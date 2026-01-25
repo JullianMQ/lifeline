@@ -19,7 +19,7 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
     const [openAvatar, setOpenAvatar] = useState(false);
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        console.log(name, value);
+        // console.log(name, value);
         setUpdateForm(prev => ({ ...prev, [name]: value }));
     };
 

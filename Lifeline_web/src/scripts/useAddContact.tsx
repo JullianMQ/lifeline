@@ -209,7 +209,8 @@ export function useAddContact() {
         e.preventDefault();
         setError(null);
         setInvalidFields([]);
-        console.log(addForm.phoneNo);
+        // TODO: DELETE CONSOLE LOGS
+        // console.log(addForm.phoneNo);
         const errors = validateForm("add");
         if (errors.length) {
             setInvalidFields(errors);

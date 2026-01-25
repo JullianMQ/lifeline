@@ -1,8 +1,8 @@
 let timeWS: WebSocket | null = null;
 let msgWS: WebSocket | null = null;
 
-const development = import.meta.env.VITE_LOCAL_BETTER_AUTH_URL!.replace('https://', 'ws://');
-const production = import.meta.env.VITE_HOSTED_BETTER_AUTH_URL!.replace('https://', 'ws://');
+const development = import.meta.env.VITE_LOCAL_BETTER_AUTH_URL!.replace('http://', 'ws://');
+const production = import.meta.env.VITE_HOSTED_BETTER_AUTH_URL!.replace('https://', 'wss://');
 
 const WS_BASE_URL = import.meta.env.VITE_NODE_ENV === "production" ? production : development;
 
@@ -33,6 +33,10 @@ export function connectMessage(onMessage: (data: string) => void){
     }
     return msgWS;
 };
+
+export function connectWS(onMessage: (data: string) => void) {
+    const ws = new WebSocket(`${WS_BASE_URL}/ws`)
+}
 
 export function disconnectTWS() {
     timeWS?.close();
