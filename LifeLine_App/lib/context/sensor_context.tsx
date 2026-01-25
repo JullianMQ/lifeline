@@ -23,37 +23,57 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
     const accSubRef = useRef<any>(null);
     const gyroSubRef = useRef<any>(null);
     const micRecordingRef = useRef<Audio.Recording | null>(null);
+
     let sessionEndTime: number | null = null;
+
     const requestAudioPermission = async () => {
         const { status } = await Audio.requestPermissionsAsync();
         return status === 'granted';
     };
 
     const backgroundTask = async () => {
-        let gravity = { x: 0, y: 0, z: 0 };
-        const ALPHA = 0.8;
+        // -----------------------------
+        // NOTE:
+        // We now send ACCEL magnitude as TOTAL magnitude in "g"
+        // (includes gravity). At rest on desk this should be ~1.0 g.
+        // This avoids gravity-filter / unit issues that caused 6–8g on desk.
+        // -----------------------------
 
         // Accelerometer
         setUpdateIntervalForType(SensorTypes.accelerometer, 300);
+
+        // Unit inference:
+        // - If raw magnitude ~9-12 => likely m/s^2 => divide by 9.80665 to get g
+        // - If raw magnitude ~0.8-1.2 => likely g => divide by 1
+        let accScale: number | null = null; // 1 (already g) or 9.80665 (m/s^2)
+
         accSubRef.current = accelerometer.subscribe(({ x, y, z }) => {
-            gravity.x = ALPHA * gravity.x + (1 - ALPHA) * x;
-            gravity.y = ALPHA * gravity.y + (1 - ALPHA) * y;
-            gravity.z = ALPHA * gravity.z + (1 - ALPHA) * z;
+            const rawMag = Math.sqrt(x * x + y * y + z * z);
 
-            const linearX = x - gravity.x;
-            const linearY = y - gravity.y;
-            const linearZ = z - gravity.z;
+            if (accScale == null) {
+                accScale = rawMag > 5 ? 9.80665 : 1;
+                console.log(
+                    `[ACCEL] Unit inferred: ${accScale === 1 ? 'g' : 'm/s²'} (rawMag=${rawMag.toFixed(3)})`
+                );
+            }
 
-            const linearMagnitude = Math.sqrt(linearX ** 2 + linearY ** 2 + linearZ ** 2);
+            const totalMagG = rawMag / (accScale || 1);
 
-            handleSensorEvent({ sensor: 'accelerometer', magnitude: linearMagnitude });
+            // Optional raw debug (uncomment while validating):
+            // console.log(`[ACCEL] x=${x.toFixed(3)} y=${y.toFixed(3)} z=${z.toFixed(3)} rawMag=${rawMag.toFixed(3)} => totalMagG=${totalMagG.toFixed(3)}`);
+
+            handleSensorEvent({ sensor: 'accelerometer', magnitude: totalMagG });
         });
 
         // Gyroscope
         setUpdateIntervalForType(SensorTypes.gyroscope, 300);
         gyroSubRef.current = gyroscope.subscribe(({ x, y, z }) => {
-            const rotationSpeed = Math.abs(x) + Math.abs(y) + Math.abs(z);
-            handleSensorEvent({ sensor: 'gyroscope', x, y, z, rotationSpeed });
+            // Standard resultant angular velocity magnitude (rad/s)
+            const omega = Math.sqrt(x * x + y * y + z * z);
+
+            // Keep rotationSpeed for backward compatibility with your logger,
+            // but send omega explicitly for the detector.
+            handleSensorEvent({ sensor: 'gyroscope', x, y, z, omega, rotationSpeed: omega });
         });
 
         // Microphone
@@ -101,12 +121,17 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
         gyroSubRef.current?.unsubscribe();
 
         if (micRecordingRef.current) {
-            await micRecordingRef.current.stopAndUnloadAsync();
+            try {
+                await micRecordingRef.current.stopAndUnloadAsync();
+            } catch {
+                // ignore
+            }
             micRecordingRef.current = null;
         }
 
         await BackgroundService.stop();
         sessionEndTime = Date.now();
+
         // Append summary with user info
         await appendSummaryRow(sessionEndTime);
 
@@ -125,9 +150,7 @@ export const SensorProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (err) {
             console.error('Failed to share CSV', err);
         }
-
     };
-
 
     return (
         <SensorContext.Provider value={{ isMonitoring, startMonitoring, stopMonitoring }}>
