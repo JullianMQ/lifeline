@@ -62,7 +62,7 @@ function Dashboard() {
             <p className="uline-btn" onClick={handleLogout}>
                 LOGOUT
             </p>
-            <img src={user?.image || "/images/user-example.svg"} alt="user-img" className="dashboard-img"  onClick={() => navigate("/profile")}/>
+            <img src={user?.image || "/images/user-example.svg"} alt="user-img" className="dashboard-img avatar"  onClick={() => navigate("/profile")}/>
           </div>         
       </header>
 

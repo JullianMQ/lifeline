@@ -51,9 +51,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 }
 
 .dashboard-img, .user-img{
-    aspect-ratio: 1/1;
     height: 100%;
-    border-radius: 100%;
 }
 
 .dashboard header{
@@ -97,9 +95,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 }
 
 .dashboard-card-img{
-    aspect-ratio: 1/1;
     height: auto;
-    border-radius: 100%;
 }
 
 .dashboard-user-img, .dashboard-card, .dashboard-buttons{
@@ -112,7 +108,6 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 
 .user-img{
     align-self: stretch;
-    border-radius: 100%;
     border: 1px solid var(--text-black);
 }
 

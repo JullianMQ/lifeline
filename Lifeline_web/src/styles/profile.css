@@ -72,8 +72,6 @@ form.profile-user{
 }
 
 .profile-id img{
-    aspect-ratio: 1/1;
-    border-radius: 100%;
     border: 1px solid var(--text-black);
 }
 
@@ -171,9 +169,7 @@ form.profile-user{
 }
 
 .avatar-img{
-    aspect-ratio: 1/1;
     width: 100%;
-    border-radius: 100%;
     border: 1px solid var(--text-black);
 }
 
@@ -221,10 +217,8 @@ form.profile-user{
 }
 
 .profile-card-name img{
-    aspect-ratio: 1/1;
     width: 32px;
     height: auto;
-    border-radius: 100%;
     border: 1px solid var(--text-black);
 }
 

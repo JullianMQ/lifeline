@@ -6,7 +6,6 @@ import { googleAuth } from "../scripts/googleAuth";
 import { API_BASE_URL } from '../config/api';
 
 function Login() {
-    console.log(API_BASE_URL)
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const { login, loading, error, invalidFields } = useLogin();

@@ -175,6 +175,11 @@ input{
   padding: 15px 20px;
 }
 
+.avatar{
+  aspect-ratio: 1/1;
+  border-radius: 100%;
+}
+
 input:focus {
   outline: none;
   border:2px solid var(--muted-grey);

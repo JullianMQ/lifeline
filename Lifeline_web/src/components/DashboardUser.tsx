@@ -18,7 +18,7 @@ export default function DashboardUser({
     <>
       <div className="dashboard-user">
         <div className="dashboard-user-img">
-          <img src={user?.image || "/images/user-example.svg"} alt="User" className="user-img"/>
+          <img src={user?.image || "/images/user-example.svg"} alt="User" className="user-img avatar"/>
         </div>
         <div className="dashboard-user-info">
           <p>Hey there,</p>
@@ -40,7 +40,7 @@ export default function DashboardUser({
                 <ul>
                   {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
                     <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
-                        <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img"/>
+                        <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img avatar"/>
                         <h3>{contact.name.split(" ")[0]}</h3>
                       </li>
                   ))}           
@@ -54,7 +54,7 @@ export default function DashboardUser({
                 <ul>
                   {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
                     <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
-                        <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img"/>
+                        <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img avatar"/>
                         <h3>{contact.name.split(" ")[0]}</h3>
                       </li>
                   ))}
@@ -63,8 +63,7 @@ export default function DashboardUser({
             </div>
           </>
         ) : (
-          <div onClick={() => navigate('/addContact')}>
-            
+          <div>
             <h3>Oops! looks like you don't have any contacts yet</h3>
             <p><span className="uline-btn" onClick={() => navigate('/addContact')}>Add a contact</span> to get started</p>
           </div>
