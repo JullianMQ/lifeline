@@ -32,7 +32,7 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
 
     const created: google.maps.marker.AdvancedMarkerElement[] = [];
 
-    markers.forEach((m) => {
+    markers.forEach((m, index) => {
       const pin = document.createElement("div");
       pin.className = "map-pin";
 
@@ -46,13 +46,12 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
         <div class="map-pin-tail"></div>
       `;
 
-      // ✅ THIS is the bridge
-      pin.addEventListener("click", (e) => {
-        e.stopPropagation(); // prevent map click
-        if (m.contact) {
+      if (index > 0 && m.contact) {
+        pin.addEventListener("click", (e) => {
+          e.stopPropagation();
           onSelectContact(m.contact);
-        }
-      });
+        });
+      }
 
       const mk = new google.maps.marker.AdvancedMarkerElement({
         map,

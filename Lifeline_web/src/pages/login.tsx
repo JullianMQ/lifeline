@@ -3,7 +3,6 @@ import '../styles/login.css';
 import { Link } from "react-router-dom";
 import { useLogin } from '../scripts/useLogin';
 import { googleAuth } from "../scripts/googleAuth";
-import { API_BASE_URL } from '../config/api';
 
 function Login() {
     const [email, setEmail] = useState('');

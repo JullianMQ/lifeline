@@ -12,7 +12,7 @@ export function googleAuth() {
 
     const signInWithGoogle = async () => {
         try {
-            const data = await authClient.signIn.social({
+            await authClient.signIn.social({
                 provider: "google",
                 callbackURL: `${window.location.origin}/dashboard`,
                 newUserCallbackURL: `${window.location.origin}/addContact`,
