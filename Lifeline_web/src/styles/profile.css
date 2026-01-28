@@ -1,10 +1,10 @@
 .dashboard{
     position: relative;
 }
-.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-radio, .info-options, .btn-row, .profile-card-name, .profile-card, .add-btn, .profile-contacts, .modal, .modal-content, .avatar-choice{
+.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-radio, .info-options, .btn-row, .profile-card-name, .profile-card, .add-btn, .profile-contacts, .modal, .modal-content, .avatar-choice, .profile-card-content{
     display: flex;
 }
-.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-options, .modal-content, .avatar-choice, .profile-contacts, .profile-card{
+.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-options, .modal-content, .avatar-choice, .profile-contacts, .profile-card, .profile-card-content{
     flex-direction: column;
 }
 .relative{
@@ -71,7 +71,7 @@ form.profile-user{
     width: fit-content;
 }
 
-.profile-id img{
+.profile-img{
     border: 1px solid var(--text-black);
 }
 
@@ -199,16 +199,16 @@ form.profile-user{
 }
 
 .profile-card{
-    gap: var(--space-xxs);
     min-width: 300px;
-    text-wrap: break-text;
+    max-width: 350px;
+    justify-content: space-between;
 }
-
-.profile-card p{
+.profile-card-content{
+    gap: var(--space-xxs);
+    text-wrap: break-text;
     overflow-wrap: break-word;
     word-break: break-word;
     text-wrap: pretty;
-    max-inline-size: 85%;
 }
 
 .profile-card-name{
@@ -245,11 +245,11 @@ form.profile-user{
     .profile-info, .profile-card-name{
         gap: var(--space-xxs);
     }
-    .profile-id img{
+    .profile-img{
         height: 64px;
     }
     .profile-card{
-        min-width: 200px;
+        min-width: 250px;
     }
     .profile-card, .profile-user{
         padding: var(--space-xs);

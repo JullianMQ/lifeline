@@ -3,6 +3,7 @@ import type { LatLng } from "../types";
 
 export function useMap() {
   const [markers, setMarkers] = useState<LatLng[]>([]);
+  const [pinIcon, setPinIcon] = useState<string>("");
   const [address, setAddress] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   
@@ -35,14 +36,16 @@ export function useMap() {
       return;
     };
     const { lat, lng } = contact.location;
+    setPinIcon(contact.image);
     setMarkers((prev) => {
       if (prev.some(p => p.lat === lat && p.lng === lng)) return prev;
-      return [...prev, { lat, lng }];
+      return [...prev, { lat, lng, image: contact.image, contact }];
     });
   }
 
   function resetLocations() {
     setMarkers([]);
+    setPinIcon("");
     setAddress("");
     setLoading(false);
   }
@@ -63,5 +66,6 @@ export function useMap() {
     resetLocations,
     getGeocode, 
     setAddress,
+    pinIcon
   };
 }

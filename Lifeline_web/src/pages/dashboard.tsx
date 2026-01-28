@@ -87,7 +87,7 @@ function Dashboard() {
         </div>
 
         <div className="map">
-          <DashboardMap markers={markers} loading={loading} center={selectedContact?.location || user?.location} />
+          <DashboardMap markers={markers} loading={loading} center={selectedContact?.location || user?.location} onSelectContact={setSelectedContact}/>
         </div>
       </section>
       <footer></footer>

@@ -20,4 +20,6 @@ export interface Contact {
 export type LatLng = {
   lat: number;
   lng: number;
+  image?: string;
+  contact?: Contact;
 };

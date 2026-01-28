@@ -178,6 +178,7 @@ input{
 .avatar{
   aspect-ratio: 1/1;
   border-radius: 100%;
+  border: 1px solid var(--text-black);
 }
 
 input:focus {
