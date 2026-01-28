@@ -87,7 +87,6 @@ function Profile() {
                                 {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
                                     <li key={index} className="profile-card" >
                                         <div className="profile-card-content">
-
                                             <div className="profile-card-name">
                                                 <img src={contact.image || "/images/user-example.svg"} className="avatar"/>
                                                 <h3>{contact.name}</h3>
@@ -96,12 +95,12 @@ function Profile() {
                                             <p>{contact.phone}</p>
                                         </div>
                                         {isRemoving &&(
-                                        <button className="pos-btn remove" onClick={() => {
-                                            setPendingRemove({ phone: contact.phone, role: contact.role });
-                                            setShowConfirm(true);
-                                        }}>
-                                            REMOVE
-                                        </button>
+                                            <button className="pos-btn remove" onClick={() => {
+                                                setPendingRemove({ phone: contact.phone, role: contact.role });
+                                                setShowConfirm(true);
+                                            }}>
+                                                REMOVE
+                                            </button>
                                         )}
                                     </li>
                                 ))}           
@@ -115,12 +114,14 @@ function Profile() {
                             <ul className="profile-grid">
                             {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
                                 <li key={index} className="profile-card" >
-                                    <div className="profile-card-name">
-                                        <img src={contact.image || "/images/user-example.svg"} className="avatar"/>
-                                        <h3>{contact.name}</h3>
+                                    <div className="profile-card-content">
+                                        <div className="profile-card-name">
+                                            <img src={contact.image || "/images/user-example.svg"} className="avatar"/>
+                                            <h3>{contact.name}</h3>
+                                        </div>
+                                        <p>{contact.email}</p>
+                                        <p>{contact.phone}</p>
                                     </div>
-                                    <p>{contact.email}</p>
-                                    <p>{contact.phone}</p>
                                     {isRemoving &&(
                                         <button className="pos-btn remove" onClick={() => {
                                             setPendingRemove({ phone: contact.phone, role: contact.role });
