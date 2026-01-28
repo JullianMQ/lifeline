@@ -39,8 +39,32 @@ export function useMap() {
     const { lat, lng } = contact.location;
     setPinIcon(contact.image);
     setMarkers((prev) => {
-      if (prev.some(p => p.lat === lat && p.lng === lng)) return prev;
-      return [...prev, { lat, lng, image: contact.image, contact }];
+      // Check if a marker for this contact already exists (by id)
+      const existingIndex = prev.findIndex(p => p.contact?.id === contact.id || p.id === contact.id);
+      
+      if (existingIndex >= 0) {
+        const existing = prev[existingIndex];
+        // If coordinates haven't changed, no update needed
+        if (existing.lat === lat && existing.lng === lng) {
+          return prev;
+        }
+        // Update the existing marker with new coordinates (remove old, add updated)
+        const updated = [...prev];
+        updated[existingIndex] = { 
+          ...existing, 
+          lat, 
+          lng, 
+          image: contact.image, 
+          contact,
+          id: contact.id 
+        };
+        console.log("[useMap] Updated existing marker for:", contact.name || contact.id, { lat, lng });
+        return updated;
+      }
+      
+      // No existing marker, add a new one
+      console.log("[useMap] Adding new marker for:", contact.name || contact.id, { lat, lng });
+      return [...prev, { lat, lng, image: contact.image, contact, id: contact.id }];
     });
   }
 
