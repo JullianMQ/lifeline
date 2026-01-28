@@ -1,3 +1,5 @@
+import type { ContactCard } from "./realtime";
+
 export interface User {
   id: string;
   name: string;
@@ -20,6 +22,12 @@ export interface Contact {
 export type LatLng = {
   lat: number;
   lng: number;
-  image?: string;
-  contact?: Contact;
+};
+
+export type pinMarker = {
+  lat: number;
+  lng: number;
+  id?: string;
+  image: string;
+  contact: ContactCard;
 };

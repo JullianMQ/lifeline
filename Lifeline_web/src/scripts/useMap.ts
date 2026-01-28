@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
-import type { LatLng } from "../types";
+import { useState, useCallback } from "react";
+import type { pinMarker } from "../types";
 
 export function useMap() {
-  const [markers, setMarkers] = useState<LatLng[]>([]);
+  const [markers, setMarkers] = useState<pinMarker[]>([]);
   const [pinIcon, setPinIcon] = useState<string>("");
   const [address, setAddress] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   
-  async function getGeocode(lat: number, lng: number) {
+  const getGeocode = useCallback(async (lat: number, lng: number) => {
     setLoading(true);
 
     try {
@@ -29,12 +29,13 @@ export function useMap() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   async function handleLocation(contact: any) {
     if (!contact?.location){
       return;
-    };
+    }
+    
     const { lat, lng } = contact.location;
     setPinIcon(contact.image);
     setMarkers((prev) => {
@@ -43,20 +44,33 @@ export function useMap() {
     });
   }
 
-  function resetLocations() {
+  // Update a specific marker by id
+  const updateMarker = useCallback((id: string, lat: number, lng: number) => {
+    console.log("[useMap] updateMarker:", { id, lat, lng });
+    setMarkers((prev) => {
+      const existingIndex = prev.findIndex(p => p.id === id);
+      if (existingIndex < 0) {
+        console.log("[useMap] Marker not found for update:", id);
+        return prev;
+      }
+      
+      const existing = prev[existingIndex];
+      if (existing.lat === lat && existing.lng === lng) {
+        return prev; // No change needed
+      }
+      
+      const updated = [...prev];
+      updated[existingIndex] = { ...existing, lat, lng };
+      return updated;
+    });
+  }, []);
+
+  const resetLocations = useCallback(() => {
     setMarkers([]);
     setPinIcon("");
     setAddress("");
     setLoading(false);
-  }
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      markers.forEach((m) => handleLocation({ location: m }));
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [markers]);
+  }, []);
 
   return { 
     markers, 
@@ -66,6 +80,7 @@ export function useMap() {
     resetLocations,
     getGeocode, 
     setAddress,
-    pinIcon
+    pinIcon,
+    updateMarker,
   };
 }

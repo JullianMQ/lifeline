@@ -2,7 +2,8 @@ import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { useEffect, useState } from "react";
 import "../styles/dashboard.css";
 import "../styles/pin.css";
-import type { Contact, LatLng } from "../types";
+import type { LatLng, pinMarker } from "../types";
+import type { ContactCard } from "../types/realtime";
 
 const containerStyle = {
   border: "2px solid var(--text-black)",
@@ -11,11 +12,16 @@ const containerStyle = {
   height: "100%",
 };
 
+// Default center (Philippines) when no location provided
+const DEFAULT_CENTER = { lat: 15.1330832, lng: 120.5874361 };
+
+export { DEFAULT_CENTER as DEFAULT_MAP_CENTER };
+
 type Props = {
-  markers: LatLng[];
+  markers: pinMarker[];
   loading: boolean;
   center?: LatLng;
-  onSelectContact: (contact: Contact) => void;
+  onSelectContact: (contact: ContactCard) => void;
 };
 
 function DashboardMap({ markers, center, onSelectContact }: Props) {
@@ -32,7 +38,7 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
 
     const created: google.maps.marker.AdvancedMarkerElement[] = [];
 
-    markers.forEach((m, index) => {
+    markers.forEach((m) => {
       const pin = document.createElement("div");
       pin.className = "map-pin";
 
@@ -46,7 +52,7 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
         <div class="map-pin-tail"></div>
       `;
 
-      if (index > 0 && m.contact) {
+      if (m.contact) {
         pin.addEventListener("click", (e) => {
           e.stopPropagation();
           onSelectContact(m.contact);
@@ -60,6 +66,7 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
       });
 
       created.push(mk);
+      console.log("[DashboardMap] Created marker:", created);
     });
 
     return () => created.forEach((mk) => (mk.map = null));
@@ -67,10 +74,16 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
 
   if (!isLoaded) return <div className="map">Loading...</div>;
 
+  // Use provided center or fallback to default
+  const mapCenter = center || DEFAULT_CENTER;
+
+  console.log("[DashboardMap] Rendering with markers:", markers);
+  console.log("[DashboardMap] Center:", mapCenter);
+
   return (
     <GoogleMap
       mapContainerStyle={containerStyle}
-      center={center}
+      center={mapCenter}
       zoom={14}
       onLoad={(m) => setMap(m)}
       options={{

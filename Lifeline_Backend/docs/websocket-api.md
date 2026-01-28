@@ -341,6 +341,62 @@ Check connection health.
 }
 ```
 
+#### Location Update (WebSocket)
+
+Send location data via WebSocket to broadcast to room members. This is an alternative to the REST `/api/location` endpoint.
+
+**Send:**
+```json
+{
+  "type": "location-update",
+  "roomId": "abc123def456",
+  "latitude": 14.5995,
+  "longitude": 120.9842,
+  "timestamp": "2026-01-18T10:00:00.000Z",
+  "accuracy": 12
+}
+```
+
+**Fields:**
+- `roomId`: optional string - If provided, broadcasts to specific room. If omitted, broadcasts to all rooms the user is in.
+- `latitude`: required number (-90 to 90)
+- `longitude`: required number (-180 to 180)
+- `timestamp`: optional string/number - Defaults to current time if not provided
+- `accuracy`: optional number
+
+**Confirmation Response (to sender):**
+```json
+{
+  "type": "location-update-confirmed",
+  "rooms": ["abc123def456"],
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Broadcast to room members (excluding sender):**
+```json
+{
+  "type": "location-update",
+  "data": {
+    "visiblePhone": "09123456789",
+    "userName": "John Doe",
+    "latitude": 14.5995,
+    "longitude": 120.9842,
+    "timestamp": "2026-01-18T10:00:00.000Z",
+    "accuracy": 12
+  },
+  "timestamp": "2026-01-18T10:00:00.000Z"
+}
+```
+
+**Error Responses:**
+- `Invalid location data: latitude and longitude are required numbers`
+- `Invalid coordinates: latitude must be -90 to 90, longitude must be -180 to 180`
+- `Room not found`
+- `Not authorized to send location to this room`
+- `Not in any room. Provide roomId to specify target room.`
+- `User phone number not available`
+
 ### Server-to-Client System Events
 
 #### User Joined
@@ -390,13 +446,13 @@ Broadcast when an emergency contact joins a room.
 
 #### Location Update
 
-Broadcast to all room members when a user's location is updated via REST API.
+Broadcast to all room members when a user's location is updated via REST API or WebSocket.
 
 ```json
 {
   "type": "location-update",
   "data": {
-    "userId": "user_id",
+    "visiblePhone": "09123456789",
     "userName": "John Doe",
     "latitude": 14.5995,
     "longitude": 120.9842,
@@ -423,7 +479,8 @@ Upload user location data via HonoJS endpoint, which is then broadcast to all ro
   "latitude": 14.5995,
   "longitude": 120.9842,
   "timestamp": "2026-01-18T10:00:00.000Z",
-  "accuracy": 12
+  "accuracy": 12,
+  "roomId": "abc123def456"
 }
 ```
 
@@ -432,21 +489,44 @@ Upload user location data via HonoJS endpoint, which is then broadcast to all ro
 - `longitude`: number between -180 and 180
 - `timestamp`: string (ISO 8601) or number (Unix timestamp)
 - `accuracy`: optional number
+- `roomId`: optional string - **Required when WebSocket is disconnected**
+
+**Behavior:**
+- **With `roomId`**: Broadcasts to the specified room (user must be owner or emergency contact)
+- **Without `roomId`**: Broadcasts to all rooms where the user has an active WebSocket connection
+
+**Use Case for `roomId`:**
+Mobile users may lose their WebSocket connection due to network issues or background restrictions. By providing `roomId`, they can continue sending location updates to their emergency contacts even when disconnected from the WebSocket.
 
 **Response:**
 ```json
 {
   "success": true,
   "timestamp": "2026-01-18T10:00:00.000Z",
-  "rooms": ["abc123def456", "def456ghi789"],
-  "stored": true
+  "rooms": ["abc123def456"]
 }
 ```
 
-**Error Response:**
+**Error Responses:**
+
+When user has no active WebSocket connection and no `roomId` provided:
 ```json
 {
-  "error": "User is not in any active room"
+  "error": "User is not in any active room. Provide roomId for disconnected location updates."
+}
+```
+
+When `roomId` is provided but room doesn't exist:
+```json
+{
+  "error": "Room not found"
+}
+```
+
+When user is not authorized for the specified room:
+```json
+{
+  "error": "User is not authorized to broadcast to this room"
 }
 ```
 
@@ -785,6 +865,20 @@ export function useEmergencyMonitoring() {
     }
   };
 
+  // Send location update via WebSocket
+  const sendLocationUpdate = (roomId, latitude, longitude, accuracy) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({
+        type: "location-update",
+        roomId,
+        latitude,
+        longitude,
+        timestamp: new Date().toISOString(),
+        accuracy
+      }));
+    }
+  };
+
   return {
     connected,
     roomIds,
@@ -793,7 +887,8 @@ export function useEmergencyMonitoring() {
     createRoom,
     joinRoom,
     sendMessage,
-    triggerSOS
+    triggerSOS,
+    sendLocationUpdate
   };
 }
 ```
@@ -807,6 +902,7 @@ class EmergencyMonitoringService {
     this.betterAuthToken = betterAuthToken;
     this.ws = null;
     this.locationInterval = null;
+    this.activeRoomId = null; // Store room ID for disconnected uploads
   }
 
   async startMonitoring() {
@@ -816,8 +912,22 @@ class EmergencyMonitoringService {
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
-      if (data.type === "emergency-alert") {
-        this.showEmergencyAlert(data);
+      switch (data.type) {
+        case "connected":
+          // Store room IDs for disconnected location uploads
+          if (data.roomIds && data.roomIds.length > 0) {
+            this.activeRoomId = data.roomIds[0];
+          }
+          break;
+
+        case "room-created":
+          // Store room ID when creating a room
+          this.activeRoomId = data.roomId;
+          break;
+
+        case "emergency-alert":
+          this.showEmergencyAlert(data);
+          break;
       }
     };
 
@@ -831,22 +941,38 @@ class EmergencyMonitoringService {
     try {
       const position = await this.getCurrentPosition();
 
-      const response = await fetch("/api/location", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.betterAuthToken}`
-        },
-        body: JSON.stringify({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          timestamp: new Date().toISOString(),
-          accuracy: position.coords.accuracy
-        })
-      });
+      const locationData = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        timestamp: new Date().toISOString(),
+        accuracy: position.coords.accuracy
+      };
 
-      if (!response.ok) {
-        console.error("Location upload failed");
+      // Always include roomId for mobile uploads
+      if (this.activeRoomId) {
+        locationData.roomId = this.activeRoomId;
+      }
+
+      // Prefer WebSocket when connected for real-time updates
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          type: "location-update",
+          ...locationData
+        }));
+      } else {
+        // Fallback to REST API when WebSocket is disconnected
+        const response = await fetch("/api/location", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.betterAuthToken}`
+          },
+          body: JSON.stringify(locationData)
+        });
+
+        if (!response.ok) {
+          console.error("Location upload failed");
+        }
       }
     } catch (error) {
       console.error("Error uploading location:", error);

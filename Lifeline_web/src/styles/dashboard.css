@@ -286,3 +286,245 @@ ul{
         padding: var(--space-sm);
     }
 }
+
+/* ============================================================================
+   Connection Status Indicator
+   ============================================================================ */
+
+.header-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+    height: 100%;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xxs) var(--space-xs);
+    border-radius: 12px;
+    background-color: var(--soft-white);
+    font-size: 0.75rem;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-text {
+    color: var(--text-black);
+    white-space: nowrap;
+}
+
+.reconnect-btn {
+    padding: var(--space-xxs) var(--space-xs);
+    font-size: 0.7rem;
+    border: none;
+    border-radius: 4px;
+    background-color: #3b82f6;
+    color: white;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.reconnect-btn:hover {
+    background-color: #2563eb;
+}
+
+.connection-error {
+    font-size: 0.65rem;
+    color: #ef4444;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================================================
+   Emergency Alert Banner (Global)
+   ============================================================================ */
+
+.alert-banner {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    padding: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    animation: pulse-alert 2s infinite;
+}
+
+@keyframes pulse-alert {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
+}
+
+.alert-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.alert-icon {
+    width: 24px;
+    height: 24px;
+    background: white;
+    color: #ef4444;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.alert-message {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.alert-dismiss {
+    padding: var(--space-xxs) var(--space-sm);
+    background: white;
+    color: #ef4444;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.alert-dismiss:hover {
+    background: #fee2e2;
+}
+
+/* ============================================================================
+   Contact Card Alert Banner
+   ============================================================================ */
+
+.alert-banner-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex: 1;
+}
+
+.alert-banner-icon {
+    font-size: 1.2rem;
+}
+
+.alert-banner-message {
+    font-size: 0.9rem;
+}
+
+.alert-acknowledge-btn {
+    padding: var(--space-xxs) var(--space-sm);
+    background: white;
+    color: #ef4444;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.alert-acknowledge-btn:hover {
+    background: #fee2e2;
+}
+
+/* ============================================================================
+   Presence Indicators
+   ============================================================================ */
+
+.dashboard-name-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.presence-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.presence-online {
+    background-color: #22c55e;
+    box-shadow: 0 0 4px #22c55e;
+}
+
+.presence-offline {
+    background-color: #9ca3af;
+}
+
+.last-seen {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 2px;
+}
+
+.location-timestamp {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: var(--space-xxs);
+}
+
+/* ============================================================================
+   Contact Card Badges/Indicators
+   ============================================================================ */
+
+.contact-img-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.presence-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+.presence-badge.online {
+    background-color: #22c55e;
+}
+
+.presence-badge.offline {
+    background-color: #9ca3af;
+}
+
+.alert-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: #ef4444;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 18px;
+    text-align: center;
+    border: 2px solid white;
+    animation: pulse-badge 1.5s infinite;
+}
+
+@keyframes pulse-badge {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}

@@ -1,19 +1,93 @@
-import type { User, Contact } from "../types";
+import type { User } from "../types";
+import type { ContactCard } from "../types/realtime";
 import { useNavigate } from 'react-router-dom';
 
 type Props = {
   user: User | null;
-  contacts: Contact[];
-  onSelectContact: (contact: Contact) => void;
+  contactCards: ContactCard[];
+  onSelectContact: (contact: ContactCard) => void;
   onAddContact: () => void;
 };
 
+/** Presence indicator dot component */
+function PresenceIndicator({ isOnline }: { isOnline: boolean }) {
+  return (
+    <span
+      className={`presence-indicator ${isOnline ? 'online' : 'offline'}`}
+      style={{
+        display: 'inline-block',
+        width: '10px',
+        height: '10px',
+        borderRadius: '50%',
+        backgroundColor: isOnline ? '#22c55e' : '#9ca3af',
+        position: 'absolute',
+        bottom: '2px',
+        right: '2px',
+        border: '2px solid white',
+      }}
+      title={isOnline ? 'Online' : 'Offline'}
+    />
+  );
+}
+
+/** Alert badge component */
+function AlertBadge() {
+  return (
+    <span
+      className="alert-badge"
+      style={{
+        display: 'inline-block',
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        backgroundColor: '#ef4444',
+        color: 'white',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        lineHeight: '18px',
+        textAlign: 'center',
+        position: 'absolute',
+        top: '-4px',
+        right: '-4px',
+        border: '2px solid white',
+      }}
+      title="Active Alert"
+    >
+      !
+    </span>
+  );
+}
+
 export default function DashboardUser({
   user,
-  contacts,
+  contactCards,
   onSelectContact,
 }: Props) {
   const navigate = useNavigate();
+
+  const renderContactCard = (contact: ContactCard, index: number) => {
+    const isOnline = contact.presence?.status === 'online';
+    
+    return (
+      <li
+        key={contact.id || index}
+        className="dashboard-card"
+        onClick={() => onSelectContact(contact)}
+      >
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <img
+            src={contact.image || "/images/user-example.svg"}
+            alt={contact.name || "User image"}
+            className="dashboard-card-img"
+          />
+          <PresenceIndicator isOnline={isOnline} />
+          {contact.hasActiveAlert && <AlertBadge />}
+        </div>
+        <h3>{contact.name.split(" ")[0]}</h3>
+      </li>
+    );
+  };
+
   return (
     <>
       <div className="dashboard-user">
@@ -27,7 +101,7 @@ export default function DashboardUser({
       </div>
 
       <div className="dashboard-contacts">
-        {contacts && contacts.length !== 0 ? (  
+        {contactCards && contactCards.length !== 0 ? (  
           <>
             <div>
               <div className="add-btn">
@@ -38,12 +112,15 @@ export default function DashboardUser({
               </div>
               <div className="scrollable">
                 <ul>
-                  {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
+                  {/* {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
                     <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
                         <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img avatar"/>
                         <h3>{contact.name.split(" ")[0]}</h3>
                       </li>
-                  ))}           
+                  ))}            */}
+                  {contactCards
+                    .filter((c) => c.role === "mutual")
+                    .map((contact, index) => renderContactCard(contact, index))}           
                 </ul>
               </div>
             </div>
@@ -52,12 +129,15 @@ export default function DashboardUser({
               <h2>Dependent</h2>
               <div className="scrollable">
                 <ul>
-                  {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                  {/* {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
                     <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
                         <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img avatar"/>
                         <h3>{contact.name.split(" ")[0]}</h3>
                       </li>
-                  ))}
+                  ))} */}
+                  {contactCards
+                    .filter((c) => c.role === "dependent")
+                    .map((contact, index) => renderContactCard(contact, index))}
                 </ul>
               </div>
             </div>

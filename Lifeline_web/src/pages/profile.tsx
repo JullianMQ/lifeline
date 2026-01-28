@@ -9,7 +9,7 @@ import ConfirmModal from "../components/confirmModal";
 
 function Profile() {
     const navigate = useNavigate();
-    const { user, contacts, displayContact } = useDashboard();
+    const { user, contactCards} = useDashboard();
     const { removeContact } = useProfile();
     const [isEditing, setIsEditing] = useState(false);
     const [isRemoving, setRemoving] = useState(false);
@@ -71,7 +71,7 @@ function Profile() {
                 />
             )}
             <div className="profile-contacts">
-            {contacts && contacts.length !== 0 ? (  
+            {contactCards && contactCards.length !== 0 ? (  
                 <>
                     <div>
                         <div className="add-btn">
@@ -84,7 +84,7 @@ function Profile() {
                         </div>
                         <div className="scrollable">
                             <ul className="profile-grid">
-                                {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
+                                {contactCards.filter((c) => c.role === "mutual").map((contact, index) => (
                                     <li key={index} className="profile-card" >
                                         <div className="profile-card-content">
                                             <div className="profile-card-name">
@@ -112,7 +112,7 @@ function Profile() {
                         <h2>Dependent</h2>
                         <div className="scrollable">
                             <ul className="profile-grid">
-                            {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                            {contactCards.filter((c) => c.role === "dependent").map((contact, index) => (
                                 <li key={index} className="profile-card" >
                                     <div className="profile-card-content">
                                         <div className="profile-card-name">
@@ -152,7 +152,6 @@ function Profile() {
                     }}
                     onConfirm={async () => { 
                         await removeContact(pendingRemove.phone, pendingRemove.role);
-                        await displayContact();
                         setShowConfirm(false);
                         setPendingRemove(null);
                     }}

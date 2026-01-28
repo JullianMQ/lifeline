@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
+import { authClient } from "./auth-client";
 import { API_BASE_URL } from "../config/api";
 
 type ProtectedRouteProps = {
@@ -8,7 +9,10 @@ type ProtectedRouteProps = {
   mode?: "protected" | "public"; // default to protected
 };
 
-export function ProtectedRoutes({ children, mode = "protected" }: ProtectedRouteProps) {
+export function ProtectedRoutes({
+  children,
+  mode = "protected",
+}: ProtectedRouteProps) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
   const location = useLocation();
@@ -16,8 +20,15 @@ export function ProtectedRoutes({ children, mode = "protected" }: ProtectedRoute
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, { credentials: "include" });
+        const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, {
+          credentials: "include",
+        });
         const data = await res.json();
+        if (data.user.role === "dependent") {
+          setSession(null);
+          await authClient.signOut();
+          return false;
+        }
         setSession(data.user || null);
       } catch {
         setSession(null);
