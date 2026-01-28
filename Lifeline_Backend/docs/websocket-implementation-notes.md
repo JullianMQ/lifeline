@@ -204,14 +204,34 @@ async function getEmergencyContacts(userId: string): Promise<string[]> {
 // REST endpoint for location upload
 router.post("/", async (c) => {
     const user = c.get("user");
-    const { latitude, longitude, timestamp, accuracy } = parsed.data;
+    const { latitude, longitude, timestamp, accuracy, roomId } = parsed.data;
     
     const userRoomIds: string[] = [];
-    rooms.forEach((room, roomId) => {
-        if (room.clients.has(user.id)) {
-            userRoomIds.push(roomId);
+    
+    // If roomId is provided, validate and use it (for disconnected mobile users)
+    if (roomId) {
+        const room = rooms.get(roomId);
+        if (!room) {
+            return c.json({ error: "Room not found" }, 404);
         }
-    });
+        
+        // Verify user is the owner or an emergency contact of this room
+        const isOwner = room.owner === user.id;
+        const isEmergencyContact = room.emergencyContacts.includes(user.phone_no ?? "");
+        
+        if (!isOwner && !isEmergencyContact) {
+            return c.json({ error: "User is not authorized to broadcast to this room" }, 403);
+        }
+        
+        userRoomIds.push(roomId);
+    } else {
+        // Find rooms where user has an active WebSocket connection
+        rooms.forEach((room, rid) => {
+            if (room.clients.has(user.id)) {
+                userRoomIds.push(rid);
+            }
+        });
+    }
     
     const locationMessage = {
         type: "location-update",
@@ -232,6 +252,7 @@ router.post("/", async (c) => {
 - Real-time updates via WebSocket to dashboard
 - Works with screen OFF and Doze mode
 - Better battery efficiency
+- **roomId parameter enables location uploads even when WebSocket is disconnected**
 
 ### 7. Cross-Room Emergency SOS
 

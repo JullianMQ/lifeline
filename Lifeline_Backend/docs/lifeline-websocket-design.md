@@ -29,6 +29,7 @@ When a user clicks "Start Monitoring", they've already given consent to be monit
 ## 3. Core Architectural Decisions
 
 ### 3.1 Mobile → Server: HTTPS REST
+
 **Why**: WebSockets die when mobile app is backgrounded by Android
 
 ```javascript
@@ -43,6 +44,7 @@ POST /api/location
 ```
 
 ### 3.2 Server → Dashboards: WebSockets
+
 **Why**: Real-time updates for web dashboards
 
 ```javascript
@@ -51,6 +53,7 @@ ws://api.example.com/api/ws
 ```
 
 ### 3.3 Room Model: Simple & Effective
+
 - One room type (no complex modes)
 - `isActive` flag instead of mode transitions
 - Emergency contacts join immediately when user starts monitoring
@@ -60,6 +63,7 @@ ws://api.example.com/api/ws
 ## 4. Simplified Data Models
 
 ### 4.1 User Types
+
 ```javascript
 enum UserType {
     USER,           // Regular user being monitored
@@ -68,6 +72,7 @@ enum UserType {
 ```
 
 ### 4.2 Simple Room Model
+
 ```javascript
 interface Room {
     id: string;              // Auto-generated UUID
@@ -79,7 +84,8 @@ interface Room {
 }
 ```
 
-**No More**: 
+**No More**:
+
 - Complex room modes (PRIVATE/EMERGENCY/MONITORED)
 - Join approval workflows
 - Multi-step permission systems
@@ -94,6 +100,7 @@ ACTIVE → INACTIVE (when user clicks "Stop Monitoring")
 ```
 
 **Rules**:
+
 - User creates room when starting monitoring
 - Emergency contacts are auto-joined to ACTIVE rooms where they're authorized
 - Emergency contacts can be in multiple rooms simultaneously (one per dependent)
@@ -106,6 +113,7 @@ ACTIVE → INACTIVE (when user clicks "Stop Monitoring")
 ## 6. WebSocket Events (Simplified)
 
 ### 6.1 Connection & Authentication
+
 All WebSocket and REST requests use BetterAuth session authentication. BetterAuth handles session cookies automatically for both WebSocket and REST APIs.
 
 ```javascript
@@ -119,12 +127,15 @@ Authorization: Bearer <better_auth_token>
 ### 6.2 Core Events
 
 **create-room** (User creates room)
+
 ```json
 {
   "type": "create-room"
 }
 ```
+
 Server response:
+
 ```json
 {
   "type": "room-created",
@@ -133,9 +144,8 @@ Server response:
 }
 ```
 
-
-
 **location-update** (Broadcast to room)
+
 ```json
 {
   "type": "location-update",
@@ -150,6 +160,7 @@ Server response:
 ```
 
 **emergency-sos** (Panic button)
+
 ```json
 {
   "type": "emergency-sos",
@@ -163,48 +174,56 @@ Server response:
 ## 7. Location Tracking (Critical)
 
 ### 7.1 Mobile Background Service
+
 When user taps "Start Monitoring":
+
 1. Start Foreground Service
 2. Show persistent notification
 3. Request location updates every 60 seconds
 4. Upload via REST (works with screen OFF)
 
 ### 7.2 Server Location Handling
+
 ```javascript
 // HonoJS + BetterAuth Location Endpoint
-import { Hono } from 'hono';
-import { auth } from '../lib/auth';
+import { Hono } from "hono";
+import { auth } from "../lib/auth";
 
 const app = new Hono();
 
-app.post('/api/location', async (c) => {
-    // 1. BetterAuth session validation
-    const session = await auth.api.getSession({
-        headers: c.req.header()
-    });
-    if (!session) {
-        return c.json({ error: 'Unauthorized' }, 401);
-    }
-    
-    // 2. Find user's active room from PostgreSQL
-    const room = await findActiveRoom(session.user.id);
-    
-    // 3. Store location in PostgreSQL
-    await db.query(
-        'INSERT INTO location_updates (user_id, latitude, longitude, timestamp) VALUES ($1, $2, $3, $4)',
-        [session.user.id, c.req.body.latitude, c.req.body.longitude, c.req.body.timestamp]
-    );
-    
-    // 4. Auto-join authorized emergency contacts
-    await autoJoinEmergencyContacts(room.id, session.user.id);
-    
-    // 5. Broadcast via Bun WebSocket helper
-    broadcastToRoom(room.id, {
-        type: 'location-update',
-        data: c.req.body
-    });
-    
-    return c.json({ success: true });
+app.post("/api/location", async (c) => {
+  // 1. BetterAuth session validation
+  const session = await auth.api.getSession({
+    headers: c.req.header(),
+  });
+  if (!session) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  // 2. Find user's active room from PostgreSQL
+  const room = await findActiveRoom(session.user.id);
+
+  // 3. Store location in PostgreSQL
+  await db.query(
+    "INSERT INTO location_updates (user_id, latitude, longitude, timestamp) VALUES ($1, $2, $3, $4)",
+    [
+      session.user.id,
+      c.req.body.latitude,
+      c.req.body.longitude,
+      c.req.body.timestamp,
+    ],
+  );
+
+  // 4. Auto-join authorized emergency contacts
+  await autoJoinEmergencyContacts(room.id, session.user.id);
+
+  // 5. Broadcast via Bun WebSocket helper
+  broadcastToRoom(room.id, {
+    type: "location-update",
+    data: c.req.body,
+  });
+
+  return c.json({ success: true });
 });
 ```
 
@@ -220,14 +239,14 @@ When a room becomes active, the server automatically joins all authorized emerge
 ```javascript
 // Client sends SOS
 ws.send({
-    type: "emergency-sos",
-    timestamp: Date.now()
+  type: "emergency-sos",
+  timestamp: Date.now(),
 });
 
 // Server broadcasts to all room members
 broadcastToRoom(roomId, {
-    type: "emergency-sos",
-    timestamp: Date.now()
+  type: "emergency-sos",
+  timestamp: Date.now(),
 });
 ```
 
@@ -245,21 +264,26 @@ In an emergency monitoring system, all participants in a room need to know who t
 
 ```javascript
 // From src/routes/websocket.ts lines 221-231
-broadcastToRoom(roomId, {
-    type: 'user-joined',
+broadcastToRoom(
+  roomId,
+  {
+    type: "user-joined",
     clientId: clientId,
     user: {
-        id: clientInfo.user.id,        // User identifier
-        name: clientInfo.user.name,      // Display name
-        email: clientInfo.user.email,    // Contact email
-        role: clientInfo.user.role,      // User role (mutual/dependent)
-        phone_no: clientInfo.user.phone_no // Emergency contact phone
+      id: clientInfo.user.id, // User identifier
+      name: clientInfo.user.name, // Display name
+      email: clientInfo.user.email, // Contact email
+      role: clientInfo.user.role, // User role (mutual/dependent)
+      phone_no: clientInfo.user.phone_no, // Emergency contact phone
     },
-    timestamp: new Date().toISOString()
-}, clientId);
+    timestamp: new Date().toISOString(),
+  },
+  clientId,
+);
 ```
 
-### **Shared Information Includes**:
+### **Shared Information Includes**
+
 - **ID**: Unique user identifier for system tracking
 - **Name**: Human-readable name for display and identification
 - **Email**: Contact information for emergency outreach
@@ -269,6 +293,7 @@ broadcastToRoom(roomId, {
 ### **Emergency Context Justification**
 
 This information sharing is critical for:
+
 1. **Emergency Identification**: Knowing exactly who is in the monitoring room
 2. **Contact Information**: Multiple ways to reach participants in emergencies
 3. **Role Clarity**: Understanding who is the monitored user vs emergency contacts
@@ -285,6 +310,7 @@ This information sharing is critical for:
 ### **Comparison to Private Systems**
 
 Unlike private chat systems where anonymity is preserved, emergency monitoring requires:
+
 - **Transparency**: All room members must know who they're connected to
 - **Accountability**: Clear identification in emergency situations
 - **Rapid Access**: No delays to identify participants during emergencies
@@ -311,7 +337,7 @@ Returns rooms where the current user is an emergency contact and the room is act
       "lastLocationUpdate": 1700000000
     },
     {
-      "roomId": "xyz-789-uvw", 
+      "roomId": "xyz-789-uvw",
       "ownerUserId": "user-456",
       "ownerName": "Jane Smith",
       "isActive": true,
@@ -330,12 +356,14 @@ This allows emergency contact dashboards to show all dependents they're currentl
 Emergency contacts can monitor multiple users simultaneously. The server handles all room management automatically.
 
 **Key Design Principles**:
+
 1. **No Manual Room Management**: Emergency contacts never see or handle room IDs
 2. **Auto-Join on Activation**: When a user starts monitoring, all authorized emergency contacts are automatically joined to that room
 3. **Multi-Room State**: Emergency contacts can be in multiple room states simultaneously
 4. **Server-Side Authorization**: All room access is validated server-side based on emergency contact relationships
 
 **Emergency Contact Connection Flow**:
+
 ```
 Emergency Contact Connects
     ↓
@@ -347,10 +375,11 @@ Broadcast: Send current location data for all active rooms
 ```
 
 **Updated State Diagram**:
+
 ```
 Emergency Contact State:
 ├── Room A (User 1) - ACTIVE ←→ Receiving Location Updates
-├── Room B (User 2) - ACTIVE ←→ Receiving Location Updates  
+├── Room B (User 2) - ACTIVE ←→ Receiving Location Updates
 ├── Room C (User 3) - INACTIVE - No Updates
 └── Room D (User 4) - ACTIVE ←→ Receiving Location Updates
 ```
@@ -361,7 +390,8 @@ Each emergency contact can be in a different state for each room they're monitor
 
 ## 10. Implementation Priority (1-2 Days)
 
-### Day 1 (6-8 hours):
+### Day 1 (6-8 hours)
+
 1. **HonoJS REST Location API** (2 hours)
    - POST /api/location endpoint with BetterAuth middleware
    - PostgreSQL integration for location storage
@@ -378,7 +408,8 @@ Each emergency contact can be in a different state for each room they're monitor
    - Auto-join for emergency contacts
    - Multi-room support for emergency contacts
 
-### Day 2 (4-6 hours):
+### Day 2 (4-6 hours)
+
 1. **Location Broadcasting** (2 hours)
    - Connect REST → WebSocket
    - Real-time location updates
@@ -419,6 +450,7 @@ Mobile App (REST) → HonoJS Backend → Bun WebSocket → Dashboard Web App
 ```
 
 **Key Components**:
+
 - **HonoJS**: Fast web framework with TypeScript support
 - **Bun WebSocket Helper**: High-performance WebSocket implementation
 - **BetterAuth**: Modern authentication framework with session management
@@ -462,14 +494,17 @@ Just like Socket.IO or Slack:
 A room is not a chat lobby.
 
 A room is:
+
 - **One monitoring session for one dependent/mutual user**
 
 So if:
+
 - Dependent A starts monitoring → Room A
-- Dependent B starts monitoring → Room B  
+- Dependent B starts monitoring → Room B
 - Mutual C starts monitoring → Room C
 
 An emergency contact E may be authorized for:
+
 - Room A
 - Room B
 - Room C
@@ -479,11 +514,13 @@ An emergency contact E may be authorized for:
 ### 3️⃣ Exact Flow: Emergency Contact with Multiple Dependents
 
 **Scenario:**
+
 - User E = emergency contact
 - Users D1, D2, D3 = dependents
 - All three press Start Monitoring
 
 **Step 1: Emergency contact connects once**
+
 ```
 WebSocket CONNECT (JWT authenticated)
 ```
@@ -491,18 +528,19 @@ WebSocket CONNECT (JWT authenticated)
 **Step 2: Server auto-discovers active rooms**
 
 On connection (or reconnection), server runs:
+
 ```javascript
-const activeRooms = rooms.filter(room =>
-  room.isActive &&
-  room.emergencyContacts.includes(user.id)
+const activeRooms = rooms.filter(
+  (room) => room.isActive && room.emergencyContacts.includes(user.id),
 );
 ```
 
 Example result:
+
 ```
 [
   room(D1),
-  room(D2), 
+  room(D2),
   room(D3)
 ]
 ```
@@ -517,17 +555,19 @@ for (const room of activeRooms) {
 ```
 
 - No client involvement
-- No room IDs sent  
+- No room IDs sent
 - No join messages
 
 ### 4️⃣ How Messages Flow with Multiple Rooms
 
 **Location update from D2:**
+
 ```javascript
 broadcastToRoom(roomD2, {
   type: "location-update",
-  userId: "D2", 
-  lat, lng
+  userId: "D2",
+  lat,
+  lng,
 });
 ```
 
@@ -542,6 +582,7 @@ broadcastToRoom(roomD2, {
 ### 5️⃣ Client-Side Perspective (Very Simple)
 
 The emergency contact frontend just receives events like:
+
 ```json
 {
   "type": "location-update",
@@ -555,7 +596,7 @@ Frontend groups by ownerUserId:
 
 ```
 📍 D1
-📍 D2  
+📍 D2
 📍 D3
 ```
 
@@ -570,6 +611,7 @@ room.isActive = false;
 ```
 
 **Server:**
+
 ```javascript
 for (const socket of room.users) {
   socket.rooms.delete(room.id);
@@ -581,13 +623,13 @@ rooms.delete(room.id);
 
 ### 7️⃣ Why This Scales Cleanly (Even Conceptually)
 
-| Concern | Result |
-|---------|--------|
+| Concern                             | Result   |
+| ----------------------------------- | -------- |
 | Emergency contact has 10 dependents | 10 rooms |
-| One socket per contact | ✅ |
-| No reconnect needed | ✅ |
-| No room selection UI | ✅ |
-| No join/leave spam | ✅ |
+| One socket per contact              | ✅       |
+| No reconnect needed                 | ✅       |
+| No room selection UI                | ✅       |
+| No join/leave spam                  | ✅       |
 
 ### 8️⃣ The Golden Rule (Put This in Your Docs)
 
@@ -603,18 +645,21 @@ rooms.delete(room.id);
 ## 14. Success Criteria for Capstone
 
 ✅ **Working Features**:
+
 - User can start/stop monitoring
 - Emergency contacts see real-time location
 - Emergency SOS button works
 - Mobile app works in background
 
 ✅ **Technical Requirements**:
+
 - REST API for location uploads
 - WebSocket rooms for real-time updates
 - JWT authentication
 - Basic data persistence
 
 ✅ **Simplified Scope**:
+
 - No complex permission workflows
 - No anomaly detection
 - No multi-step escalation
@@ -626,10 +671,11 @@ rooms.delete(room.id);
 
 ## 15. Removed Features & Rationale
 
-| Removed Feature | Why That's Good |
-| --------------- | --------------- |
-| Room modes | Unnecessary for implied consent |
-| Join approvals | Slows emergency response |
-| Anomaly detection | Out of scope for capstone |
-| Complex escalation | Focused on core safety feature |
-| Persistent sockets on mobile | OS-incompatible |
+| Removed Feature              | Why That's Good                 |
+| ---------------------------- | ------------------------------- |
+| Room modes                   | Unnecessary for implied consent |
+| Join approvals               | Slows emergency response        |
+| Anomaly detection            | Out of scope for capstone       |
+| Complex escalation           | Focused on core safety feature  |
+| Persistent sockets on mobile | OS-incompatible                 |
+

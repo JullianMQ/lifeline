@@ -548,6 +548,122 @@ function handlePing(ws: any): void {
     }));
 }
 
+function handleLocationUpdate(clientId: string, clientInfo: ClientInfo, data: any, ws: any): void {
+    const { roomId, latitude, longitude, timestamp, accuracy } = data;
+
+    // Validate required fields
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+        ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Invalid location data: latitude and longitude are required numbers',
+            timestamp: new Date().toISOString()
+        }));
+        return;
+    }
+
+    // Validate coordinate ranges
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Invalid coordinates: latitude must be -90 to 90, longitude must be -180 to 180',
+            timestamp: new Date().toISOString()
+        }));
+        return;
+    }
+
+    const userPhone = clientInfo.user.phone_no;
+    const userRoomIds: string[] = [];
+
+    // If roomId is provided, validate and use it
+    if (roomId) {
+        const room = rooms.get(roomId);
+        if (!room) {
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Room not found',
+                timestamp: new Date().toISOString()
+            }));
+            return;
+        }
+
+        // Verify user is the owner or an emergency contact of this room (by phone number)
+        const ownerClient = clients.get(room.owner);
+        const isOwner = ownerClient?.user?.phone_no === userPhone;
+        const isEmergencyContact = userPhone && room.emergencyContacts.includes(userPhone);
+
+        if (!isOwner && !isEmergencyContact) {
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Not authorized to send location to this room',
+                timestamp: new Date().toISOString()
+            }));
+            return;
+        }
+
+        userRoomIds.push(roomId);
+    } else {
+        // Find all rooms where user is authorized (by phone number)
+        if (!userPhone) {
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'User phone number not available',
+                timestamp: new Date().toISOString()
+            }));
+            return;
+        }
+
+        rooms.forEach((room, rid) => {
+            const ownerClient = clients.get(room.owner);
+            const isOwner = ownerClient?.user?.phone_no === userPhone;
+            const isEmergencyContact = room.emergencyContacts.includes(userPhone);
+            
+            if (isOwner || isEmergencyContact) {
+                userRoomIds.push(rid);
+            }
+        });
+
+        if (userRoomIds.length === 0) {
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Not in any room. Provide roomId to specify target room.',
+                timestamp: new Date().toISOString()
+            }));
+            return;
+        }
+    }
+
+    const timestampStr = timestamp 
+        ? (typeof timestamp === 'number' ? new Date(timestamp).toISOString() : timestamp)
+        : new Date().toISOString();
+
+    const locationMessage = {
+        type: 'location-update',
+        data: {
+            visiblePhone: userPhone,
+            userName: clientInfo.user.name,
+            latitude,
+            longitude,
+            timestamp: timestampStr,
+            accuracy: accuracy || null
+        },
+        timestamp: new Date().toISOString()
+    };
+
+    // Broadcast to all target rooms (excluding sender)
+    userRoomIds.forEach(rid => {
+        broadcastToRoom(rid, locationMessage, clientId);
+    });
+
+    // Send confirmation to sender
+    ws.send(JSON.stringify({
+        type: 'location-update-confirmed',
+        rooms: userRoomIds,
+        timestamp: new Date().toISOString()
+    }));
+
+    console.log(`[${new Date().toISOString()}] Location update from ${clientInfo.user.name} (${userPhone}) broadcast to ${userRoomIds.length} room(s)`);
+}
+
 function handleGetUsers(clientId: string, clientInfo: ClientInfo, data: any, ws: any): void {
     const roomId = data.roomId;
     if (!roomId) {
@@ -725,6 +841,10 @@ ws.get('/ws', upgradeWebSocket((c) => {
                         handlePing(ws);
                         break;
 
+                    case 'location-update':
+                        handleLocationUpdate(clientId, clientInfo, data, ws);
+                        break;
+
                     case 'get_users':
                         handleGetUsers(clientId, clientInfo, data, ws);
                         break;
@@ -803,4 +923,4 @@ ws.get('/rooms-info', (c) => {
 });
 
 export default ws;
-export { rooms, broadcastToRoom };
+export { rooms, clients, broadcastToRoom };
