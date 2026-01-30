@@ -1,0 +1,210 @@
+import { useState } from "react";
+
+export type MediaType = "picture" | "video" | "voice_recording";
+
+export interface MediaFile {
+  id: number;
+  user_id: string;
+  drive_file_id: string;
+  file_name: string;
+  original_name: string;
+  mime_type: string;
+  media_type: MediaType;
+  file_size: number;
+  web_view_link: string | null;
+  web_content_link: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+  owner_name?: string;
+  owner_email?: string;
+  owner_phone?: string | null;
+}
+
+type MediaModalProps = {
+  open: boolean;
+  onClose: () => void;
+  files: MediaFile[];
+  mediaType: MediaType;
+  loading: boolean;
+  error: string | null;
+  contactName: string;
+};
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getMediaTypeLabel(mediaType: MediaType): string {
+  switch (mediaType) {
+    case "picture":
+      return "Photos";
+    case "video":
+      return "Videos";
+    case "voice_recording":
+      return "Voice Recordings";
+    default:
+      return "Media";
+  }
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+
+export default function MediaModal({
+  open,
+  onClose,
+  files,
+  mediaType,
+  loading,
+  error,
+  contactName,
+}: MediaModalProps) {
+  const [previewFile, setPreviewFile] = useState<MediaFile | null>(null);
+
+  if (!open) return null;
+
+  const handleImageClick = (file: MediaFile) => {
+    if (file.media_type === "picture") {
+      setPreviewFile(file);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewFile(null);
+  };
+
+  const getDownloadUrl = (fileId: number) => {
+    return `${API_BASE_URL}/api/media/files/${fileId}/download`;
+  };
+
+  return (
+    <div className="modal media-modal-overlay" onClick={onClose}>
+      <div className="modal-content media-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="media-modal-header">
+          <h3 className="info-label">
+            {contactName}'s {getMediaTypeLabel(mediaType)}
+          </h3>
+          <button className="media-close-btn" onClick={onClose} aria-label="Close">
+            <img src="/images/close.svg" alt="Close" />
+          </button>
+        </div>
+
+        {loading && (
+          <div className="media-loading">
+            <p>Loading...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="media-error">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && files.length === 0 && (
+          <div className="media-empty">
+            <p>No {getMediaTypeLabel(mediaType).toLowerCase()} found</p>
+          </div>
+        )}
+
+        {!loading && !error && files.length > 0 && (
+          <div className="media-grid">
+            {files.map((file) => (
+              <div key={file.id} className="media-item">
+                {file.media_type === "picture" && (
+                  <div
+                    className="media-thumbnail clickable"
+                    onClick={() => handleImageClick(file)}
+                  >
+                    <img
+                      src={getDownloadUrl(file.id)}
+                      alt={file.original_name}
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+
+                {file.media_type === "video" && (
+                  <div className="media-thumbnail video-thumbnail">
+                    <video
+                      src={getDownloadUrl(file.id)}
+                      controls
+                      preload="metadata"
+                    >
+                      Your browser does not support video playback.
+                    </video>
+                  </div>
+                )}
+
+                {file.media_type === "voice_recording" && (
+                  <div className="media-thumbnail audio-thumbnail">
+                    <div className="audio-icon">
+                      <img src="/images/mic.svg" alt="Audio" />
+                    </div>
+                    <audio
+                      src={getDownloadUrl(file.id)}
+                      controls
+                      preload="metadata"
+                    >
+                      Your browser does not support audio playback.
+                    </audio>
+                  </div>
+                )}
+
+                <div className="media-info">
+                  <p className="media-name" title={file.original_name}>
+                    {file.original_name}
+                  </p>
+                  <p className="media-meta">
+                    {formatFileSize(file.file_size)} - {formatDate(file.createdAt)}
+                  </p>
+                  {file.description && (
+                    <p className="media-description" title={file.description}>
+                      {file.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Image Preview Modal */}
+      {previewFile && (
+        <div className="image-preview-overlay" onClick={closePreview}>
+          <div className="image-preview-content" onClick={(e) => e.stopPropagation()}>
+            <button className="preview-close-btn" onClick={closePreview} aria-label="Close preview">
+              <img src="/images/close.svg" alt="Close" />
+            </button>
+            <img
+              src={getDownloadUrl(previewFile.id)}
+              alt={previewFile.original_name}
+              className="preview-image"
+            />
+            <div className="preview-info">
+              <p className="preview-name">{previewFile.original_name}</p>
+              {previewFile.description && (
+                <p className="preview-description">{previewFile.description}</p>
+              )}
+              <p className="preview-meta">
+                {formatFileSize(previewFile.file_size)} - {formatDate(previewFile.createdAt)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

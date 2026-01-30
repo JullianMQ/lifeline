@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { auth } from "../lib/auth";
 import { dbPool } from "../lib/db";
 import { getGoogleDriveService, MediaType, ALLOWED_MIME_TYPES, FILE_SIZE_LIMITS } from "../lib/googleDrive";
+import { debugMedia } from "../lib/debug";
 import { z } from "zod";
 
 type User = NonNullable<typeof auth.$Infer.Session.user>;
@@ -54,12 +55,19 @@ router.use("*", async (c, next) => {
  * 5. The file owner is in the requesting user's dependent_contacts
  */
 async function hasAccessToUserFiles(requestingUserId: string, requestingUserPhone: string | null, fileOwnerId: string): Promise<boolean> {
+    debugMedia.log("=== hasAccessToUserFiles ===");
+    debugMedia.log("requestingUserId:", requestingUserId);
+    debugMedia.log("requestingUserPhone:", requestingUserPhone);
+    debugMedia.log("fileOwnerId:", fileOwnerId);
+    
     // Owner always has access
     if (requestingUserId === fileOwnerId) {
+        debugMedia.log("Access granted: same user (owner)");
         return true;
     }
 
     if (!requestingUserPhone) {
+        debugMedia.log("Access denied: requesting user has no phone number");
         return false;
     }
 
@@ -69,12 +77,18 @@ async function hasAccessToUserFiles(requestingUserId: string, requestingUserPhon
         [fileOwnerId]
     );
 
+    debugMedia.log("Owner contacts query result rows:", ownerContactsResult.rows.length);
+    
     if (ownerContactsResult.rows.length > 0) {
         const ownerContacts = ownerContactsResult.rows[0];
         const emergencyContacts: string[] = ownerContacts.emergency_contacts || [];
         const dependentContacts: string[] = ownerContacts.dependent_contacts || [];
 
+        debugMedia.log("File owner's emergency_contacts:", emergencyContacts);
+        debugMedia.log("File owner's dependent_contacts:", dependentContacts);
+
         if (emergencyContacts.includes(requestingUserPhone) || dependentContacts.includes(requestingUserPhone)) {
+            debugMedia.log("Access granted: requesting user is in file owner's contacts");
             return true;
         }
     }
@@ -85,8 +99,11 @@ async function hasAccessToUserFiles(requestingUserId: string, requestingUserPhon
         [fileOwnerId]
     );
 
+    debugMedia.log("File owner user query result rows:", fileOwnerResult.rows.length);
+
     if (fileOwnerResult.rows.length > 0) {
         const fileOwnerPhone = fileOwnerResult.rows[0].phone_no;
+        debugMedia.log("File owner's phone_no:", fileOwnerPhone);
 
         if (fileOwnerPhone) {
             const requesterContactsResult = await dbPool.query(
@@ -94,18 +111,25 @@ async function hasAccessToUserFiles(requestingUserId: string, requestingUserPhon
                 [requestingUserId]
             );
 
+            debugMedia.log("Requester contacts query result rows:", requesterContactsResult.rows.length);
+
             if (requesterContactsResult.rows.length > 0) {
                 const requesterContacts = requesterContactsResult.rows[0];
                 const emergencyContacts: string[] = requesterContacts.emergency_contacts || [];
                 const dependentContacts: string[] = requesterContacts.dependent_contacts || [];
 
+                debugMedia.log("Requesting user's emergency_contacts:", emergencyContacts);
+                debugMedia.log("Requesting user's dependent_contacts:", dependentContacts);
+
                 if (emergencyContacts.includes(fileOwnerPhone) || dependentContacts.includes(fileOwnerPhone)) {
+                    debugMedia.log("Access granted: file owner is in requesting user's contacts");
                     return true;
                 }
             }
         }
     }
 
+    debugMedia.log("Access denied: no matching contact relationship found");
     return false;
 }
 
@@ -266,7 +290,11 @@ router.post("/media/upload", async (c) => {
 router.get("/media/files", async (c) => {
     const user = c.get("user");
     const mediaType = c.req.query('media_type');
-    const userId = c.req.query('user_id'); // Optional: filter by specific user
+    const userIdOrPhone = c.req.query('user_id'); // Can be user ID or phone number
+
+    debugMedia.log("=== GET /media/files ===");
+    debugMedia.log("Authenticated user:", { id: user.id, phone_no: user.phone_no, name: user.name });
+    debugMedia.log("Query params - mediaType:", mediaType, "userIdOrPhone:", userIdOrPhone);
 
     try {
         // Validate media_type if provided
@@ -280,8 +308,30 @@ router.get("/media/files", async (c) => {
         }
 
         // If specific user requested, check access
-        if (userId) {
-            const hasAccess = await hasAccessToUserFiles(user.id, user.phone_no || null, userId);
+        if (userIdOrPhone) {
+            // Resolve phone number to user ID if needed
+            let fileOwnerId = userIdOrPhone;
+            
+            // Check if it looks like a phone number (starts with 0 or +)
+            if (userIdOrPhone.startsWith('0') || userIdOrPhone.startsWith('+')) {
+                debugMedia.log("userIdOrPhone appears to be a phone number, looking up user ID...");
+                const userLookup = await dbPool.query(
+                    `SELECT id FROM "user" WHERE phone_no = $1`,
+                    [userIdOrPhone]
+                );
+                
+                if (userLookup.rows.length === 0) {
+                    debugMedia.log("No user found with phone number:", userIdOrPhone);
+                    return c.json({ error: "User not found" }, 404);
+                }
+                
+                fileOwnerId = userLookup.rows[0].id;
+                debugMedia.log("Resolved phone number to user ID:", fileOwnerId);
+            }
+            
+            debugMedia.log("Checking access for fileOwnerId:", fileOwnerId);
+            const hasAccess = await hasAccessToUserFiles(user.id, user.phone_no || null, fileOwnerId);
+            debugMedia.log("hasAccess result:", hasAccess);
             if (!hasAccess) {
                 return c.json({ error: "Access denied to this user's files" }, 403);
             }
@@ -292,7 +342,7 @@ router.get("/media/files", async (c) => {
                 JOIN "user" u ON mf.user_id = u.id
                 WHERE mf.user_id = $1
             `;
-            const params: (string | undefined)[] = [userId];
+            const params: (string | undefined)[] = [fileOwnerId];
 
             if (mediaType) {
                 query += ` AND mf.media_type = $2`;
