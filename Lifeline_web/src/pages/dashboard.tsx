@@ -11,16 +11,31 @@ import type { ContactCard } from "../types/realtime";
 /** Alert Modal Component */
 function AlertModal({
   alerts,
+  contactCards,
   onAcknowledge,
   onViewContact,
   onClose,
 }: {
   alerts: Array<{ id: string; emergencyUserId: string; emergencyUserName: string; message: string; timestamp?: string }>;
+  contactCards: ContactCard[];
   onAcknowledge: (alertId: string) => void;
-  onViewContact: (userId: string) => void;
+  onViewContact: (contact: ContactCard) => void;
   onClose: () => void;
 }) {
   if (alerts.length === 0) return null;
+
+  // Find contact by matching emergencyUserId with contact.id or by phone
+  const findContactForAlert = (alert: { emergencyUserId: string; emergencyUserName: string }) => {
+    // First try to find by user ID
+    let contact = contactCards.find(c => c.id === alert.emergencyUserId);
+    
+    // If not found, try to find by matching the roomId pattern (which contains phone)
+    if (!contact) {
+      contact = contactCards.find(c => c.name === alert.emergencyUserName);
+    }
+    
+    return contact;
+  };
 
   return (
     <div className="alert-modal-overlay" onClick={onClose}>
@@ -30,39 +45,52 @@ function AlertModal({
           <h2>Emergency Alert{alerts.length > 1 ? 's' : ''}</h2>
         </div>
         <div className="alert-modal-body">
-          {alerts.map((alert) => (
-            <div key={alert.id} className="alert-modal-item">
-              <div className="alert-modal-item-icon">
-                {alert.emergencyUserName.charAt(0).toUpperCase()}
+          {alerts.map((alert) => {
+            const contact = findContactForAlert(alert);
+            
+            return (
+              <div key={alert.id} className="alert-modal-item">
+                <div className="alert-modal-item-icon">
+                  {alert.emergencyUserName.charAt(0).toUpperCase()}
+                </div>
+                <div className="alert-modal-item-content">
+                  <span className="alert-modal-item-name">{alert.emergencyUserName}</span>
+                  <span className="alert-modal-item-message">{alert.message}</span>
+                  {contact?.phone && (
+                    <span className="alert-modal-item-phone">{contact.phone}</span>
+                  )}
+                  {alert.timestamp && (
+                    <span className="alert-modal-item-time">
+                      {new Date(alert.timestamp).toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+                <div className="alert-modal-item-actions">
+                  <button
+                    className="alert-view-btn"
+                    onClick={() => {
+                      if (contact) {
+                        console.log("[AlertModal] Viewing contact:", contact.id, contact.name, contact.phone);
+                        onViewContact(contact);
+                        onClose();
+                      } else {
+                        console.warn("[AlertModal] Could not find contact for alert:", alert);
+                      }
+                    }}
+                    disabled={!contact}
+                  >
+                    View
+                  </button>
+                  <button
+                    className="alert-acknowledge-btn"
+                    onClick={() => onAcknowledge(alert.id)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
-              <div className="alert-modal-item-content">
-                <span className="alert-modal-item-name">{alert.emergencyUserName}</span>
-                <span className="alert-modal-item-message">{alert.message}</span>
-                {alert.timestamp && (
-                  <span className="alert-modal-item-time">
-                    {new Date(alert.timestamp).toLocaleTimeString()}
-                  </span>
-                )}
-              </div>
-              <div className="alert-modal-item-actions">
-                <button
-                  className="alert-view-btn"
-                  onClick={() => {
-                    onViewContact(alert.emergencyUserId);
-                    onClose();
-                  }}
-                >
-                  View
-                </button>
-                <button
-                  className="alert-acknowledge-btn"
-                  onClick={() => onAcknowledge(alert.id)}
-                >
-                  Acknowledge
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="alert-modal-footer">
           <button className="alert-modal-close-btn" onClick={onClose}>
@@ -119,7 +147,7 @@ function Dashboard() {
     console.log("[Dashboard] Selecting contact:", contact.id, contact.name);
     setSelectedContactId(contact.id);
     // Reset address when selecting new contact
-    setAddress("");
+    // setAddress("");
   };
 
   // Handle going back - clear the selected contact ID
@@ -209,9 +237,8 @@ function Dashboard() {
   }, [selectedContact?.id, selectedContact?.location?.coords?.lat, selectedContact?.location?.coords?.lng]);
 
   // Handle viewing a contact from alert modal
-  const handleViewAlertContact = (userId: string) => {
-    const contact = contactCards.find(c => c.id === userId);
-        console.log(contact); // turns into undefined
+  const handleViewAlertContact = (contact: ContactCard) => {
+    console.log("[Dashboard] handleViewAlertContact:", contact.id, contact.name, contact.phone);
     if (contact) {
       handleSelectContact(contact);
     }
@@ -257,6 +284,7 @@ function Dashboard() {
       {showAlertModal && activeAlerts.length > 0 && (
         <AlertModal
           alerts={activeAlerts}
+          contactCards={contactCards}
           onAcknowledge={acknowledgeAlert}
           onViewContact={handleViewAlertContact}
           onClose={() => setShowAlertModal(false)}

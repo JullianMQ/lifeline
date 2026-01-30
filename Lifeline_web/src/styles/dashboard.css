@@ -698,6 +698,12 @@ ul{
     color: var(--muted-grey);
 }
 
+.alert-modal-item-phone {
+    font-size: 0.85rem;
+    color: var(--muted-grey);
+    font-weight: 500;
+}
+
 .alert-modal-item-actions {
     display: flex;
     flex-direction: column;
@@ -705,23 +711,6 @@ ul{
 }
 
 .alert-acknowledge-btn {
-    padding: var(--space-xs) var(--space-sm);
-    background: var(--lifeline-red);
-    color: var(--soft-white);
-    border: none;
-    border-radius: var(--space-xs);
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    transition: background-color 0.2s ease;
-}
-
-.alert-acknowledge-btn:hover {
-    background-color: #c62d1a;
-}
-
-.alert-view-btn {
     padding: var(--space-xs) var(--space-sm);
     background: transparent;
     color: var(--lifeline-red);
@@ -734,9 +723,26 @@ ul{
     transition: all 0.2s ease;
 }
 
-.alert-view-btn:hover {
+.alert-acknowledge-btn:hover {
     background-color: var(--lifeline-red);
     color: var(--soft-white);
+}
+
+.alert-view-btn {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--lifeline-red);
+    color: var(--soft-white);
+    border: none;
+    border-radius: var(--space-xs);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.alert-view-btn:hover {
+    background-color: #c62d1a;
 }
 
 .alert-modal-footer {
