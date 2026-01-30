@@ -147,7 +147,7 @@ form.profile-user{
     background-color: rgba(0, 0, 0, 0.5);
 }
 
-.modal-content{
+.profile-user-content .modal-content{
     width: 60%;
     max-width: 800px;
     gap: var(--space-md);
