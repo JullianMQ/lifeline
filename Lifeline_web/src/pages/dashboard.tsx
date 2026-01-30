@@ -8,11 +8,78 @@ import DashboardContact from "../components/DashboardContact";
 import { useMap } from "../scripts/useMap";
 import type { ContactCard } from "../types/realtime";
 
+/** Alert Modal Component */
+function AlertModal({
+  alerts,
+  onAcknowledge,
+  onViewContact,
+  onClose,
+}: {
+  alerts: Array<{ id: string; emergencyUserId: string; emergencyUserName: string; message: string; timestamp?: string }>;
+  onAcknowledge: (alertId: string) => void;
+  onViewContact: (userId: string) => void;
+  onClose: () => void;
+}) {
+  if (alerts.length === 0) return null;
+
+  return (
+    <div className="alert-modal-overlay" onClick={onClose}>
+      <div className="alert-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="alert-modal-header">
+          <span className="alert-modal-header-icon">!</span>
+          <h2>Emergency Alert{alerts.length > 1 ? 's' : ''}</h2>
+        </div>
+        <div className="alert-modal-body">
+          {alerts.map((alert) => (
+            <div key={alert.id} className="alert-modal-item">
+              <div className="alert-modal-item-icon">
+                {alert.emergencyUserName.charAt(0).toUpperCase()}
+              </div>
+              <div className="alert-modal-item-content">
+                <span className="alert-modal-item-name">{alert.emergencyUserName}</span>
+                <span className="alert-modal-item-message">{alert.message}</span>
+                {alert.timestamp && (
+                  <span className="alert-modal-item-time">
+                    {new Date(alert.timestamp).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              <div className="alert-modal-item-actions">
+                <button
+                  className="alert-view-btn"
+                  onClick={() => {
+                    onViewContact(alert.emergencyUserId);
+                    onClose();
+                  }}
+                >
+                  View
+                </button>
+                <button
+                  className="alert-acknowledge-btn"
+                  onClick={() => onAcknowledge(alert.id)}
+                >
+                  Acknowledge
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="alert-modal-footer">
+          <button className="alert-modal-close-btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const navigate = useNavigate();
   // Store only the contact ID, not the whole object - this ensures we always get fresh data
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, { time: string; lat: number; lng: number }[]>>({});
+  const [showAlertModal, setShowAlertModal] = useState(false);
 
   const { markers, loading, handleLocation, getGeocode, setAddress, address, updateMarker } = useMap();
   const {
@@ -25,6 +92,13 @@ function Dashboard() {
     acknowledgeAlert,
     manualReconnect,
   } = useDashboard();
+
+  // Show modal automatically when new alerts come in
+  useEffect(() => {
+    if (activeAlerts.length > 0) {
+      setShowAlertModal(true);
+    }
+  }, [activeAlerts.length]);
 
   // Derive selectedContact from contactCards using the stored ID
   // This ensures we always have the latest data when contactCards updates
@@ -134,6 +208,15 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, [selectedContact?.id, selectedContact?.location?.coords?.lat, selectedContact?.location?.coords?.lng]);
 
+  // Handle viewing a contact from alert modal
+  const handleViewAlertContact = (userId: string) => {
+    const contact = contactCards.find(c => c.id === userId);
+        console.log(contact); // turns into undefined
+    if (contact) {
+      handleSelectContact(contact);
+    }
+  };
+
   // Get connection status indicator
   const getConnectionIndicator = () => {
     switch (connectionStatus) {
@@ -170,25 +253,14 @@ function Dashboard() {
 
   return (
     <main className="dashboard">
-      {/* Global Emergency Alerts Banner */}
-      {activeAlerts.length > 0 && (
-        <div className="alert-banner">
-          {activeAlerts.map((alert) => (
-            <div key={alert.id} className="alert-item">
-              <span className="alert-icon">!</span>
-              <span className="alert-message">
-                <strong>Emergency Alert:</strong> {alert.emergencyUserName} - {alert.message}
-              </span>
-              <button
-                className="alert-dismiss"
-                onClick={() => acknowledgeAlert(alert.id)}
-                aria-label="Acknowledge alert"
-              >
-                Acknowledge
-              </button>
-            </div>
-          ))}
-        </div>
+      {/* Emergency Alert Modal */}
+      {showAlertModal && activeAlerts.length > 0 && (
+        <AlertModal
+          alerts={activeAlerts}
+          onAcknowledge={acknowledgeAlert}
+          onViewContact={handleViewAlertContact}
+          onClose={() => setShowAlertModal(false)}
+        />
       )}
 
       <header>
@@ -211,6 +283,16 @@ function Dashboard() {
             <span className="connection-error" title={connectionError}>
               {connectionError}
             </span>
+          )}
+          {activeAlerts.length > 0 && !showAlertModal && (
+            <button
+              className="alert-indicator-btn"
+              onClick={() => setShowAlertModal(true)}
+              title={`${activeAlerts.length} active alert${activeAlerts.length > 1 ? 's' : ''}`}
+            >
+              <span className="alert-indicator-icon">!</span>
+              <span>{activeAlerts.length}</span>
+            </button>
           )}
           <p className="uline-btn" onClick={handleLogout}>
             LOGOUT

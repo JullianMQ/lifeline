@@ -530,6 +530,400 @@ ul{
 }
 
 /* ============================================================================
+   Alert Card Styling (Red background when SOS active)
+   ============================================================================ */
+
+.dashboard-card-alert {
+    background-color: var(--lifeline-red) !important;
+    animation: pulse-card 1.5s infinite;
+}
+
+.dashboard-card-alert h3,
+.dashboard-card-alert .alert-text {
+    color: var(--soft-white) !important;
+}
+
+.dashboard-card-alert .alert-label {
+    color: var(--soft-white);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-top: var(--space-xxs);
+    text-transform: uppercase;
+}
+
+@keyframes pulse-card {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0px 6px 4px rgba(0, 0, 0, 0.25);
+    }
+    50% { 
+        transform: scale(1.02);
+        box-shadow: 0px 8px 12px rgba(223, 55, 33, 0.4);
+    }
+}
+
+/* ============================================================================
+   Emergency Alert Modal
+   ============================================================================ */
+
+.alert-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-md);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.alert-modal {
+    background-color: var(--soft-white);
+    border-radius: var(--space-sm);
+    width: 100%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.alert-modal-header {
+    background: var(--lifeline-red);
+    color: var(--soft-white);
+    padding: var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    border-radius: var(--space-sm) var(--space-sm) 0 0;
+}
+
+.alert-modal-header-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--soft-white);
+    color: var(--lifeline-red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    animation: pulse-icon 1s infinite;
+}
+
+@keyframes pulse-icon {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.alert-modal-header h2 {
+    color: var(--soft-white);
+    margin: 0;
+}
+
+.alert-modal-body {
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.alert-modal-item {
+    background-color: var(--base-white);
+    border-radius: var(--space-xs);
+    padding: var(--space-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    border-left: 4px solid var(--lifeline-red);
+}
+
+.alert-modal-item-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: var(--lifeline-red);
+    color: var(--soft-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.alert-modal-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+}
+
+.alert-modal-item-name {
+    font-family: var(--inter-bold);
+    font-size: 1.1rem;
+    color: var(--text-black);
+}
+
+.alert-modal-item-message {
+    font-size: 0.9rem;
+    color: var(--muted-grey);
+}
+
+.alert-modal-item-time {
+    font-size: 0.75rem;
+    color: var(--muted-grey);
+}
+
+.alert-modal-item-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+}
+
+.alert-acknowledge-btn {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--lifeline-red);
+    color: var(--soft-white);
+    border: none;
+    border-radius: var(--space-xs);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.alert-acknowledge-btn:hover {
+    background-color: #c62d1a;
+}
+
+.alert-view-btn {
+    padding: var(--space-xs) var(--space-sm);
+    background: transparent;
+    color: var(--lifeline-red);
+    border: 2px solid var(--lifeline-red);
+    border-radius: var(--space-xs);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.alert-view-btn:hover {
+    background-color: var(--lifeline-red);
+    color: var(--soft-white);
+}
+
+.alert-modal-footer {
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--base-white);
+    display: flex;
+    justify-content: center;
+}
+
+.alert-modal-close-btn {
+    padding: var(--space-xs) var(--space-lg);
+    background: var(--muted-grey);
+    color: var(--soft-white);
+    border: none;
+    border-radius: var(--space-xs);
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s ease;
+}
+
+.alert-modal-close-btn:hover {
+    background-color: var(--text-black);
+}
+
+/* Alert Indicator Button (shows when modal is closed but alerts exist) */
+.alert-indicator-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xxs);
+    padding: var(--space-xxs) var(--space-xs);
+    background-color: var(--lifeline-red);
+    color: var(--soft-white);
+    border: none;
+    border-radius: var(--space-xs);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    animation: pulse-alert-btn 1.5s infinite;
+    width: auto;
+}
+
+.alert-indicator-btn:hover {
+    background-color: #c62d1a;
+}
+
+.alert-indicator-icon {
+    width: 18px;
+    height: 18px;
+    background: var(--soft-white);
+    color: var(--lifeline-red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+@keyframes pulse-alert-btn {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
+    }
+    50% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 0 8px rgba(223, 55, 33, 0);
+    }
+}
+
+/* ============================================================================
+   Dashboard Contact Alert State (Red background when viewing SOS contact)
+   ============================================================================ */
+
+.dashboard-contact-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    width: 100%;
+    height: 100%;
+    position: relative;
+    padding: var(--space-sm);
+    border-radius: var(--space-sm);
+    transition: background-color 0.3s ease;
+}
+
+.dashboard-contact-alert {
+    background-color: var(--lifeline-red);
+    animation: pulse-contact-alert 2s infinite;
+}
+
+@keyframes pulse-contact-alert {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
+    }
+    50% { 
+        box-shadow: 0 0 20px 10px rgba(223, 55, 33, 0.2);
+    }
+}
+
+.dashboard-contact-alert .alert-text {
+    color: var(--soft-white) !important;
+}
+
+.dashboard-contact-alert .alert-text-muted {
+    color: rgba(255, 255, 252, 0.8) !important;
+}
+
+.dashboard-contact-alert .back-btn img {
+    filter: brightness(0) invert(1);
+}
+
+/* Alert banner inline (inside DashboardContact) */
+.alert-banner-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: var(--space-xs);
+    border: 2px solid var(--soft-white);
+}
+
+.alert-banner-inline .alert-banner-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.alert-banner-inline .alert-banner-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--soft-white);
+    color: var(--lifeline-red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1rem;
+    flex-shrink: 0;
+    animation: pulse-icon 1s infinite;
+}
+
+.alert-banner-inline .alert-banner-message {
+    color: var(--soft-white);
+    font-size: 0.95rem;
+}
+
+.alert-acknowledge-btn-white {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--soft-white);
+    color: var(--lifeline-red);
+    border: none;
+    border-radius: var(--space-xs);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    width: auto;
+}
+
+.alert-acknowledge-btn-white:hover {
+    background-color: var(--base-white);
+    transform: scale(1.02);
+}
+
+/* Responsive adjustments for contact alert state */
+@media screen and (max-width: 768px) {
+    .dashboard-contact-wrapper {
+        padding: var(--space-xs);
+        gap: var(--space-sm);
+    }
+
+    .alert-banner-inline {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--space-xs);
+    }
+
+    .alert-banner-inline .alert-banner-content {
+        flex-direction: column;
+    }
+}
+
+/* ============================================================================
    Media Modal Styles
    ============================================================================ */
 

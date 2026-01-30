@@ -112,19 +112,19 @@ export default function DashboardContact({
   };
 
   return (
-    <>
+    <div className={`dashboard-contact-wrapper ${contact.hasActiveAlert ? 'dashboard-contact-alert' : ''}`}>
       {/* Emergency Alert Banner */}
       {contact.hasActiveAlert && contact.activeAlert && (
-        <div className="alert-banner">
+        <div className="alert-banner-inline">
           <div className="alert-banner-content">
-            <span className="alert-banner-icon">⚠</span>
+            <span className="alert-banner-icon">!</span>
             <span className="alert-banner-message">
-              {contact.activeAlert.message || "Emergency alert active"}
+              <strong>SOS ACTIVE</strong> - {contact.activeAlert.message || "Emergency alert active"}
             </span>
           </div>
           {onAcknowledgeAlert && (
             <button
-              className="alert-acknowledge-btn"
+              className="alert-acknowledge-btn-white"
               onClick={() => onAcknowledgeAlert(contact.activeAlert!.id)}
             >
               Acknowledge
@@ -145,28 +145,28 @@ export default function DashboardContact({
         />
         <div className="dashboard-cont-info">
           <div className="dashboard-name-row">
-            <h1>{contact?.name?.split(" ")[0] || "User"}</h1>
+            <h1 className={contact.hasActiveAlert ? 'alert-text' : ''}>{contact?.name?.split(" ")[0] || "User"}</h1>
             <span
               className={`presence-indicator ${isOnline ? "presence-online" : "presence-offline"}`}
               title={isOnline ? "Online" : "Offline"}
             />
           </div>
-          <p>{contact?.phone}</p>
+          <p className={contact.hasActiveAlert ? 'alert-text' : ''}>{contact?.phone}</p>
           {!isOnline && lastSeen && (
-            <p className="last-seen">Last seen: {formatLastSeen(lastSeen)}</p>
+            <p className={`last-seen ${contact.hasActiveAlert ? 'alert-text-muted' : ''}`}>Last seen: {formatLastSeen(lastSeen)}</p>
           )}
         </div>
       </section>
 
       <section className="dashboard-cont-ws">
-        <h2 className="geo-loc">
+        <h2 className={`geo-loc ${contact.hasActiveAlert ? 'alert-text' : ''}`}>
           {geocode === "" ? "Loading..." : geocode}
         </h2>
-        <p>
+        <p className={contact.hasActiveAlert ? 'alert-text' : ''}>
           {location ? `${location.lng}, ${location.lat}` : "Loading..."}
         </p>
         {lastUpdate && (
-          <p className="location-timestamp">
+          <p className={`location-timestamp ${contact.hasActiveAlert ? 'alert-text-muted' : ''}`}>
             Updated: {formatTimestamp(lastUpdate)}
           </p>
         )}
@@ -188,7 +188,7 @@ export default function DashboardContact({
       </section>
 
       <section className="dashboard-history">
-        <p>History:</p>
+        <p className={contact.hasActiveAlert ? 'alert-text' : ''}>History:</p>
         <div className="table-card">
           <article className="table-scroll">
             <table>
@@ -223,6 +223,6 @@ export default function DashboardContact({
         error={mediaError}
         contactName={contact?.name?.split(" ")[0] || "User"}
       />
-    </>
+    </div>
   );
 }

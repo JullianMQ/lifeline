@@ -67,11 +67,12 @@ export default function DashboardUser({
 
   const renderContactCard = (contact: ContactCard, index: number) => {
     const isOnline = contact.presence?.status === 'online';
+    const hasAlert = contact.hasActiveAlert;
     
     return (
       <li
         key={contact.id || index}
-        className="dashboard-card"
+        className={`dashboard-card ${hasAlert ? 'dashboard-card-alert' : ''}`}
         onClick={() => onSelectContact(contact)}
       >
         <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -81,9 +82,10 @@ export default function DashboardUser({
             className="dashboard-card-img"
           />
           <PresenceIndicator isOnline={isOnline} />
-          {contact.hasActiveAlert && <AlertBadge />}
+          {hasAlert && <AlertBadge />}
         </div>
-        <h3>{contact.name.split(" ")[0]}</h3>
+        <h3 className={hasAlert ? 'alert-text' : ''}>{contact.name.split(" ")[0]}</h3>
+        {hasAlert && <p className="alert-label">SOS ACTIVE</p>}
       </li>
     );
   };
