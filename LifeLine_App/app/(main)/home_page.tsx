@@ -1,18 +1,19 @@
 import React, { useContext, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, Pressable } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import reverseGeocodeWithGoogle from "@/lib/services/geocode";
 import { SensorContext } from "@/lib/context/sensor_context";
+import SosAlertCallScreen from "@/components/sos_alert";
+import { incidentManager } from "@/lib/services/incident_manager";
 import {
     connectRoomSocket,
     disconnectRoomSocket,
     sendChatMessage,
     WSMessage,
 } from "@/lib/services/websocket";
-
 
 const HomePage = () => {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
@@ -21,6 +22,7 @@ const HomePage = () => {
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
+    const [incident, setIncident] = useState(incidentManager.getActive());
 
     // Fetch user location
     useEffect(() => {
@@ -63,7 +65,6 @@ const HomePage = () => {
         const roomId = "emergency-room";
 
         connectRoomSocket(roomId, (msg: WSMessage) => {
-
             if ("timestamp" in msg) {
                 setServerTime(msg.timestamp);
             }
@@ -91,6 +92,17 @@ const HomePage = () => {
         };
     }, []);
 
+    //
+    useEffect(() => {
+        // hydrate in case app restarted
+        incidentManager.hydrateFromStorage();
+
+        const unsub = incidentManager.subscribe((inc) => {
+            setIncident(inc);
+        });
+        return unsub;
+    }, []);
+
     // SOS button
     const handleSOS = () => {
         const messageParts = [];
@@ -113,10 +125,24 @@ const HomePage = () => {
         sendChatMessage(message);
     };
 
-
-
     return (
         <ScreenWrapper>
+
+            <SosAlertCallScreen
+                visible={!!incident}
+                callerName="Chister"
+                onAnswer={async () => {
+                    // "Answer" = silently trigger SOS
+                    await incidentManager.clearIncident();
+                    handleSOS();
+                }}
+                onDecline={async () => {
+                    // "Decline" = snooze safely (doesn't permanently disable)
+                    await incidentManager.snoozeActive();
+                    await incidentManager.clearIncident();
+                }}
+            />
+
             {/* MAP BOX */}
             <View className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden border" style={{ height: 384 }}>
                 {locationLoading ? (
@@ -163,14 +189,12 @@ const HomePage = () => {
             <View className="mx-4 mt-4">
                 <Text className="text-gray-600">Server Time:</Text>
                 <Text className="text-lg font-semibold">
-                    {serverTime
-                        ? new Date(serverTime).toLocaleTimeString()
-                        : "Connecting..."}
+                    {serverTime ? new Date(serverTime).toLocaleTimeString() : "Connecting..."}
                 </Text>
-
             </View>
 
             <View style={{ flex: 1 }} />
+
             {/* SOS and STOP BUTTON */}
             <View className="items-center mt-12">
                 <TouchableOpacity
@@ -181,14 +205,26 @@ const HomePage = () => {
                     <Text className="text-white font-bold mt-1 text-3xl">SOS</Text>
                 </TouchableOpacity>
 
-                {/* STOP MONITORING BUTTON - Only shows if monitoring is active */}
-
+                {/* ✅ quick preview button */}
+                <Pressable
+                    onPress={async () => {
+                        await incidentManager.onDetectorEvent({
+                            type: 'CRASH_CONFIRMED',
+                            t: Date.now(),
+                            data: { debug: true },
+                        });
+                    }}
+                    className="px-4 py-3 rounded-xl bg-black/10 border border-black/10"
+                >
+                    <Text className="text-black">Test Incoming Call UI</Text>
+                </Pressable>
 
                 {messageReply ? (
                     <Text className="mt-4 text-center text-gray-700">
                         Server reply: {messageReply}
                     </Text>
                 ) : null}
+
                 <TouchableOpacity
                     className="mt-6 mb-8 px-6 py-3 rounded-full border-2 flex-row items-center h-20 w-48 justify-center"
                     onPress={() => {
