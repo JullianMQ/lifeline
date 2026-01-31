@@ -245,7 +245,7 @@ function Dashboard() {
         </div>
 
         <div className="map">
-          <DashboardMap markers={markers} loading={loading} center={getMapCenter()} />
+          <DashboardMap markers={markers} loading={loading} center={getMapCenter()} onSelectContact={handleSelectContact}/>
         </div>
       </section>
       <footer></footer>

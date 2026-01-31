@@ -4,3 +4,6 @@
 node_modules/
 ca.pem
 dist/
+
+# credentials
+earnest-cooler-481111-j2-e137512c25c8.json

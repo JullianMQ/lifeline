@@ -1,5 +1,5 @@
 export type SensorLogEvent = {
-    sensor: 'accelerometer' | 'gyroscope' | 'microphone';
+    sensor: 'accelerometer' | 'gyroscope' | 'microphone' | 'detector';
     timestamp: number;
 
     x?: number;
@@ -8,6 +8,10 @@ export type SensorLogEvent = {
 
     magnitude?: number;
     rotationSpeed?: number;
+    omega?: number;
+    eventType?: string;
+    message?: string;
+    meta?: Record<string, any>;
     metering?: number;
     severity?: 'movement' | 'impact' | 'rotation' | 'noise';
     sessionId?: number;
@@ -31,7 +35,7 @@ class SensorLogger {
 
     getStats() {
         const accelLogs = this.logs.filter(l => l.magnitude !== undefined);
-        const gyroLogs = this.logs.filter(l => l.rotationSpeed !== undefined);
+        const gyroLogs = this.logs.filter(l => (l.omega !== undefined || l.rotationSpeed !== undefined));
         const micLogs = this.logs.filter(l => l.metering !== undefined);
 
         const getMaxMin = (logs: any[], key: string) => {
@@ -42,7 +46,7 @@ class SensorLogger {
         };
 
         const accelStats = getMaxMin(accelLogs, 'magnitude');
-        const gyroStats = getMaxMin(gyroLogs, 'rotationSpeed');
+        const gyroStats = getMaxMin(gyroLogs, (gyroLogs.some(l => l.omega !== undefined) ? 'omega' : 'rotationSpeed'));
         const micStats = getMaxMin(micLogs, 'metering');
 
         return {

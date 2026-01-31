@@ -423,6 +423,7 @@ export function useWebSocket(): UseWebSocketReturn {
           // Use visiblePhone as the key since that's what the backend sends
           if (data && data.visiblePhone) {
             saveLocation({
+              userId: data.visiblePhone, // Use phone as userId for consistency
               visiblePhone: data.visiblePhone,
               userName: data.userName,
               latitude: data.latitude,
