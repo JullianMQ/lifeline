@@ -136,14 +136,7 @@ export function useDashboard(): UseDashboardReturn {
       setRawContacts(userContacts);
 
       // Also format for backward compatibility
-      const formatted: Contact[] = userContacts.map((contact) => ({
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone_no,
-        image: contact.image,
-        role: contact.role as "mutual" | "dependent",
-      }));
-      setContacts(formatted);
+
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load contacts";
       setError(errorMessage);
@@ -286,5 +279,6 @@ export function useDashboard(): UseDashboardReturn {
     acknowledgeAlert,
     manualReconnect,
     refreshContacts: displayContact,
+    
   };
 }

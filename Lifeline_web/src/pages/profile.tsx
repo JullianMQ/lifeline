@@ -9,7 +9,7 @@ import ConfirmModal from "../components/confirmModal";
 
 function Profile() {
     const navigate = useNavigate();
-    const { user, contacts, displayContact } = useDashboard();
+    const { user, contactCards} = useDashboard();
     const { removeContact } = useProfile();
     const [isEditing, setIsEditing] = useState(false);
     const [isRemoving, setRemoving] = useState(false);
@@ -33,7 +33,7 @@ function Profile() {
             <article className="profile-user">
                 <section className="profile-user-content">
                     <div className="profile-id">
-                        <img src={user?.image || "/images/user-example.svg"} alt="user-img"/>
+                        <img src={user?.image || "/images/user-example.svg"} alt="user-img" className="profile-img avatar"/>
                         <h2>{user?.name}</h2>
                     </div>
                         <hr className="vr"/>
@@ -71,7 +71,7 @@ function Profile() {
                 />
             )}
             <div className="profile-contacts">
-            {contacts && contacts.length !== 0 ? (  
+            {contactCards && contactCards.length !== 0 ? (  
                 <>
                     <div>
                         <div className="add-btn">
@@ -84,21 +84,23 @@ function Profile() {
                         </div>
                         <div className="scrollable">
                             <ul className="profile-grid">
-                                {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
+                                {contactCards.filter((c) => c.role === "mutual").map((contact, index) => (
                                     <li key={index} className="profile-card" >
-                                        <div className="profile-card-name">
-                                            <img src={contact.image || "/images/user-example.svg"} />
-                                            <h3>{contact.name}</h3>
+                                        <div className="profile-card-content">
+                                            <div className="profile-card-name">
+                                                <img src={contact.image || "/images/user-example.svg"} className="avatar"/>
+                                                <h3>{contact.name}</h3>
+                                            </div>
+                                            <p>{contact.email}</p>
+                                            <p>{contact.phone}</p>
                                         </div>
-                                        <p>{contact.email}</p>
-                                        <p>{contact.phone}</p>
                                         {isRemoving &&(
-                                        <button className="pos-btn remove" onClick={() => {
-                                            setPendingRemove({ phone: contact.phone, role: contact.role });
-                                            setShowConfirm(true);
-                                        }}>
-                                            REMOVE
-                                        </button>
+                                            <button className="pos-btn remove" onClick={() => {
+                                                setPendingRemove({ phone: contact.phone, role: contact.role });
+                                                setShowConfirm(true);
+                                            }}>
+                                                REMOVE
+                                            </button>
                                         )}
                                     </li>
                                 ))}           
@@ -110,14 +112,16 @@ function Profile() {
                         <h2>Dependent</h2>
                         <div className="scrollable">
                             <ul className="profile-grid">
-                            {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                            {contactCards.filter((c) => c.role === "dependent").map((contact, index) => (
                                 <li key={index} className="profile-card" >
-                                    <div className="profile-card-name">
-                                        <img src={contact.image || "/images/user-example.svg"} />
-                                        <h3>{contact.name}</h3>
+                                    <div className="profile-card-content">
+                                        <div className="profile-card-name">
+                                            <img src={contact.image || "/images/user-example.svg"} className="avatar"/>
+                                            <h3>{contact.name}</h3>
+                                        </div>
+                                        <p>{contact.email}</p>
+                                        <p>{contact.phone}</p>
                                     </div>
-                                    <p>{contact.email}</p>
-                                    <p>{contact.phone}</p>
                                     {isRemoving &&(
                                         <button className="pos-btn remove" onClick={() => {
                                             setPendingRemove({ phone: contact.phone, role: contact.role });
@@ -133,7 +137,7 @@ function Profile() {
                     </div>
                 </>
                 ) : (
-                <div onClick={() => navigate('/addContact')}>              
+                <div>              
                     <h3>Oops! looks like you don't have any contacts yet</h3>
                     <p><span className="uline-btn" onClick={() => navigate('/addContact')}>Add a contact</span> to get started</p>
                 </div>
@@ -148,7 +152,6 @@ function Profile() {
                     }}
                     onConfirm={async () => { 
                         await removeContact(pendingRemove.phone, pendingRemove.role);
-                        await displayContact();
                         setShowConfirm(false);
                         setPendingRemove(null);
                     }}

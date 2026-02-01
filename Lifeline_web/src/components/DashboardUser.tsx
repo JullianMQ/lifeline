@@ -14,17 +14,6 @@ function PresenceIndicator({ isOnline }: { isOnline: boolean }) {
   return (
     <span
       className={`presence-indicator ${isOnline ? 'online' : 'offline'}`}
-      style={{
-        display: 'inline-block',
-        width: '10px',
-        height: '10px',
-        borderRadius: '50%',
-        backgroundColor: isOnline ? '#22c55e' : '#9ca3af',
-        position: 'absolute',
-        bottom: '2px',
-        right: '2px',
-        border: '2px solid white',
-      }}
       title={isOnline ? 'Online' : 'Offline'}
     />
   );
@@ -67,23 +56,25 @@ export default function DashboardUser({
 
   const renderContactCard = (contact: ContactCard, index: number) => {
     const isOnline = contact.presence?.status === 'online';
+    const hasAlert = contact.hasActiveAlert;
     
     return (
       <li
         key={contact.id || index}
-        className="dashboard-card"
+        className={`dashboard-card ${hasAlert ? 'dashboard-card-alert' : ''}`}
         onClick={() => onSelectContact(contact)}
       >
-        <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div style={{ position: 'relative'}}>
           <img
             src={contact.image || "/images/user-example.svg"}
             alt={contact.name || "User image"}
-            className="dashboard-card-img"
+            className="dashboard-card-img avatar"
           />
           <PresenceIndicator isOnline={isOnline} />
-          {contact.hasActiveAlert && <AlertBadge />}
+          {hasAlert && <AlertBadge />}
         </div>
-        <h3>{contact.name.split(" ")[0]}</h3>
+        <h3 className={hasAlert ? 'alert-text' : ''}>{contact.name.split(" ")[0]}</h3>
+        {hasAlert && <p className="alert-label">SOS ACTIVE</p>}
       </li>
     );
   };
@@ -92,7 +83,7 @@ export default function DashboardUser({
     <>
       <div className="dashboard-user">
         <div className="dashboard-user-img">
-          <img src={user?.image || "/images/user-example.svg"} alt="User" className="user-img"/>
+          <img src={user?.image || "/images/user-example.svg"} alt="User" className="user-img avatar"/>
         </div>
         <div className="dashboard-user-info">
           <p>Hey there,</p>
@@ -112,6 +103,12 @@ export default function DashboardUser({
               </div>
               <div className="scrollable">
                 <ul>
+                  {/* {contacts.filter((c) => c.role === "mutual").map((contact, index) => (
+                    <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
+                        <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img avatar"/>
+                        <h3>{contact.name.split(" ")[0]}</h3>
+                      </li>
+                  ))}            */}
                   {contactCards
                     .filter((c) => c.role === "mutual")
                     .map((contact, index) => renderContactCard(contact, index))}           
@@ -123,6 +120,12 @@ export default function DashboardUser({
               <h2>Dependent</h2>
               <div className="scrollable">
                 <ul>
+                  {/* {contacts.filter((c) => c.role === "dependent").map((contact, index) => (
+                    <li key={index} className="dashboard-card" onClick={() => onSelectContact(contact)}>
+                        <img src={contact.image || "/images/user-example.svg"} alt={contact.image || "User image"} className="dashboard-card-img avatar"/>
+                        <h3>{contact.name.split(" ")[0]}</h3>
+                      </li>
+                  ))} */}
                   {contactCards
                     .filter((c) => c.role === "dependent")
                     .map((contact, index) => renderContactCard(contact, index))}
@@ -131,8 +134,7 @@ export default function DashboardUser({
             </div>
           </>
         ) : (
-          <div onClick={() => navigate('/addContact')}>
-            
+          <div>
             <h3>Oops! looks like you don't have any contacts yet</h3>
             <p><span className="uline-btn" onClick={() => navigate('/addContact')}>Add a contact</span> to get started</p>
           </div>

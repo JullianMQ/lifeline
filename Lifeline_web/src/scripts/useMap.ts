@@ -1,13 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
-import type { LatLng } from "../types";
-
-interface MarkerData extends LatLng {
-  id?: string;
-  name?: string;
-}
+import { useState, useCallback } from "react";
+import type { pinMarker } from "../types";
 
 export function useMap() {
-  const [markers, setMarkers] = useState<MarkerData[]>([]);
+  const [markers, setMarkers] = useState<pinMarker[]>([]);
+  const [pinIcon, setPinIcon] = useState<string>("");
   const [address, setAddress] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   
@@ -35,40 +31,46 @@ export function useMap() {
     }
   }, []);
 
-  // Add or update a marker based on id
-  const handleLocation = useCallback((contact: { id?: string; name?: string; location?: { lat: number; lng: number } }) => {
-    if (!contact?.location) {
-      console.log("[useMap] handleLocation called without location:", contact);
+  async function handleLocation(contact: any) {
+    if (!contact?.location){
       return;
     }
     
     const { lat, lng } = contact.location;
-    const id = contact.id || contact.name || `${lat},${lng}`;
-    
-    console.log("[useMap] handleLocation:", { id, name: contact.name, lat, lng });
-    
+    if (contact.image) {
+      setPinIcon(contact.image);
+    }
     setMarkers((prev) => {
-      const existingIndex = prev.findIndex(p => p.id === id);
+      // Check if a marker for this contact already exists (by id)
+      const existingIndex = prev.findIndex(p => p.contact?.id === contact.id || p.id === contact.id);
       
       if (existingIndex >= 0) {
-        // Update existing marker
         const existing = prev[existingIndex];
-        if (existing.lat === lat && existing.lng === lng) {
-          console.log("[useMap] Marker unchanged for", id);
-          return prev; // No change needed
+        const isSameLocation = existing.lat === lat && existing.lng === lng;
+        const isSameImage = existing.image === contact.image;
+        const isSameContact = existing.contact === contact;
+        if (isSameLocation && isSameImage && isSameContact) {
+          return prev;
         }
-        
-        console.log("[useMap] Updating marker for", id, "from", existing.lat, existing.lng, "to", lat, lng);
+        // Update the existing marker with new coordinates (remove old, add updated)
         const updated = [...prev];
-        updated[existingIndex] = { ...existing, lat, lng };
+        updated[existingIndex] = { 
+          ...existing, 
+          lat, 
+          lng, 
+          image: contact.image, 
+          contact,
+          id: contact.id 
+        };
+        console.log("[useMap] Updated existing marker for:", contact.name || contact.id, { lat, lng });
         return updated;
       }
       
-      // Add new marker
-      console.log("[useMap] Adding new marker for", id);
-      return [...prev, { id, name: contact.name, lat, lng }];
+      // No existing marker, add a new one
+      console.log("[useMap] Adding new marker for:", contact.name || contact.id, { lat, lng });
+      return [...prev, { lat, lng, image: contact.image, contact, id: contact.id }];
     });
-  }, []);
+  }
 
   // Update a specific marker by id
   const updateMarker = useCallback((id: string, lat: number, lng: number) => {
@@ -93,6 +95,7 @@ export function useMap() {
 
   const resetLocations = useCallback(() => {
     setMarkers([]);
+    setPinIcon("");
     setAddress("");
     setLoading(false);
   }, []);
@@ -105,6 +108,7 @@ export function useMap() {
     resetLocations,
     getGeocode, 
     setAddress,
+    pinIcon,
     updateMarker,
   };
 }

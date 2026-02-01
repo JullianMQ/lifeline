@@ -4,6 +4,7 @@ import { auth } from "../lib/auth";
 import type { AuthType } from "../lib/auth";
 import { randomBytes } from "crypto";
 import { dbPool } from "../lib/db";
+import { debugWs } from "../lib/debug";
 
 type User = NonNullable<typeof auth.$Infer.Session.user>;
 
@@ -771,7 +772,7 @@ ws.get('/ws', upgradeWebSocket((c) => {
             };
 
             clients.set(clientId, clientInfo);
-            console.log(`[${new Date().toISOString()}] ${user?.name || "Unknown"} (${clientId}) connected to WebSocket`);
+            debugWs.log(`[${new Date().toISOString()}] ${user?.name || "Unknown"} (${clientId}) connected to WebSocket`);
 
             await autoJoinEmergencyContacts(clientId, clientInfo);
 

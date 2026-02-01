@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import "../styles/dashboard.css";
 import { useDashboard } from "../scripts/useDashboard";
 import { useNavigate } from "react-router-dom";
@@ -8,13 +8,145 @@ import DashboardContact from "../components/DashboardContact";
 import { useMap } from "../scripts/useMap";
 import type { ContactCard } from "../types/realtime";
 
+/** Alert Modal Component */
+function AlertModal({
+  alerts,
+  contactCards,
+  onAcknowledge,
+  onViewContact,
+  onClose,
+}: {
+  alerts: Array<{
+    id: string;
+    emergencyUserId: string;
+    emergencyUserName: string;
+    message: string;
+    timestamp?: string;
+  }>;
+  contactCards: ContactCard[];
+  onAcknowledge: (alertId: string) => void;
+  onViewContact: (contact: ContactCard) => void;
+  onClose: () => void;
+}) {
+  if (alerts.length === 0) return null;
+
+  // Find contact by matching emergencyUserId with contact.id or by phone
+  const findContactForAlert = (alert: {
+    emergencyUserId: string;
+    emergencyUserName: string;
+  }) => {
+    // First try to find by user ID
+    let contact = contactCards.find((c) => c.id === alert.emergencyUserId);
+
+    // If not found, try to find by matching the roomId pattern (which contains phone)
+    if (!contact) {
+      contact = contactCards.find((c) => c.name === alert.emergencyUserName);
+    }
+
+    return contact;
+  };
+
+  return (
+    <div className="alert-modal-overlay" onClick={onClose}>
+      <div className="alert-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="alert-modal-header">
+          <span className="alert-modal-header-icon">!</span>
+          <h2>Emergency Alert{alerts.length > 1 ? "s" : ""}</h2>
+        </div>
+        <div className="alert-modal-body">
+          {alerts.map((alert) => {
+            const contact = findContactForAlert(alert);
+
+            return (
+              <div key={alert.id} className="alert-modal-item">
+                <div className="alert-modal-item-icon">
+                  {alert.emergencyUserName.charAt(0).toUpperCase()}
+                </div>
+                <div className="alert-modal-item-content">
+                  <span className="alert-modal-item-name">
+                    {alert.emergencyUserName}
+                  </span>
+                  <span className="alert-modal-item-message">
+                    {alert.message}
+                  </span>
+                  {contact?.phone && (
+                    <span className="alert-modal-item-phone">
+                      {contact.phone}
+                    </span>
+                  )}
+                  {alert.timestamp && (
+                    <span className="alert-modal-item-time">
+                      {new Date(alert.timestamp).toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+                <div className="alert-modal-item-actions">
+                  <button
+                    className="alert-view-btn"
+                    onClick={() => {
+                      if (contact) {
+                        console.log(
+                          "[AlertModal] Viewing contact:",
+                          contact.id,
+                          contact.name,
+                          contact.phone,
+                        );
+                        onViewContact(contact);
+                        onClose();
+                      } else {
+                        console.warn(
+                          "[AlertModal] Could not find contact for alert:",
+                          alert,
+                        );
+                      }
+                    }}
+                    disabled={!contact}
+                  >
+                    View
+                  </button>
+                  <button
+                    className="alert-acknowledge-btn"
+                    onClick={() => onAcknowledge(alert.id)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="alert-modal-footer">
+          <button className="alert-modal-close-btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const navigate = useNavigate();
   // Store only the contact ID, not the whole object - this ensures we always get fresh data
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const [history, setHistory] = useState<Record<string, { time: string; lat: number; lng: number }[]>>({});
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(
+    null,
+  );
+  const [history, setHistory] = useState<
+    Record<string, { time: string; lat: number; lng: number }[]>
+  >({});
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
+  const prevAlertsSignature = useRef<string>("");
 
-  const { markers, loading, handleLocation, getGeocode, setAddress, address, updateMarker } = useMap();
+  const {
+    markers,
+    loading,
+    handleLocation,
+    getGeocode,
+    setAddress,
+    address,
+    updateMarker,
+  } = useMap();
   const {
     user,
     handleLogout,
@@ -26,11 +158,28 @@ function Dashboard() {
     manualReconnect,
   } = useDashboard();
 
+  // Show modal automatically when new alerts come in
+  useEffect(() => {
+    const signature = activeAlerts
+      .map((alert) => `${alert.id}:${alert.timestamp ?? ""}:${alert.message}`)
+      .join("|");
+
+    if (activeAlerts.length > 0 && signature !== prevAlertsSignature.current) {
+      if (!userClosedAlertModal) {
+        setShowAlertModal(true);
+      }
+      prevAlertsSignature.current = signature;
+      if (userClosedAlertModal) {
+        setUserClosedAlertModal(false);
+      }
+    }
+  }, [activeAlerts, userClosedAlertModal]);
+
   // Derive selectedContact from contactCards using the stored ID
   // This ensures we always have the latest data when contactCards updates
   const selectedContact = useMemo(() => {
     if (!selectedContactId) return null;
-    const contact = contactCards.find(c => c.id === selectedContactId);
+    const contact = contactCards.find((c) => c.id === selectedContactId);
     console.log("[Dashboard] Derived selectedContact:", {
       selectedContactId,
       found: !!contact,
@@ -45,7 +194,7 @@ function Dashboard() {
     console.log("[Dashboard] Selecting contact:", contact.id, contact.name);
     setSelectedContactId(contact.id);
     // Reset address when selecting new contact
-    setAddress("");
+    // setAddress("");
   };
 
   // Handle going back - clear the selected contact ID
@@ -58,19 +207,26 @@ function Dashboard() {
   // Handle location markers for user and contacts
   useEffect(() => {
     console.log("[Dashboard] Updating markers - contactCards changed");
-    console.log("[Dashboard] contactCards:", contactCards.map(c => ({
-      id: c.id,
-      name: c.name,
-      hasLocation: !!c.location,
-      coords: c.location?.coords,
-    })));
-    
+    console.log(
+      "[Dashboard] contactCards:",
+      contactCards.map((c) => ({
+        id: c.id,
+        name: c.name,
+        hasLocation: !!c.location,
+        coords: c.location?.coords,
+      })),
+    );
+
     if (!contactCards) return;
-    
+
     // Update markers for all contacts with locations
     contactCards.forEach((c) => {
       if (c.location?.coords) {
-        console.log("[Dashboard] Updating marker for", c.name, c.location.coords);
+        console.log(
+          "[Dashboard] Updating marker for",
+          c.name,
+          c.location.coords,
+        );
         handleLocation({
           id: c.id,
           name: c.name,
@@ -79,7 +235,7 @@ function Dashboard() {
         });
       }
     });
-    
+
     // Also update user marker if available
     if (user?.location) {
       handleLocation(user);
@@ -93,13 +249,16 @@ function Dashboard() {
       return;
     }
     if (!selectedContact.location?.coords) {
-      console.log("[Dashboard] Selected contact has no location:", selectedContact.name);
+      console.log(
+        "[Dashboard] Selected contact has no location:",
+        selectedContact.name,
+      );
       return;
     }
 
     const lat = selectedContact.location.coords.lat;
     const lng = selectedContact.location.coords.lng;
-    
+
     console.log("[Dashboard] Selected contact location changed:", {
       name: selectedContact.name,
       lat,
@@ -132,7 +291,24 @@ function Dashboard() {
     }, 30000); // Poll less frequently since WebSocket provides real-time updates
 
     return () => clearInterval(interval);
-  }, [selectedContact?.id, selectedContact?.location?.coords?.lat, selectedContact?.location?.coords?.lng]);
+  }, [
+    selectedContact?.id,
+    selectedContact?.location?.coords?.lat,
+    selectedContact?.location?.coords?.lng,
+  ]);
+
+  // Handle viewing a contact from alert modal
+  const handleViewAlertContact = (contact: ContactCard) => {
+    console.log(
+      "[Dashboard] handleViewAlertContact:",
+      contact.id,
+      contact.name,
+      contact.phone,
+    );
+    if (contact) {
+      handleSelectContact(contact);
+    }
+  };
 
   // Get connection status indicator
   const getConnectionIndicator = () => {
@@ -157,12 +333,18 @@ function Dashboard() {
   // Get map center based on selected contact or user location
   const getMapCenter = () => {
     if (selectedContact?.location?.coords) {
-      return { lat: selectedContact.location.coords.lat, lng: selectedContact.location.coords.lng };
+      return {
+        lat: selectedContact.location.coords.lat,
+        lng: selectedContact.location.coords.lng,
+      };
     }
     // Try to get first contact with location
-    const contactWithLocation = contactCards.find(c => c.location?.coords);
+    const contactWithLocation = contactCards.find((c) => c.location?.coords);
     if (contactWithLocation?.location?.coords) {
-      return { lat: contactWithLocation.location.coords.lat, lng: contactWithLocation.location.coords.lng };
+      return {
+        lat: contactWithLocation.location.coords.lat,
+        lng: contactWithLocation.location.coords.lng,
+      };
     }
     // Fall back to user location or default
     return user?.location || DEFAULT_MAP_CENTER;
@@ -170,25 +352,18 @@ function Dashboard() {
 
   return (
     <main className="dashboard">
-      {/* Global Emergency Alerts Banner */}
-      {activeAlerts.length > 0 && (
-        <div className="alert-banner">
-          {activeAlerts.map((alert) => (
-            <div key={alert.id} className="alert-item">
-              <span className="alert-icon">!</span>
-              <span className="alert-message">
-                <strong>Emergency Alert:</strong> {alert.emergencyUserName} - {alert.message}
-              </span>
-              <button
-                className="alert-dismiss"
-                onClick={() => acknowledgeAlert(alert.id)}
-                aria-label="Acknowledge alert"
-              >
-                Acknowledge
-              </button>
-            </div>
-          ))}
-        </div>
+      {/* Emergency Alert Modal */}
+      {showAlertModal && activeAlerts.length > 0 && (
+        <AlertModal
+          alerts={activeAlerts}
+          contactCards={contactCards}
+          onAcknowledge={acknowledgeAlert}
+          onViewContact={handleViewAlertContact}
+          onClose={() => {
+            setShowAlertModal(false);
+            setUserClosedAlertModal(true);
+          }}
+        />
       )}
 
       <header>
@@ -201,7 +376,8 @@ function Dashboard() {
               style={{ backgroundColor: connectionIndicator.color }}
             />
             <span className="status-text">{connectionIndicator.text}</span>
-            {(connectionStatus === "error" || connectionStatus === "disconnected") && (
+            {(connectionStatus === "error" ||
+              connectionStatus === "disconnected") && (
               <button className="reconnect-btn" onClick={manualReconnect}>
                 Reconnect
               </button>
@@ -211,6 +387,20 @@ function Dashboard() {
             <span className="connection-error" title={connectionError}>
               {connectionError}
             </span>
+          )}
+          {activeAlerts.length > 0 && !showAlertModal && (
+            <button
+              className="alert-indicator-btn"
+              onClick={() => {
+                console.log("activeAlerts:", activeAlerts);
+                setShowAlertModal(true);
+                setUserClosedAlertModal(false);
+              }}
+              title={`${activeAlerts.length} active alert${activeAlerts.length > 1 ? "s" : ""}`}
+            >
+              <span className="alert-indicator-icon">!</span>
+              <span>{activeAlerts.length}</span>
+            </button>
           )}
           <p className="uline-btn" onClick={handleLogout}>
             LOGOUT
@@ -245,7 +435,12 @@ function Dashboard() {
         </div>
 
         <div className="map">
-          <DashboardMap markers={markers} loading={loading} center={getMapCenter()} />
+          <DashboardMap
+            markers={markers}
+            loading={loading}
+            center={getMapCenter()}
+            onSelectContact={handleSelectContact}
+          />
         </div>
       </section>
       <footer></footer>

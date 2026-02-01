@@ -173,7 +173,7 @@ Mobile App → Backend /api/ws → useWebSocket (state) → useDashboard (select
 ## 6. Operational Notes
 
 - **Environments**:  
-  - Dev: `ws://localhost:<api-port>/api/ws` (likely 3001).  
+  - Dev: `ws://localhost:<api-port>/api/ws` (likely 3000).  
   - Prod: `wss://<hosted-domain>/api/ws`.  
 - **Retry Strategy**: automatic for first three failures, then UI button. Log every failure with timestamp for debugging.  
 - **Graceful Degradation**: if socket stays down, show cached last known location and a banner explaining that data may be stale; no HTTP polling fallback needed for capstone.  

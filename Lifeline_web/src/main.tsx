@@ -10,6 +10,7 @@ import PhoneNumber from "./pages/phoneNumber.tsx"
 import Dashboard from "./pages/dashboard.tsx"
 import AddContact from "./pages/addContact.tsx"
 import Profile from "./pages/profile.tsx"
+import Unauthorized from "./pages/unauthorized.tsx"
 import { ProtectedRoutes } from "./scripts/ProtectedRoute"
 
 createRoot(document.getElementById("root")!).render(
@@ -17,6 +18,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/login" element={<ProtectedRoutes mode="public"><Login /></ProtectedRoutes>} />
         <Route path="/signup" element={<ProtectedRoutes mode="public"><Signup /></ProtectedRoutes>} />
 
