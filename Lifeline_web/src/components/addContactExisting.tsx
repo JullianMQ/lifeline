@@ -42,7 +42,7 @@ function AddContactExisting({ setMode }: Props) {
                     <>
                         <h2>Add this account?</h2>
                         <div className="add-cont">
-                            <img src={fetchedUser.image || "../images/user-example.svg"} alt={fetchedUser.name}/>
+                            <img src={fetchedUser.image || "../images/user-example.svg"} alt={fetchedUser.name} className="avatar"/>
                             <h3>{fetchedUser.name}</h3>
                         </div>
                     </>

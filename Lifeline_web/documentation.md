@@ -114,3 +114,9 @@ npm install
 ### 2026-01-23
 
 - Mobile and tablet responsiveness for all pages
+
+### 2026-01-28
+
+- Added user and contact icon as Google Map pin
+- Implemented pin onclick function to view details
+- Fixed user location pin 

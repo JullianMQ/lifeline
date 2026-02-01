@@ -39,7 +39,7 @@ export default function AvatarModal({
                         checked={value === path}
                         onChange={onChange}
                         />
-                        <img src={path} className="avatar-img" alt={avatar}/>
+                        <img src={path} className="avatar-img avatar" alt={avatar}/>
                     </label>
                 );
             })}

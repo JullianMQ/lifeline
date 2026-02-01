@@ -12,14 +12,12 @@ export function googleAuth() {
 
     const signInWithGoogle = async () => {
         try {
-            const data = await authClient.signIn.social({
+            await authClient.signIn.social({
                 provider: "google",
                 callbackURL: `${window.location.origin}/dashboard`,
                 newUserCallbackURL: `${window.location.origin}/addContact`,
                 disableRedirect: false,
             });
-            // TODO: DELETE CONSOLE LOGS
-            // console.log("Data:", data)
             const res = await fetch(`${API_BASE_URL}/api/auth/get-session`, { credentials: "include", });
             const session = await res.json();
 

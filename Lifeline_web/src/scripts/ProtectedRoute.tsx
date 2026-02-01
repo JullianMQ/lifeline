@@ -25,9 +25,9 @@ export function ProtectedRoutes({
         });
         const data = await res.json();
         if (data.user.role === "dependent") {
-          setSession(null);
           await authClient.signOut();
-          return false;
+          setSession({ unauthorized: true });
+          return;
         }
         setSession(data.user || null);
       } catch {
@@ -44,6 +44,9 @@ export function ProtectedRoutes({
   if (mode === "protected") {
     if (!session) {
       return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+    if (session.unauthorized) {
+      return <Navigate to="/unauthorized" replace />;
     }
     if (!session.phone_no && location.pathname !== "/phoneNumber") {
       return <Navigate to="/phoneNumber" state={{ from: location }} replace />;
