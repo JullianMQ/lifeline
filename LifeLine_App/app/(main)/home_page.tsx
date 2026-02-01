@@ -9,24 +9,17 @@ import reverseGeocodeWithGoogle from "@/lib/services/geocode";
 import { SensorContext } from "@/lib/context/sensor_context";
 import { useWS } from "@/lib/context/ws_context";
 
-// If you actually have this config, keep it. If not, remove the REST call block.
-import { API_BASE_URL } from "@/lib/api/config";
+import {
+    startForegroundLocationSharing,
+    stopForegroundLocationSharing,
+    startBackgroundLocationUploads,
+    stopBackgroundLocationUploads,
+    setRoomIdForBackgroundUploads,
+} from "@/lib/services/background_location";
 
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
-
-    const {
-        isConnected,
-        clientId,
-        rooms,
-        activeRoomId,
-        serverTimestamp,
-        lastMessage,
-        lastError,
-        ensureMyRoom,
-        sendToRoom,
-        sos,
-    } = useWS();
+    const { isConnected, activeRoomId, serverTimestamp, lastError, ensureMyRoom, sos } = useWS();
 
     const [messageReply, setMessageReply] = useState("");
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -34,6 +27,7 @@ export default function HomePage() {
     const [locationLoading, setLocationLoading] = useState(true);
     const [isSOSSending, setIsSOSSending] = useState(false);
 
+    // Fetch user location (for the map UI only)
     // Fetch user location (for the map UI only)
     useEffect(() => {
         (async () => {
@@ -48,8 +42,6 @@ export default function HomePage() {
 
                 const googleAddress = await reverseGeocodeWithGoogle(loc.coords.latitude, loc.coords.longitude);
                 setAddress(googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
-                const googleAddress = await reverseGeocodeWithGoogle(loc.coords.latitude, loc.coords.longitude);
-                setAddress(googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
             } catch (err) {
                 console.log("Error fetching location:", err);
             } finally {
@@ -58,93 +50,39 @@ export default function HomePage() {
         })();
     }, []);
 
-    // Ensure we end up in "my room" once socket + clientId are ready.
-    // This uses join-first then create-fallback, so it won't spam "room already exists".
+    // Create/ensure a room ONLY when monitoring starts
     useEffect(() => {
-        if (!isConnected) return;
-        if (!clientId) return;
+        if (!isMonitoring) return;
+        if (activeRoomId) return;
+        ensureMyRoom();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMonitoring, activeRoomId]);
 
-        // Only ensure if we truly have no rooms yet
-        if (!rooms.length) {
-            ensureMyRoom();
-        }
-    }, [isConnected, clientId, rooms.length, ensureMyRoom]);
-
-    // Handle incoming WS messages (matches integration test flow)
+    // When we have an active room, cache it for REST fallback (background task)
     useEffect(() => {
-        if (!lastMessage) return;
-
-        switch (lastMessage.type) {
-            case "room-message": {
-                const text =
-                    typeof lastMessage.content === "string"
-                        ? lastMessage.content
-                        : lastMessage.content?.text ?? JSON.stringify(lastMessage.content);
-
-                setMessageReply(`${lastMessage.user?.name ?? "Unknown"}: ${text}`);
-                break;
-            }
-
-            case "location-update": {
-                setMessageReply(
-                    `Location update: (${lastMessage.latitude.toFixed(5)}, ${lastMessage.longitude.toFixed(5)})`
-                );
-                break;
-            }
-
-            case "emergency-alert": {
-                setMessageReply(`EMERGENCY ALERT: ${lastMessage.message}`);
-                break;
-            }
-
-            case "emergency-confirmed": {
-                setMessageReply(`SOS confirmed. Activated rooms: ${lastMessage.activatedRooms.join(", ")}`);
-                break;
-            }
-
-            case "emergency-activated": {
-                setMessageReply(`Emergency activated in room: ${lastMessage.roomId}`);
-                break;
-            }
-
-            case "join-denied":
-            case "error": {
-                setMessageReply(`Error: ${lastMessage.message}`);
-                break;
-            }
-
-            default:
-                break;
-        }
-    }, [lastMessage]);
-
-    const serverTimeLabel = useMemo(() => {
-        if (!serverTimestamp) return "Connecting...";
-        try {
-            return new Date(serverTimestamp).toLocaleTimeString();
-        } catch {
-            return serverTimestamp;
-        }
-    }, [serverTimestamp]);
-
-    async function postLocationToApi() {
-        if (!API_BASE_URL) return;
-        if (!location) return;
         if (!activeRoomId) return;
+        setRoomIdForBackgroundUploads(activeRoomId);
+    }, [activeRoomId]);
 
-        await fetch(`${API_BASE_URL}/api/location`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            // include cookies if your auth uses cookie sessions
-            credentials: "include" as any,
-            body: JSON.stringify({
-                roomId: activeRoomId,
-                latitude: location.latitude,
-                longitude: location.longitude,
-                address,
-            }),
-        });
-    }
+    // Start/stop location sharing based on monitoring.
+    // Foreground: WS-first every ~60s (HTTP fallback if WS is down)
+    // Background: HTTP fallback every ~60s (Expo task)
+    useEffect(() => {
+        if (!isMonitoring) {
+            stopForegroundLocationSharing();
+            stopBackgroundLocationUploads();
+            return;
+        }
+
+        // Start both; background task will only succeed once roomId is cached.
+        startForegroundLocationSharing();
+        startBackgroundLocationUploads();
+
+        return () => {
+            stopForegroundLocationSharing();
+            stopBackgroundLocationUploads();
+        };
+    }, [isMonitoring]);
 
     const handleSOS = async () => {
         // guard: avoid confusing warnings + guarantee room scoped actions
@@ -218,6 +156,7 @@ export default function HomePage() {
             <View className="mx-4 mt-3">
                 <Text className="text-s text-gray-500">You are at:</Text>
 
+
                 {address ? (
                     <Text className="text-xl font-semibold">{address}</Text>
                 ) : location ? (
@@ -231,11 +170,14 @@ export default function HomePage() {
 
             {/* WS STATUS */}
             <View className="mx-4 mt-4">
-                <Text className="text-gray-600">Server Time:</Text>
-                <Text className="text-lg font-semibold">{serverTimeLabel}</Text>
+                <Text className="text-gray-600">WebSocket:</Text>
+                <Text className="text-base font-semibold">
+                    {isConnected ? `connected | ${activeRoomId ?? "no room"}` : "disconnected"}
+                </Text>
 
-                <Text className="text-gray-500 mt-2">
-                    WS: {isConnected ? "connected" : "connecting"} {activeRoomId ? `| active room: ${activeRoomId}` : "| no room"}
+                <Text className="text-gray-600 mt-2">Server Time:</Text>
+                <Text className="text-lg font-semibold">
+                    {serverTimestamp ? new Date(serverTimestamp).toLocaleTimeString() : "—"}
                 </Text>
 
                 {lastError ? <Text className="text-red-600 mt-1">{lastError}</Text> : null}

@@ -80,6 +80,9 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
     const myRoomCreatedRef = useRef(false);
     const creatingMyRoomRef = useRef(false);
 
+    // We only treat the server room list as truth after we receive "connected".
+    const hasHandshakeRef = useRef(false);
+
     // de-dupe notifications
     const seenNotifRef = useRef<Set<string>>(new Set());
 
@@ -119,10 +122,13 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
     };
 
     const ensureMyRoomInternal = async () => {
-        const myRoomId = myRoomIdRef.current;
-        if (!myRoomId) return;
+        // Spec: roomIds in the "connected" handshake is server-truth.
+        // Do NOT create a room until we have received that handshake.
+        if (!hasHandshakeRef.current) return;
 
-        if (myRoomCreatedRef.current) return;
+        // Doc: only create a room when we truly have none.
+        // Let the server generate the roomId to avoid "Room already exists".
+        if (getJoinedRooms().length > 0) return;
         if (creatingMyRoomRef.current) return;
 
         creatingMyRoomRef.current = true;
@@ -147,6 +153,19 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 setClientId((msg as any).clientId);
                 setUser((msg as any).user);
                 setLastError(null);
+
+                hasHandshakeRef.current = true;
+
+                // server truth (doc)
+                const roomIds: string[] = Array.isArray((msg as any).roomIds) ? (msg as any).roomIds : [];
+                setRooms(roomIds);
+
+                // pick an active room if we don't have one
+                const active = activeRoomIdState ?? getActiveRoom();
+                if (!active && roomIds.length) {
+                    setActiveRoom(roomIds[0]);
+                    setActiveRoomIdState(roomIds[0]);
+                }
 
                 // reset per-connection flags
                 myRoomCreatedRef.current = false;
@@ -210,9 +229,59 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 break;
             }
 
-            case "room-message": {
-                // OPTIONAL: if you want room messages to appear in notifications, turn this back on.
-                // By default: keep it quiet and only show emergency alerts.
+            case "emergency-confirmed": {
+                const m = msg as any;
+                addNotif({
+                    type: "emergency-confirmed",
+                    message: `Emergency confirmed${Array.isArray(m.activatedRooms) ? ` (${m.activatedRooms.length} room(s))` : ""
+                        }`,
+                    timestamp: m.timestamp,
+                });
+                break;
+            }
+
+            case "emergency-activated": {
+                const m = msg as any;
+                addNotif({
+                    type: "emergency-activated",
+                    message: `Emergency activated in room ${m.roomId}`,
+                    timestamp: m.timestamp,
+                    roomId: m.roomId,
+                    fromUser: { id: m.clientId, name: m.userName },
+                });
+                break;
+            }
+
+            case "user-joined": {
+                const m = msg as any;
+                addNotif({
+                    type: "user-joined",
+                    message: `${m.user?.name ?? "A user"} joined`,
+                    timestamp: m.timestamp,
+                    fromUser: { id: m.clientId, name: m.user?.name },
+                });
+                break;
+            }
+
+            case "user-left": {
+                const m = msg as any;
+                addNotif({
+                    type: "user-left",
+                    message: `${m.userName ?? "A user"} left`,
+                    timestamp: m.timestamp,
+                    fromUser: { id: m.clientId, name: m.userName },
+                });
+                break;
+            }
+
+            case "emergency-contact-joined": {
+                const m = msg as any;
+                addNotif({
+                    type: "emergency-contact-joined",
+                    message: `${m.contactName ?? "Emergency contact"} joined`,
+                    timestamp: m.timestamp,
+                    fromUser: { id: m.contactId, name: m.contactName },
+                });
                 break;
             }
 
@@ -231,13 +300,14 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
             onMessage: handleMessage,
             onClose: () => {
                 setIsConnected(false);
-                setRooms([]);
-                setActiveRoomIdState(null);
-                setLastError(null);
-                setRoomUsers({});
+
+                // Keep last-known rooms/active room for mobile REST fallback.
+                // The next "connected" handshake will rehydrate server-truth anyway.
                 myRoomIdRef.current = null;
                 myRoomCreatedRef.current = false;
                 creatingMyRoomRef.current = false;
+
+                hasHandshakeRef.current = false;
             },
             onError: (e) => {
                 console.log("WS onError", e);
@@ -252,29 +322,11 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // reflect socket state
-    useEffect(() => {
-        const t = setInterval(() => setIsConnected(isWSOpen()), 400);
-        return () => clearInterval(t);
-    }, []);
-
     // Optional: background/foreground handling (do NOT disconnect on "inactive" which happens during navigation)
     useEffect(() => {
         const sub = AppState.addEventListener("change", (nextState) => {
-            const prev = appStateRef.current;
-            appStateRef.current = nextState;
-
-            const wentBackground = prev === "active" && nextState === "background";
-            const cameForeground = prev === "background" && nextState === "active";
-
-            if (wentBackground) {
-                // If you want "always-on" websocket even in background, remove this.
-                disconnectWS();
-                setIsConnected(false);
-            }
-
-            if (cameForeground) {
-                if (!isWSOpen()) connectOnce();
+            if (nextState === "active") {
+                if (!isWSConnected()) connectOnce();
             }
         });
 

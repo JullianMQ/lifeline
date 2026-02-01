@@ -175,6 +175,16 @@ export function joinRoom(roomId: string) {
     emit({ type: "join-room", roomId });
 }
 
+export async function requestJoin(roomId: string) {
+    await waitForOpen();
+    safeEmit({ type: "request-join", roomId });
+}
+
+export async function approveJoin(roomId: string, requesterId: string) {
+    await waitForOpen();
+    safeEmit({ type: "approve-join", roomId, requesterId });
+}
+
 export function sendRoomMessage(content: any, roomId?: string) {
     const rid = roomId ?? activeRoomId;
     if (!rid) {
