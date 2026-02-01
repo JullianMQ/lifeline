@@ -16,7 +16,13 @@ function AlertModal({
   onViewContact,
   onClose,
 }: {
-  alerts: Array<{ id: string; emergencyUserId: string; emergencyUserName: string; message: string; timestamp?: string }>;
+  alerts: Array<{
+    id: string;
+    emergencyUserId: string;
+    emergencyUserName: string;
+    message: string;
+    timestamp?: string;
+  }>;
   contactCards: ContactCard[];
   onAcknowledge: (alertId: string) => void;
   onViewContact: (contact: ContactCard) => void;
@@ -25,15 +31,18 @@ function AlertModal({
   if (alerts.length === 0) return null;
 
   // Find contact by matching emergencyUserId with contact.id or by phone
-  const findContactForAlert = (alert: { emergencyUserId: string; emergencyUserName: string }) => {
+  const findContactForAlert = (alert: {
+    emergencyUserId: string;
+    emergencyUserName: string;
+  }) => {
     // First try to find by user ID
-    let contact = contactCards.find(c => c.id === alert.emergencyUserId);
-    
+    let contact = contactCards.find((c) => c.id === alert.emergencyUserId);
+
     // If not found, try to find by matching the roomId pattern (which contains phone)
     if (!contact) {
-      contact = contactCards.find(c => c.name === alert.emergencyUserName);
+      contact = contactCards.find((c) => c.name === alert.emergencyUserName);
     }
-    
+
     return contact;
   };
 
@@ -42,22 +51,28 @@ function AlertModal({
       <div className="alert-modal" onClick={(e) => e.stopPropagation()}>
         <div className="alert-modal-header">
           <span className="alert-modal-header-icon">!</span>
-          <h2>Emergency Alert{alerts.length > 1 ? 's' : ''}</h2>
+          <h2>Emergency Alert{alerts.length > 1 ? "s" : ""}</h2>
         </div>
         <div className="alert-modal-body">
           {alerts.map((alert) => {
             const contact = findContactForAlert(alert);
-            
+
             return (
               <div key={alert.id} className="alert-modal-item">
                 <div className="alert-modal-item-icon">
                   {alert.emergencyUserName.charAt(0).toUpperCase()}
                 </div>
                 <div className="alert-modal-item-content">
-                  <span className="alert-modal-item-name">{alert.emergencyUserName}</span>
-                  <span className="alert-modal-item-message">{alert.message}</span>
+                  <span className="alert-modal-item-name">
+                    {alert.emergencyUserName}
+                  </span>
+                  <span className="alert-modal-item-message">
+                    {alert.message}
+                  </span>
                   {contact?.phone && (
-                    <span className="alert-modal-item-phone">{contact.phone}</span>
+                    <span className="alert-modal-item-phone">
+                      {contact.phone}
+                    </span>
                   )}
                   {alert.timestamp && (
                     <span className="alert-modal-item-time">
@@ -70,11 +85,19 @@ function AlertModal({
                     className="alert-view-btn"
                     onClick={() => {
                       if (contact) {
-                        console.log("[AlertModal] Viewing contact:", contact.id, contact.name, contact.phone);
+                        console.log(
+                          "[AlertModal] Viewing contact:",
+                          contact.id,
+                          contact.name,
+                          contact.phone,
+                        );
                         onViewContact(contact);
                         onClose();
                       } else {
-                        console.warn("[AlertModal] Could not find contact for alert:", alert);
+                        console.warn(
+                          "[AlertModal] Could not find contact for alert:",
+                          alert,
+                        );
                       }
                     }}
                     disabled={!contact}
@@ -105,11 +128,23 @@ function AlertModal({
 function Dashboard() {
   const navigate = useNavigate();
   // Store only the contact ID, not the whole object - this ensures we always get fresh data
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const [history, setHistory] = useState<Record<string, { time: string; lat: number; lng: number }[]>>({});
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(
+    null,
+  );
+  const [history, setHistory] = useState<
+    Record<string, { time: string; lat: number; lng: number }[]>
+  >({});
   const [showAlertModal, setShowAlertModal] = useState(false);
 
-  const { markers, loading, handleLocation, getGeocode, setAddress, address, updateMarker } = useMap();
+  const {
+    markers,
+    loading,
+    handleLocation,
+    getGeocode,
+    setAddress,
+    address,
+    updateMarker,
+  } = useMap();
   const {
     user,
     handleLogout,
@@ -132,7 +167,7 @@ function Dashboard() {
   // This ensures we always have the latest data when contactCards updates
   const selectedContact = useMemo(() => {
     if (!selectedContactId) return null;
-    const contact = contactCards.find(c => c.id === selectedContactId);
+    const contact = contactCards.find((c) => c.id === selectedContactId);
     console.log("[Dashboard] Derived selectedContact:", {
       selectedContactId,
       found: !!contact,
@@ -160,19 +195,26 @@ function Dashboard() {
   // Handle location markers for user and contacts
   useEffect(() => {
     console.log("[Dashboard] Updating markers - contactCards changed");
-    console.log("[Dashboard] contactCards:", contactCards.map(c => ({
-      id: c.id,
-      name: c.name,
-      hasLocation: !!c.location,
-      coords: c.location?.coords,
-    })));
-    
+    console.log(
+      "[Dashboard] contactCards:",
+      contactCards.map((c) => ({
+        id: c.id,
+        name: c.name,
+        hasLocation: !!c.location,
+        coords: c.location?.coords,
+      })),
+    );
+
     if (!contactCards) return;
-    
+
     // Update markers for all contacts with locations
     contactCards.forEach((c) => {
       if (c.location?.coords) {
-        console.log("[Dashboard] Updating marker for", c.name, c.location.coords);
+        console.log(
+          "[Dashboard] Updating marker for",
+          c.name,
+          c.location.coords,
+        );
         handleLocation({
           id: c.id,
           name: c.name,
@@ -181,7 +223,7 @@ function Dashboard() {
         });
       }
     });
-    
+
     // Also update user marker if available
     if (user?.location) {
       handleLocation(user);
@@ -195,13 +237,16 @@ function Dashboard() {
       return;
     }
     if (!selectedContact.location?.coords) {
-      console.log("[Dashboard] Selected contact has no location:", selectedContact.name);
+      console.log(
+        "[Dashboard] Selected contact has no location:",
+        selectedContact.name,
+      );
       return;
     }
 
     const lat = selectedContact.location.coords.lat;
     const lng = selectedContact.location.coords.lng;
-    
+
     console.log("[Dashboard] Selected contact location changed:", {
       name: selectedContact.name,
       lat,
@@ -234,11 +279,20 @@ function Dashboard() {
     }, 30000); // Poll less frequently since WebSocket provides real-time updates
 
     return () => clearInterval(interval);
-  }, [selectedContact?.id, selectedContact?.location?.coords?.lat, selectedContact?.location?.coords?.lng]);
+  }, [
+    selectedContact?.id,
+    selectedContact?.location?.coords?.lat,
+    selectedContact?.location?.coords?.lng,
+  ]);
 
   // Handle viewing a contact from alert modal
   const handleViewAlertContact = (contact: ContactCard) => {
-    console.log("[Dashboard] handleViewAlertContact:", contact.id, contact.name, contact.phone);
+    console.log(
+      "[Dashboard] handleViewAlertContact:",
+      contact.id,
+      contact.name,
+      contact.phone,
+    );
     if (contact) {
       handleSelectContact(contact);
     }
@@ -267,12 +321,18 @@ function Dashboard() {
   // Get map center based on selected contact or user location
   const getMapCenter = () => {
     if (selectedContact?.location?.coords) {
-      return { lat: selectedContact.location.coords.lat, lng: selectedContact.location.coords.lng };
+      return {
+        lat: selectedContact.location.coords.lat,
+        lng: selectedContact.location.coords.lng,
+      };
     }
     // Try to get first contact with location
-    const contactWithLocation = contactCards.find(c => c.location?.coords);
+    const contactWithLocation = contactCards.find((c) => c.location?.coords);
     if (contactWithLocation?.location?.coords) {
-      return { lat: contactWithLocation.location.coords.lat, lng: contactWithLocation.location.coords.lng };
+      return {
+        lat: contactWithLocation.location.coords.lat,
+        lng: contactWithLocation.location.coords.lng,
+      };
     }
     // Fall back to user location or default
     return user?.location || DEFAULT_MAP_CENTER;
@@ -301,7 +361,8 @@ function Dashboard() {
               style={{ backgroundColor: connectionIndicator.color }}
             />
             <span className="status-text">{connectionIndicator.text}</span>
-            {(connectionStatus === "error" || connectionStatus === "disconnected") && (
+            {(connectionStatus === "error" ||
+              connectionStatus === "disconnected") && (
               <button className="reconnect-btn" onClick={manualReconnect}>
                 Reconnect
               </button>
@@ -315,8 +376,11 @@ function Dashboard() {
           {activeAlerts.length > 0 && !showAlertModal && (
             <button
               className="alert-indicator-btn"
-              onClick={() => setShowAlertModal(true)}
-              title={`${activeAlerts.length} active alert${activeAlerts.length > 1 ? 's' : ''}`}
+              onClick={() => {
+                console.log("activeAlerts:", activeAlerts);
+                setShowAlertModal(true);
+              }}
+              title={`${activeAlerts.length} active alert${activeAlerts.length > 1 ? "s" : ""}`}
             >
               <span className="alert-indicator-icon">!</span>
               <span>{activeAlerts.length}</span>
@@ -355,7 +419,12 @@ function Dashboard() {
         </div>
 
         <div className="map">
-          <DashboardMap markers={markers} loading={loading} center={getMapCenter()} onSelectContact={handleSelectContact}/>
+          <DashboardMap
+            markers={markers}
+            loading={loading}
+            center={getMapCenter()}
+            onSelectContact={handleSelectContact}
+          />
         </div>
       </section>
       <footer></footer>
