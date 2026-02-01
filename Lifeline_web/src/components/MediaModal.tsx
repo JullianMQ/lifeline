@@ -90,8 +90,6 @@ export default function MediaModal({
     };
   }, []);
 
-  if (!open) return null;
-
   const handleImageClick = (file: MediaFile) => {
     if (file.media_type === "picture") {
       setPreviewFile(file);
@@ -107,13 +105,14 @@ export default function MediaModal({
   };
 
   const isSameOrigin = useMemo(() => {
+    if (!open) return true;
     if (!API_BASE_URL) return true;
     try {
       return new URL(API_BASE_URL, window.location.href).origin === window.location.origin;
     } catch {
       return true;
     }
-  }, [API_BASE_URL]);
+  }, [open]);
 
   const fetchMediaBlob = async (fileId: number) => {
     const response = await fetch(getDownloadUrl(fileId), {
@@ -177,6 +176,8 @@ export default function MediaModal({
       return next;
     });
   }, [files]);
+
+  if (!open) return null;
 
   return (
     <div className="modal media-modal-overlay" onClick={onClose}>

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS "media_files" (
     "web_view_link" TEXT,
     "web_content_link" TEXT,
     "description" TEXT,
+    "deleting" BOOLEAN NOT NULL DEFAULT FALSE,
     "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

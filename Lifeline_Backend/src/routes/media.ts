@@ -4,6 +4,7 @@ import { dbPool } from "../lib/db";
 import { getGoogleDriveService, MediaType, ALLOWED_MIME_TYPES, FILE_SIZE_LIMITS } from "../lib/googleDrive";
 import { debugMedia } from "../lib/debug";
 import { z } from "zod";
+import { Readable } from 'stream';
 
 type User = NonNullable<typeof auth.$Infer.Session.user>;
 
@@ -505,17 +506,17 @@ router.get("/media/files/:id/download", async (c) => {
             return c.json({ error: "Failed to retrieve file from storage" }, 500);
         }
 
-        // Convert stream to buffer for Hono response
-        const chunks: Buffer[] = [];
-        for await (const chunk of fileStream) {
-            chunks.push(Buffer.from(chunk));
-        }
-        const buffer = Buffer.concat(chunks);
+        // sanitize filename for Content-Disposition header
+        const sanitizedName = file.original_name
+            .replace(/["\\\r\n]/g, '_')
+            .replace(/[\x00-\x1F\x7F]/g, '_')
+            .substring(0, 255);
+        const encodedName = encodeURIComponent(file.original_name);
 
-        return new Response(buffer, {
+        return new Response(Readable.toWeb(fileStream), {
             headers: {
                 'Content-Type': file.mime_type,
-                'Content-Disposition': `attachment; filename="${file.original_name}"`,
+                'Content-Disposition': `attachment; filename="${sanitizedName}"; filename*=UTF-8''${encodedName}`,
                 'Content-Length': file.file_size.toString(),
             },
         });
@@ -552,16 +553,25 @@ router.delete("/media/files/:id", async (c) => {
             return c.json({ error: "Only the file owner can delete this file" }, 403);
         }
 
-        // Delete from Google Drive
         const driveService = getGoogleDriveService();
-        await driveService.deleteFile(file.drive_file_id);
 
-        // Delete from database
+        await dbPool.query(`UPDATE media_files SET deleting = TRUE WHERE id = $1`, [fileId]);
+
+        const deleted = await driveService.deleteFile(file.drive_file_id);
+        if (!deleted) {
+            throw new Error("Failed to delete file from storage");
+        }
+
         await dbPool.query(`DELETE FROM media_files WHERE id = $1`, [fileId]);
 
         return c.json({ success: true, message: "File deleted successfully" });
 
     } catch (error) {
+        try {
+            await dbPool.query(`UPDATE media_files SET deleting = FALSE WHERE id = $1`, [fileId]);
+        } catch (rollbackError) {
+            console.error('Failed to rollback deleting flag:', rollbackError);
+        }
         console.error('Error deleting file:', error);
         return c.json({ error: "Failed to delete file" }, 500);
     }
