@@ -1,58 +1,53 @@
+// lib/context/ws_context.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, AppStateStatus } from "react-native";
+import { AppState } from "react-native";
+
 import {
     connectWS,
     disconnectWS,
     createRoom,
-    joinRoom,
-    sendRoomMessage,
-    sendEmergencySOS,
-    getRoomUsers,
     getJoinedRooms,
     getActiveRoom,
     setActiveRoom,
-    isWSOpen,
+    getRoomUsers,
+    isWSConnected,
+    sendEmergencySOS,
     type ServerMessage,
 } from "@/lib/services/websocket";
 
-type RoomUsersMap = Record<string, any[]>;
-
 export type AppNotification = {
     id: string;
-    type: "emergency-alert" | "room-message" | "system";
+    type: string;
     message: string;
-    timestamp: string;
-    read: boolean;
+    timestamp?: string;
     roomId?: string;
-    fromUser?: any;
+    read: boolean;
+    fromUser?: { id: string; name?: string };
 };
 
 type WSContextValue = {
     isConnected: boolean;
     clientId: string | null;
     user: any | null;
-
     rooms: string[];
     activeRoomId: string | null;
-
     serverTimestamp: string | null;
-    lastMessage: ServerMessage | null;
     lastError: string | null;
 
+    roomUsers: Record<string, any[]>;
     notifications: AppNotification[];
+
+    ensureMyRoom: () => void;
+    sos: () => void;
+    refreshUsers: (roomId?: string) => void;
+
     markNotifRead: (id: string) => void;
     deleteNotif: (id: string) => void;
     clearNotifs: () => void;
 
-    ensureMyRoom: () => void;
-    joinRoomById: (roomId: string) => void;
     setActiveRoomId: (roomId: string) => void;
-
-    sendToRoom: (content: any, roomId?: string) => void;
-    sos: () => void;
-
-    roomUsers: RoomUsersMap;
-    refreshUsers: (roomId?: string) => void;
 };
 
 const WSContext = createContext<WSContextValue | null>(null);
@@ -66,16 +61,12 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
     const [activeRoomIdState, setActiveRoomIdState] = useState<string | null>(null);
 
     const [serverTimestamp, setServerTimestamp] = useState<string | null>(null);
-    const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null);
     const [lastError, setLastError] = useState<string | null>(null);
 
-    const [roomUsers, setRoomUsers] = useState<RoomUsersMap>({});
-
+    const [roomUsers, setRoomUsers] = useState<Record<string, any[]>>({});
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-    const appStateRef = useRef<AppStateStatus>(AppState.currentState);
-
-    // create-my-room is a one-shot per connection
+    // legacy refs kept, but we no longer invent custom room IDs
     const myRoomIdRef = useRef<string | null>(null);
     const myRoomCreatedRef = useRef(false);
     const creatingMyRoomRef = useRef(false);
@@ -119,27 +110,20 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
     };
 
     const ensureMyRoomInternal = async () => {
-        const myRoomId = myRoomIdRef.current;
-        if (!myRoomId) return;
-
-        if (myRoomCreatedRef.current) return;
+        // Doc: only create a room when we truly have none.
+        // Let the server generate the roomId to avoid "Room already exists".
+        if (rooms.length > 0) return;
         if (creatingMyRoomRef.current) return;
 
         creatingMyRoomRef.current = true;
-
-        // IMPORTANT: Create first.
-        // If backend replies "room already exists", you can then join (optional).
-        // But most backends auto-join the creator on "room-created".
         try {
-            await createRoom(myRoomId);
+            await createRoom();
         } finally {
-            // keep "creating" true until server confirms via "room-created" or "join-approved"
-            // We'll clear it in handleMessage.
+            // keep "creating" true until server confirms via "room-created"
         }
     };
 
     const handleMessage = (msg: ServerMessage) => {
-        setLastMessage(msg);
         if ("timestamp" in msg) setServerTimestamp((msg as any).timestamp);
 
         switch (msg.type) {
@@ -148,27 +132,22 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 setUser((msg as any).user);
                 setLastError(null);
 
+                // server truth (doc)
+                const roomIds: string[] = Array.isArray((msg as any).roomIds) ? (msg as any).roomIds : [];
+                setRooms(roomIds);
+
+                // pick an active room if we don't have one
+                const active = activeRoomIdState ?? getActiveRoom();
+                if (!active && roomIds.length) {
+                    setActiveRoom(roomIds[0]);
+                    setActiveRoomIdState(roomIds[0]);
+                }
+
                 // reset per-connection flags
                 myRoomCreatedRef.current = false;
                 creatingMyRoomRef.current = false;
+                myRoomIdRef.current = null;
 
-                myRoomIdRef.current = `user:${(msg as any).clientId}`;
-
-                syncRooms();
-
-                // ensure I have an owned room so SOS works for this user
-                ensureMyRoomInternal();
-                break;
-            }
-
-            // room success signals
-            case "room-created":
-            case "join-approved": {
-                if ((msg as any).roomId && (msg as any).roomId === myRoomIdRef.current) {
-                    myRoomCreatedRef.current = true;
-                    creatingMyRoomRef.current = false;
-                }
-                syncRooms();
                 break;
             }
 
@@ -178,46 +157,44 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 break;
             }
 
+            case "room-created":
+            case "join-approved": {
+                creatingMyRoomRef.current = false;
+                myRoomCreatedRef.current = true;
+                syncRooms();
+                break;
+            }
+
+            case "join-denied": {
+                setLastError((msg as any).message ?? "Join denied");
+                creatingMyRoomRef.current = false;
+                break;
+            }
+
             case "room-users": {
                 const m = msg as any;
                 if (m.roomId) setRoomUsers((prev) => ({ ...prev, [m.roomId]: m.users ?? [] }));
                 break;
             }
 
-            case "join-denied": {
-                // This can still happen when you explicitly join a room that doesn't exist.
-                // But we should NOT loop creating/joining here anymore.
-                setLastError((msg as any).message ?? "Join denied");
-                creatingMyRoomRef.current = false;
-                break;
-            }
-
             case "emergency-alert": {
                 const m = msg as any;
-
-                // Don't notify myself if I'm the one who triggered SOS
-                const ownerId = m.owner?.id ?? m.owner?.clientId ?? null;
                 const myId = user?.id ?? clientId ?? null;
-                if (ownerId && myId && ownerId === myId) break;
+                if (myId && m.emergencyUserId === myId) break;
 
                 addNotif({
                     type: "emergency-alert",
-                    message: m.message ?? "Emergency alert received",
+                    message: m.message ?? "Emergency alert",
                     timestamp: m.timestamp,
                     roomId: m.roomId,
-                    fromUser: m.owner,
+                    fromUser: { id: m.emergencyUserId, name: m.emergencyUserName },
                 });
-                break;
-            }
-
-            case "room-message": {
-                // OPTIONAL: if you want room messages to appear in notifications, turn this back on.
-                // By default: keep it quiet and only show emergency alerts.
                 break;
             }
 
             case "error": {
                 setLastError((msg as any).message ?? "WS error");
+                creatingMyRoomRef.current = false;
                 break;
             }
 
@@ -228,6 +205,7 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
     const connectOnce = () => {
         connectWS({
+            onOpen: () => setIsConnected(true),
             onMessage: handleMessage,
             onClose: () => {
                 setIsConnected(false);
@@ -254,27 +232,21 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
     // reflect socket state
     useEffect(() => {
-        const t = setInterval(() => setIsConnected(isWSOpen()), 400);
+        const t = setInterval(() => setIsConnected(isWSConnected()), 400);
         return () => clearInterval(t);
     }, []);
 
-    // Optional: background/foreground handling (do NOT disconnect on "inactive" which happens during navigation)
+    // Background/foreground handling (doc-friendly)
     useEffect(() => {
         const sub = AppState.addEventListener("change", (nextState) => {
-            const prev = appStateRef.current;
-            appStateRef.current = nextState;
-
-            const wentBackground = prev === "active" && nextState === "background";
-            const cameForeground = prev === "background" && nextState === "active";
-
-            if (wentBackground) {
-                // If you want "always-on" websocket even in background, remove this.
+            // Optional: disconnect in background to avoid mobile WS reliability/battery issues
+            if (nextState === "background") {
                 disconnectWS();
                 setIsConnected(false);
             }
 
-            if (cameForeground) {
-                if (!isWSOpen()) connectOnce();
+            if (nextState === "active") {
+                if (!isWSConnected()) connectOnce();
             }
         });
 
@@ -287,53 +259,41 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
     const setActiveRoomId = (roomId: string) => {
         setActiveRoom(roomId);
         setActiveRoomIdState(roomId);
-        syncRooms();
     };
 
     const ensureMyRoom = () => {
         ensureMyRoomInternal();
     };
 
-    const joinRoomById = (roomId: string) => {
-        joinRoom(roomId);
-    };
-
-    const sendToRoom = (content: any, roomId?: string) => {
-        const rid = roomId ?? activeRoomIdState ?? getActiveRoom() ?? undefined;
-        sendRoomMessage(content, rid);
-    };
-
     const sos = () => sendEmergencySOS();
 
-    const refreshUsers = (roomId?: string) => getRoomUsers(roomId);
+    const refreshUsers = (roomId?: string) => {
+        const rid = roomId ?? activeRoomIdState ?? getActiveRoom();
+        if (!rid) {
+            setLastError("No active room selected.");
+            return;
+        }
+        getRoomUsers(rid);
+    };
 
     const value = useMemo<WSContextValue>(
         () => ({
             isConnected,
             clientId,
             user,
-
             rooms,
             activeRoomId: activeRoomIdState ?? getActiveRoom(),
-
             serverTimestamp,
-            lastMessage,
             lastError,
-
+            roomUsers,
             notifications,
+            ensureMyRoom,
+            sos,
+            refreshUsers,
             markNotifRead,
             deleteNotif,
             clearNotifs,
-
-            ensureMyRoom,
-            joinRoomById,
             setActiveRoomId,
-
-            sendToRoom,
-            sos,
-
-            roomUsers,
-            refreshUsers,
         }),
         [
             isConnected,
@@ -342,10 +302,9 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
             rooms,
             activeRoomIdState,
             serverTimestamp,
-            lastMessage,
             lastError,
-            notifications,
             roomUsers,
+            notifications,
         ]
     );
 
@@ -354,6 +313,6 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
 export function useWS() {
     const ctx = useContext(WSContext);
-    if (!ctx) throw new Error("useWS must be used within WSProvider");
+    if (!ctx) throw new Error("useWS must be used inside WSProvider");
     return ctx;
 }
