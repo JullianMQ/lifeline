@@ -1,15 +1,15 @@
 import { Slot, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
+import { useEffect, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
 import { checkSession } from "../../lib/api/auth";
-import { getToken } from "@/lib/api/storage/user";
 import { WSProvider } from "@/lib/context/ws_context";
 
 export default function MainLayout() {
     const router = useRouter();
     const [checking, setChecking] = useState(true);
     const [isAuthed, setIsAuthed] = useState(false);
-    const [token, setToken] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -21,16 +21,10 @@ export default function MainLayout() {
 
                 if (!session) {
                     setIsAuthed(false);
-                    setToken(null);
                     router.replace("/(auth)/login");
-                    return;
+                } else {
+                    setIsAuthed(true);
                 }
-
-                setIsAuthed(true);
-
-                // For mobile WS auth we pass the stored token (Authorization: Bearer <token>)
-                const t = await getToken().catch(() => null);
-                if (!cancelled) setToken(t ?? null);
             } finally {
                 if (!cancelled) setChecking(false);
             }
@@ -41,6 +35,7 @@ export default function MainLayout() {
         };
     }, [router]);
 
+    // While we’re checking auth, don’t render Slot or WSProvider yet
     if (checking) {
         return (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -49,10 +44,12 @@ export default function MainLayout() {
         );
     }
 
+    // If not authed, we already redirected; render nothing
     if (!isAuthed) return null;
 
+    // ✅ Authenticated: mount WSProvider once for the entire (main) stack
     return (
-        <WSProvider authToken={token}>
+        <WSProvider>
             <Slot />
         </WSProvider>
     );

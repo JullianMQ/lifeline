@@ -1,5 +1,6 @@
-import React, { useContext, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+// app/(main)/home_page.tsx
+import React, { useContext, useEffect, useMemo, useState } from "react";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
 import MapView from "react-native-maps";
 import * as Location from "expo-location";
@@ -8,18 +9,26 @@ import reverseGeocodeWithGoogle from "@/lib/services/geocode";
 import { SensorContext } from "@/lib/context/sensor_context";
 import { useWS } from "@/lib/context/ws_context";
 
-import {
-    startForegroundLocationSharing,
-    stopForegroundLocationSharing,
-    startBackgroundLocationUploads,
-    stopBackgroundLocationUploads,
-    setRoomIdForBackgroundUploads,
-} from "@/lib/services/background_location";
+// If you actually have this config, keep it. If not, remove the REST call block.
+import { API_BASE_URL } from "@/lib/api/config";
 
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
-    const { isConnected, activeRoomId, lastError, ensureMyRoom, sos } = useWS();
 
+    const {
+        isConnected,
+        clientId,
+        rooms,
+        activeRoomId,
+        serverTimestamp,
+        lastMessage,
+        lastError,
+        ensureMyRoom,
+        sendToRoom,
+        sos,
+    } = useWS();
+
+    const [messageReply, setMessageReply] = useState("");
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
@@ -34,10 +43,11 @@ export default function HomePage() {
                     setLocationLoading(false);
                     return;
                 }
-
                 const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
                 setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
 
+                const googleAddress = await reverseGeocodeWithGoogle(loc.coords.latitude, loc.coords.longitude);
+                setAddress(googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
                 const googleAddress = await reverseGeocodeWithGoogle(loc.coords.latitude, loc.coords.longitude);
                 setAddress(googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
             } catch (err) {
@@ -48,80 +58,136 @@ export default function HomePage() {
         })();
     }, []);
 
-    /**
-     * Monitoring orchestration (SEQUENCED):
-     * 1) if monitoring OFF -> stop sharing
-     * 2) if monitoring ON but no room yet -> ensureMyRoom, then wait for activeRoomId via re-render
-     * 3) once room exists -> cache roomId, then start foreground/background sharing
-     */
+    // Ensure we end up in "my room" once socket + clientId are ready.
+    // This uses join-first then create-fallback, so it won't spam "room already exists".
     useEffect(() => {
-        if (!isMonitoring) {
-            stopForegroundLocationSharing().catch((err) => {
-                console.error("stopForegroundLocationSharing failed:", err);
-            });
-            stopBackgroundLocationUploads().catch((err) => {
-                console.error("stopBackgroundLocationUploads failed:", err);
-            });
-            return;
-        }
+        if (!isConnected) return;
+        if (!clientId) return;
 
-        // Monitoring ON, but room not ready yet -> create/ensure room first
-        if (!activeRoomId) {
-            ensureMyRoom().catch((err) => {
-                console.error("ensureMyRoom failed:", err);
-                Alert.alert(
-                    "Room setup failed",
-                    "We couldn’t create or join your room. Please check your connection and try again.",
-                    [{ text: "OK" }]
+        // Only ensure if we truly have no rooms yet
+        if (!rooms.length) {
+            ensureMyRoom();
+        }
+    }, [isConnected, clientId, rooms.length, ensureMyRoom]);
+
+    // Handle incoming WS messages (matches integration test flow)
+    useEffect(() => {
+        if (!lastMessage) return;
+
+        switch (lastMessage.type) {
+            case "room-message": {
+                const text =
+                    typeof lastMessage.content === "string"
+                        ? lastMessage.content
+                        : lastMessage.content?.text ?? JSON.stringify(lastMessage.content);
+
+                setMessageReply(`${lastMessage.user?.name ?? "Unknown"}: ${text}`);
+                break;
+            }
+
+            case "location-update": {
+                setMessageReply(
+                    `Location update: (${lastMessage.latitude.toFixed(5)}, ${lastMessage.longitude.toFixed(5)})`
                 );
-            });
-            return;
+                break;
+            }
+
+            case "emergency-alert": {
+                setMessageReply(`EMERGENCY ALERT: ${lastMessage.message}`);
+                break;
+            }
+
+            case "emergency-confirmed": {
+                setMessageReply(`SOS confirmed. Activated rooms: ${lastMessage.activatedRooms.join(", ")}`);
+                break;
+            }
+
+            case "emergency-activated": {
+                setMessageReply(`Emergency activated in room: ${lastMessage.roomId}`);
+                break;
+            }
+
+            case "join-denied":
+            case "error": {
+                setMessageReply(`Error: ${lastMessage.message}`);
+                break;
+            }
+
+            default:
+                break;
         }
+    }, [lastMessage]);
 
-        // Room is ready -> cache for background REST uploads, then start sharing
-        setRoomIdForBackgroundUploads(activeRoomId).catch((err) => {
-            console.error("setRoomIdForBackgroundUploads failed:", err);
+    const serverTimeLabel = useMemo(() => {
+        if (!serverTimestamp) return "Connecting...";
+        try {
+            return new Date(serverTimestamp).toLocaleTimeString();
+        } catch {
+            return serverTimestamp;
+        }
+    }, [serverTimestamp]);
+
+    async function postLocationToApi() {
+        if (!API_BASE_URL) return;
+        if (!location) return;
+        if (!activeRoomId) return;
+
+        await fetch(`${API_BASE_URL}/api/location`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // include cookies if your auth uses cookie sessions
+            credentials: "include" as any,
+            body: JSON.stringify({
+                roomId: activeRoomId,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                address,
+            }),
         });
-
-        startForegroundLocationSharing().catch((err) => {
-            console.error("startForegroundLocationSharing failed:", err);
-        });
-
-        startBackgroundLocationUploads().catch((err) => {
-            console.error("startBackgroundLocationUploads failed:", err);
-        });
-    }, [isMonitoring, activeRoomId, ensureMyRoom]);
-
-    // Safety: stop on unmount too
-    useEffect(() => {
-        return () => {
-            stopForegroundLocationSharing().catch((err) => {
-                console.error("stopForegroundLocationSharing unmount failed:", err);
-            });
-            stopBackgroundLocationUploads().catch((err) => {
-                console.error("stopBackgroundLocationUploads unmount failed:", err);
-            });
-        };
-    }, []);
+    }
 
     const handleSOS = async () => {
-        if (isSOSSending) return;
+        // guard: avoid confusing warnings + guarantee room scoped actions
+        if (!isConnected) {
+            setMessageReply("WebSocket not connected yet.");
+            return;
+        }
+        if (!activeRoomId) {
+            setMessageReply("Connected, but you are not in a room yet.");
+            return;
+        }
 
-        setIsSOSSending(true);
+        const parts: string[] = [];
+        if (address) parts.push(address);
+        if (location) parts.push(`(${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`);
+
+        const text = parts.length > 0 ? `SOS! Current location: ${parts.join(" ")}` : "SOS pressed! Help needed.";
+
+        // 1) Trigger emergency workflow
+        sos();
+
+        // 2) Broadcast to current room
+        sendToRoom(
+            {
+                text,
+                address,
+                location: location ? { ...location } : null,
+                createdAt: new Date().toISOString(),
+            },
+            activeRoomId
+        );
+
+        // 3) Optional: POST /api/location to trigger WS location-update broadcasts (matches test Suite 6)
         try {
-            await sos();
-        } catch (err) {
-            console.error("SOS failed:", err);
-            Alert.alert("SOS failed", "We couldn’t send your SOS right now. Please check your connection and try again.", [
-                { text: "OK" },
-            ]);
-        } finally {
-            setIsSOSSending(false);
+            await postLocationToApi();
+        } catch (e) {
+            console.log("Failed to POST /api/location", e);
         }
     };
 
     return (
         <ScreenWrapper>
+
             {/* MAP BOX */}
             <View className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden border" style={{ height: 384 }}>
                 {locationLoading ? (
@@ -165,13 +231,18 @@ export default function HomePage() {
 
             {/* WS STATUS */}
             <View className="mx-4 mt-4">
-                <Text className="text-gray-600">WebSocket:</Text>
-                <Text className="text-base font-semibold">
-                    {isConnected ? `connected | ${activeRoomId ?? "no room"}` : "disconnected"}
+                <Text className="text-gray-600">Server Time:</Text>
+                <Text className="text-lg font-semibold">{serverTimeLabel}</Text>
+
+                <Text className="text-gray-500 mt-2">
+                    WS: {isConnected ? "connected" : "connecting"} {activeRoomId ? `| active room: ${activeRoomId}` : "| no room"}
                 </Text>
+
+                {lastError ? <Text className="text-red-600 mt-1">{lastError}</Text> : null}
             </View>
 
             <View style={{ flex: 1 }} />
+
 
             {/* SOS and STOP BUTTON */}
             <View className="items-center mt-12">
@@ -191,23 +262,20 @@ export default function HomePage() {
                     )}
                 </TouchableOpacity>
 
+                {messageReply ? <Text className="mt-4 text-center text-gray-700">Server: {messageReply}</Text> : null}
+
                 <TouchableOpacity
                     className="mt-6 mb-8 px-6 py-3 rounded-full border-2 flex-row items-center h-20 w-48 justify-center"
-                    onPress={async () => {
-                        try {
-                            if (isMonitoring) await stopMonitoring();
-                            else await startMonitoring();
-                        } catch (err) {
-                            console.error(`${isMonitoring ? "stopMonitoring" : "startMonitoring"} failed:`, err);
-                            Alert.alert("Monitoring failed", "We couldn’t update monitoring right now. Please try again.", [
-                                { text: "OK" },
-                            ]);
-                        }
+                    onPress={() => {
+                        if (isMonitoring) stopMonitoring();
+                        else startMonitoring();
                     }}
                 >
+                    <Text className="font-bold ml-2 text-2xl">{isMonitoring ? "STOP" : "START"}</Text>
                     <Text className="font-bold ml-2 text-2xl">{isMonitoring ? "STOP" : "START"}</Text>
                 </TouchableOpacity>
             </View>
         </ScreenWrapper>
     );
+}
 }
