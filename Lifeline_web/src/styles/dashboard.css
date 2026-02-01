@@ -62,7 +62,8 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 }
 
 .dashboard-card{
-    padding: var(--space-xs);
+    padding: var(--space-sm);
+    gap: var(--space-xxs);
     flex-shrink: 0;
     width: 150px;
 }
@@ -95,7 +96,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 }
 
 .dashboard-card-img{
-    height: auto;
+    width: 100%;
 }
 
 .dashboard-user-img, .dashboard-card, .dashboard-buttons{
@@ -228,6 +229,7 @@ ul{
         gap: var(--space-sm);
     }
     .dashboard-card{
+        padding: var(--space-xs);
         width: 100px;
     }
     .dashboard-buttons{
@@ -282,8 +284,12 @@ ul{
     }
 
     .dashboard-card{
-        gap: var(--space-sm);
+        gap: var(--space-xs);
         padding: var(--space-sm);
+    }
+    .presence-indicator{
+        width: 30px !important;
+        height: 30px !important;
     }
 }
 
@@ -499,12 +505,23 @@ ul{
     border: 2px solid white;
 }
 
-.presence-badge.online {
+.presence-badge.online, .presence-indicator.online {
     background-color: #22c55e;
 }
 
-.presence-badge.offline {
+.presence-badge.offline, .presence-indicator.offline {
     background-color: #9ca3af;
+}
+
+.presence-indicator{
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 100%;
+    position: absolute;
+    bottom: 4px;
+    right: 0;
+    border: 5px solid var(--soft-white);
 }
 
 .alert-badge {

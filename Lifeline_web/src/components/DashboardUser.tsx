@@ -14,17 +14,6 @@ function PresenceIndicator({ isOnline }: { isOnline: boolean }) {
   return (
     <span
       className={`presence-indicator ${isOnline ? 'online' : 'offline'}`}
-      style={{
-        display: 'inline-block',
-        width: '10px',
-        height: '10px',
-        borderRadius: '50%',
-        backgroundColor: isOnline ? '#22c55e' : '#9ca3af',
-        position: 'absolute',
-        bottom: '2px',
-        right: '2px',
-        border: '2px solid white',
-      }}
       title={isOnline ? 'Online' : 'Offline'}
     />
   );
@@ -75,11 +64,11 @@ export default function DashboardUser({
         className={`dashboard-card ${hasAlert ? 'dashboard-card-alert' : ''}`}
         onClick={() => onSelectContact(contact)}
       >
-        <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div style={{ position: 'relative'}}>
           <img
             src={contact.image || "/images/user-example.svg"}
             alt={contact.name || "User image"}
-            className="dashboard-card-img"
+            className="dashboard-card-img avatar"
           />
           <PresenceIndicator isOnline={isOnline} />
           {hasAlert && <AlertBadge />}
