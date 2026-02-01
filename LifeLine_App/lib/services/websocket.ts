@@ -1,89 +1,199 @@
+// lib/services/websocket.ts
 import { WS_BASE_URL } from "../api/config";
 
-if (!WS_BASE_URL) {
-    console.error("No WS_BASE_URL");
-};
-let socket: WebSocket | null = null;
-let currentRoom: string | null = null;
+if (!WS_BASE_URL) console.error("No WS_BASE_URL");
 
-export type WSMessage =
-    | { type: "connected"; roomId: string; user: any }
-    | { type: "user_joined"; user: any }
-    | { type: "user_left"; clientId: string }
-    | { type: "chat"; message: string; user: any; timestamp: string }
-    | { type: "direct_message"; message: string; fromUser: any }
-    | { type: "room_users"; users: any[] }
+// --- module state ---
+let socket: WebSocket | null = null;
+
+// rooms we are currently in (based on server events)
+let joinedRooms = new Set<string>();
+let activeRoomId: string | null = null;
+
+// queue messages until OPEN
+let pending: string[] = [];
+
+// --- types ---
+export type LocationPayload = {
+    roomId: string;
+    userId?: string;
+    user?: any;
+    latitude: number;
+    longitude: number;
+    address?: string;
+    timestamp: string;
+};
+
+export type ServerMessage =
+    | { type: "connected"; clientId: string; user: any; roomIds: string[]; timestamp: string }
+    | { type: "room-created"; roomId: string; owner: string; emergencyContacts: string[]; timestamp: string }
+    | { type: "join-approved"; roomId: string; timestamp: string }
+    | { type: "join-denied"; message: string; timestamp: string; roomId?: string }
+    | { type: "auto-joined"; roomId: string; ownerId: string; timestamp: string }
+    | { type: "auto-join-summary"; joinedRooms: string[]; timestamp: string }
+    | { type: "room-users"; roomId: string; users: any[]; timestamp: string }
+    | { type: "user-joined"; roomId: string; clientId: string; user: any; timestamp: string }
+    | { type: "user-left"; roomId: string; clientId: string; timestamp: string }
+    | { type: "room-message"; roomId: string; from: string; user: any; content: any; timestamp: string }
+    | ({ type: "location-update" } & LocationPayload)
+    | { type: "emergency-alert"; ownerId: string; owner: any; roomId: string; message: string; timestamp: string }
+    | { type: "emergency-activated"; ownerId: string; roomId: string; timestamp: string }
+    | { type: "emergency-confirmed"; activatedRooms: string[]; timestamp: string }
     | { type: "pong" }
     | { type: "error"; message: string };
 
-export function connectRoomSocket(
-    roomId: string,
-    onMessage: (data: WSMessage) => void
-) {
-    // if socket is already connected to a different room, disconnect
-    if (socket && currentRoom !== roomId) {
-        disconnectRoomSocket();
-    }
+type ClientEmit =
+    | { type: "create-room"; roomId?: string }
+    | { type: "join-room"; roomId: string }
+    | { type: "room-message"; roomId: string; content: any }
+    | { type: "get_users"; roomId: string }
+    | { type: "emergency-sos" }
+    | { type: "ping" };
 
+type Handlers = {
+    onMessage: (msg: ServerMessage) => void;
+    onOpen?: () => void;
+    onClose?: (e: { code?: number; reason?: string }) => void;
+    onError?: (e: any) => void;
+};
 
+function endpoint() {
+    // server upgrades on /ws
+    return `${WS_BASE_URL}/ws`;
+}
+
+function flushPending() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    for (const msg of pending) socket.send(msg);
+    pending = [];
+}
+
+export function connectWS(handlers: Handlers) {
     if (socket) return socket;
 
-    socket = new WebSocket(`${WS_BASE_URL}/${roomId}`);
-    currentRoom = roomId;
+    socket = new WebSocket(endpoint());
+
     socket.onopen = () => {
-        console.log("WS connected to room:", roomId);
+        handlers.onOpen?.();
+        flushPending();
     };
 
     socket.onmessage = (e) => {
         try {
-            const data = JSON.parse(e.data);
-            onMessage(data);
-        } catch (err) {
+            const data = JSON.parse(e.data) as ServerMessage;
+
+            // Maintain local room state based on server truth
+            switch (data.type) {
+                case "connected":
+                    if (Array.isArray(data.roomIds)) {
+                        data.roomIds.forEach((r) => joinedRooms.add(r));
+                        if (!activeRoomId && data.roomIds.length) activeRoomId = data.roomIds[0];
+                    }
+                    break;
+                case "auto-joined":
+                case "room-created":
+                case "join-approved":
+                    joinedRooms.add(data.roomId);
+                    if (!activeRoomId) activeRoomId = data.roomId;
+                    break;
+
+                default:
+                    break;
+            }
+
+            handlers.onMessage(data);
+        } catch {
             console.warn("Non-JSON WS message:", e.data);
         }
     };
 
     socket.onerror = (e) => {
-        console.log("WS error", e);
+        console.log("WS error", { url: endpoint(), e });
+        handlers.onError?.(e);
     };
 
-    socket.onclose = () => {
-        console.log("WS closed");
+    socket.onclose = (e: any) => {
+        handlers.onClose?.({ code: e?.code, reason: e?.reason });
         socket = null;
-        currentRoom = null;
+        joinedRooms = new Set<string>();
+        activeRoomId = null;
+        pending = [];
     };
 
     return socket;
 }
 
-export function disconnectRoomSocket() {
+export function disconnectWS() {
     socket?.close();
     socket = null;
-    currentRoom = null;
+    joinedRooms = new Set<string>();
+    activeRoomId = null;
+    pending = [];
+    console.log("🔌 disconnectWS() called");
 }
 
-export function sendChatMessage(message: string) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-        console.warn("Cannot send message: socket not ready");
+export function isWSOpen() {
+    return socket?.readyState === WebSocket.OPEN;
+}
+
+export function getJoinedRooms(): string[] {
+    return Array.from(joinedRooms);
+}
+
+export function getActiveRoom(): string | null {
+    return activeRoomId;
+}
+
+export function setActiveRoom(roomId: string | null) {
+    activeRoomId = roomId;
+    if (roomId) joinedRooms.add(roomId);
+}
+
+function emit(msg: ClientEmit) {
+    if (!socket) {
+        console.warn("WS not connected yet; call connectWS first");
         return;
     }
 
-    socket.send(
-        JSON.stringify({
-            type: "chat",
-            message,
-        })
-    );
-}
+    const payload = JSON.stringify(msg);
 
-export function sendPing() {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-        console.warn("Cannot send ping: socket not ready");
+    if (socket.readyState !== WebSocket.OPEN) {
+        pending.push(payload);
         return;
     }
-    socket.send(
-        JSON.stringify({
-            type: "ping",
-        })
-    );
+
+    socket.send(payload);
+}
+
+// ---- Client actions ----
+
+export function createRoom(roomId?: string) {
+    emit({ type: "create-room", roomId });
+}
+
+export function joinRoom(roomId: string) {
+    emit({ type: "join-room", roomId });
+}
+
+export function sendRoomMessage(content: any, roomId?: string) {
+    const rid = roomId ?? activeRoomId;
+    if (!rid) {
+        console.warn("No roomId available for room-message");
+        return;
+    }
+    emit({ type: "room-message", roomId: rid, content });
+}
+
+export function getRoomUsers(roomId?: string) {
+    const rid = roomId ?? activeRoomId;
+    if (!rid) return;
+    emit({ type: "get_users", roomId: rid });
+}
+
+export function sendEmergencySOS() {
+    emit({ type: "emergency-sos" });
+}
+
+export function ping() {
+    emit({ type: "ping" });
 }
