@@ -54,6 +54,7 @@ export default function DashboardContact({
   const fetchMediaFiles = useCallback(async (mediaType: MediaType) => {
     // Use contact.id which is the user ID from the ContactCard
     const userId = contact.id || contact.location?.userId;
+    let shouldStopLoading = false;
     
     // Debug logging
     debugMedia.log("=== Media Fetch ===");
@@ -65,15 +66,17 @@ export default function DashboardContact({
     debugMedia.log("mediaType:", mediaType);
     
     if (!userId) {
+      setMediaLoading(false);
       setMediaError("User ID not available");
       return;
     }
 
+    shouldStopLoading = true;
     setMediaLoading(true);
     setMediaError(null);
 
     try {
-      const url = `${API_BASE_URL}/api/media/files?user_id=${userId}&media_type=${mediaType}`;
+      const url = `${API_BASE_URL}/api/media/files?user_id=${encodeURIComponent(userId)}&media_type=${encodeURIComponent(mediaType)}`;
       debugMedia.log("Fetching from URL:", url);
       
       const response = await fetch(
@@ -95,7 +98,9 @@ export default function DashboardContact({
       setMediaError(message);
       setMediaFiles([]);
     } finally {
-      setMediaLoading(false);
+      if (shouldStopLoading) {
+        setMediaLoading(false);
+      }
     }
   }, [contact.id, contact.location?.userId]);
 

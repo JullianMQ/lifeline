@@ -239,26 +239,41 @@ router.post("/media/upload", async (c) => {
         );
 
         // Store file metadata in database
-        const dbResult = await dbPool.query(
-            `INSERT INTO media_files (
-                user_id, drive_file_id, file_name, original_name, 
-                mime_type, media_type, file_size, web_view_link, 
-                web_content_link, description
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING *`,
-            [
-                user.id,
-                uploadResult.fileId,
-                uploadResult.fileName,
-                originalName,
-                mimeType,
-                mediaType,
-                fileSize,
-                uploadResult.webViewLink,
-                uploadResult.webContentLink,
-                description || null
-            ]
-        );
+        let dbResult;
+        try {
+            dbResult = await dbPool.query(
+                `INSERT INTO media_files (
+                    user_id, drive_file_id, file_name, original_name, 
+                    mime_type, media_type, file_size, web_view_link, 
+                    web_content_link, description
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                RETURNING *`,
+                [
+                    user.id,
+                    uploadResult.fileId,
+                    uploadResult.fileName,
+                    originalName,
+                    mimeType,
+                    mediaType,
+                    fileSize,
+                    uploadResult.webViewLink,
+                    uploadResult.webContentLink,
+                    description || null
+                ]
+            );
+        } catch (dbError) {
+            if (uploadResult?.fileId) {
+                try {
+                    const deleted = await driveService.deleteFile(uploadResult.fileId);
+                    if (!deleted) {
+                        console.error('Failed to cleanup orphaned Drive file:', uploadResult.fileId);
+                    }
+                } catch (cleanupError) {
+                    console.error('Failed to cleanup orphaned Drive file:', cleanupError);
+                }
+            }
+            throw dbError;
+        }
 
         const savedFile = dbResult.rows[0] as MediaFile;
 

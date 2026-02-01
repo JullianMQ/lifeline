@@ -22,7 +22,7 @@ const RenderHeader = ({
   setSearch: (text: string) => void;
 }) => (
   <View className="flex-row items-center mb-4 px-5 pt-6">
-    <View className="flex-1 flex-row items-center px-3 py-.5 rounded-full border-2 mr-3">
+    <View className="flex-1 flex-row items-center px-3 py-0.5 rounded-full border-2 mr-3">
       <Ionicons name="search" size={20} color="black" />
       <TextInput
         placeholder="Search"
@@ -61,9 +61,15 @@ const ContactPage = () => {
 
   const fetchContacts = async () => {
     setLoading(true);
-    const data = await getContacts();
-    setContacts(data);
-    setLoading(false);
+    try {
+      const data = await getContacts();
+      setContacts(data);
+    } catch (error) {
+      console.error("Failed to fetch contacts:", error);
+      setContacts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useFocusEffect(

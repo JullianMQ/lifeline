@@ -37,15 +37,19 @@ export function useMap() {
     }
     
     const { lat, lng } = contact.location;
-    setPinIcon(contact.image);
+    if (contact.image) {
+      setPinIcon(contact.image);
+    }
     setMarkers((prev) => {
       // Check if a marker for this contact already exists (by id)
       const existingIndex = prev.findIndex(p => p.contact?.id === contact.id || p.id === contact.id);
       
       if (existingIndex >= 0) {
         const existing = prev[existingIndex];
-        // If coordinates haven't changed, no update needed
-        if (existing.lat === lat && existing.lng === lng) {
+        const isSameLocation = existing.lat === lat && existing.lng === lng;
+        const isSameImage = existing.image === contact.image;
+        const isSameContact = existing.contact === contact;
+        if (isSameLocation && isSameImage && isSameContact) {
           return prev;
         }
         // Update the existing marker with new coordinates (remove old, add updated)

@@ -205,10 +205,9 @@ form.profile-user{
 }
 .profile-card-content{
     gap: var(--space-xxs);
-    text-wrap: break-text;
     overflow-wrap: break-word;
     word-break: break-word;
-    text-wrap: pretty;
+    overflow-wrap: anywhere;
 }
 
 .profile-card-name{

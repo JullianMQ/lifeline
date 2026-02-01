@@ -37,26 +37,34 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
     if (!google?.maps?.marker?.AdvancedMarkerElement) return;
 
     const created: google.maps.marker.AdvancedMarkerElement[] = [];
+    const listeners: Array<() => void> = [];
 
     markers.forEach((m) => {
       const pin = document.createElement("div");
       pin.className = "map-pin";
 
-      pin.innerHTML = `
-        <div class="map-pin-head">
-          <img
-            class="map-pin-avatar"
-            src="${m.image || "/images/user-example.svg"}"
-          />
-        </div>
-        <div class="map-pin-tail"></div>
-      `;
+      const head = document.createElement("div");
+      head.className = "map-pin-head";
+
+      const avatar = document.createElement("img");
+      avatar.className = "map-pin-avatar";
+      avatar.src = m.image || "/images/user-example.svg";
+      avatar.alt = m.contact?.name ? `${m.contact.name} avatar` : "Contact avatar";
+      head.appendChild(avatar);
+
+      const tail = document.createElement("div");
+      tail.className = "map-pin-tail";
+
+      pin.appendChild(head);
+      pin.appendChild(tail);
 
       if (m.contact) {
-        pin.addEventListener("click", (e) => {
+        const handler = (e: Event) => {
           e.stopPropagation();
           onSelectContact(m.contact);
-        });
+        };
+        pin.addEventListener("click", handler);
+        listeners.push(() => pin.removeEventListener("click", handler));
       }
 
       const mk = new google.maps.marker.AdvancedMarkerElement({
@@ -69,8 +77,13 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
       console.log("[DashboardMap] Created marker:", created);
     });
 
-    return () => created.forEach((mk) => (mk.map = null));
-  }, [map, markers]);
+    return () => {
+      listeners.forEach((remove) => remove());
+      created.forEach((mk) => {
+        mk.map = null;
+      });
+    };
+  }, [map, markers, onSelectContact]);
 
   if (!isLoaded) return <div className="map">Loading...</div>;
 
@@ -89,7 +102,7 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
       options={{
         disableDefaultUI: true,
         zoomControl: true,
-        mapId: import.meta.env.VITE_GOOGLE_MAPS_API_KEY, 
+        mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
       }}
     />
   );

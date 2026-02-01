@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import "../styles/dashboard.css";
 import { useDashboard } from "../scripts/useDashboard";
 import { useNavigate } from "react-router-dom";
@@ -135,6 +135,8 @@ function Dashboard() {
     Record<string, { time: string; lat: number; lng: number }[]>
   >({});
   const [showAlertModal, setShowAlertModal] = useState(false);
+  const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
+  const prevAlertsSignature = useRef<string>("");
 
   const {
     markers,
@@ -158,10 +160,20 @@ function Dashboard() {
 
   // Show modal automatically when new alerts come in
   useEffect(() => {
-    if (activeAlerts.length > 0) {
-      setShowAlertModal(true);
+    const signature = activeAlerts
+      .map((alert) => `${alert.id}:${alert.timestamp ?? ""}:${alert.message}`)
+      .join("|");
+
+    if (activeAlerts.length > 0 && signature !== prevAlertsSignature.current) {
+      if (!userClosedAlertModal) {
+        setShowAlertModal(true);
+      }
+      prevAlertsSignature.current = signature;
+      if (userClosedAlertModal) {
+        setUserClosedAlertModal(false);
+      }
     }
-  }, [activeAlerts.length]);
+  }, [activeAlerts, userClosedAlertModal]);
 
   // Derive selectedContact from contactCards using the stored ID
   // This ensures we always have the latest data when contactCards updates
@@ -347,7 +359,10 @@ function Dashboard() {
           contactCards={contactCards}
           onAcknowledge={acknowledgeAlert}
           onViewContact={handleViewAlertContact}
-          onClose={() => setShowAlertModal(false)}
+          onClose={() => {
+            setShowAlertModal(false);
+            setUserClosedAlertModal(true);
+          }}
         />
       )}
 
@@ -379,6 +394,7 @@ function Dashboard() {
               onClick={() => {
                 console.log("activeAlerts:", activeAlerts);
                 setShowAlertModal(true);
+                setUserClosedAlertModal(false);
               }}
               title={`${activeAlerts.length} active alert${activeAlerts.length > 1 ? "s" : ""}`}
             >

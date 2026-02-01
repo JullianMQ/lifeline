@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS "media_files" (
     "original_name" TEXT NOT NULL,
     "mime_type" TEXT NOT NULL,
     "media_type" TEXT NOT NULL CHECK (media_type IN ('picture', 'video', 'voice_recording')),
-    "file_size" INTEGER NOT NULL,
+    "file_size" BIGINT NOT NULL,
     "web_view_link" TEXT,
     "web_content_link" TEXT,
     "description" TEXT,

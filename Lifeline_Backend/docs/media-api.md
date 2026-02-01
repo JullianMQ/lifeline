@@ -21,7 +21,7 @@ The Media API allows users to upload, retrieve, and manage media files (pictures
 
 ## 2. Storage Architecture
 
-```
+```text
 Google Drive (App Owner's Account)
 └── Lifeline Media (Root Folder - GOOGLE_DRIVE_FOLDER_ID)
     ├── {user_id_1}/
@@ -47,11 +47,11 @@ The backend uses OAuth2 with a refresh token from the app owner's Google account
 
 ## 3. Media Types & Constraints
 
-| Media Type       | Allowed MIME Types                                                        | Max Size |
-|------------------|---------------------------------------------------------------------------|----------|
-| `picture`        | `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/heic`, `image/heif` | 10 MB    |
-| `video`          | `video/mp4`, `video/quicktime`, `video/x-msvideo`, `video/webm`, `video/3gpp`    | 50 MB    |
-| `voice_recording`| `audio/mpeg`, `audio/mp4`, `audio/wav`, `audio/ogg`, `audio/webm`, `audio/aac`, `audio/m4a`, `audio/x-m4a` | 50 MB    |
+| Media Type        | Allowed MIME Types                                                                                       | Max Size |
+|-------------------|----------------------------------------------------------------------------------------------------------|----------|
+| `picture`         | `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/heic`, `image/heif`                         | 10 MB    |
+| `video`           | `video/mp4`, `video/quicktime`, `video/x-msvideo`, `video/webm`, `video/3gpp`                            | 50 MB    |
+| `voice_recording` | `audio/mpeg`, `audio/mp4`, `audio/wav`, `audio/ogg`, `audio/webm`, `audio/aac`, `audio/m4a`, `audio/x-m4a` | 50 MB    |
 
 ---
 
@@ -68,11 +68,11 @@ Upload a media file to Google Drive.
 - **Content-Type**: `multipart/form-data`
 - **Authentication**: Required (session cookie)
 
-| Field        | Type   | Required | Description                                      |
-|--------------|--------|----------|--------------------------------------------------|
-| `file`       | File   | Yes      | The file to upload                               |
-| `media_type` | String | Yes      | One of: `picture`, `video`, `voice_recording`    |
-| `description`| String | No       | Optional description for the file                |
+| Field         | Type   | Required | Description                                   |
+|---------------|--------|----------|-----------------------------------------------|
+| `file`        | File   | Yes      | The file to upload                            |
+| `media_type`  | String | Yes      | One of: `picture`, `video`, `voice_recording` |
+| `description` | String | No       | Optional description for the file             |
 
 #### Example (cURL)
 
@@ -152,14 +152,14 @@ const uploadFile = async (fileUri, mediaType, description) => {
 
 #### Error Responses
 
-| Status | Error                          | Description                           |
-|--------|--------------------------------|---------------------------------------|
-| 400    | `No file provided`             | Missing file in form data             |
+| Status | Error                          | Description                                |
+|--------|--------------------------------|--------------------------------------------|
+| 400    | `No file provided`             | Missing file in form data                  |
 | 400    | `Invalid media_type`           | media_type not picture/video/voice_recording |
-| 400    | `Invalid file type for {type}` | MIME type not allowed for media type  |
-| 400    | `File size exceeds limit`      | File larger than allowed size         |
-| 401    | `Unauthorized`                 | No valid session                      |
-| 500    | `Failed to upload file`        | Google Drive upload error             |
+| 400    | `Invalid file type for {type}` | MIME type not allowed for media type       |
+| 400    | `File size exceeds limit`      | File larger than allowed size              |
+| 401    | `Unauthorized`                 | No valid session                           |
+| 500    | `Failed to upload file`        | Google Drive upload error                  |
 
 ---
 
@@ -171,10 +171,10 @@ Get all files accessible to the current user (own files + connected users' files
 
 #### Query Parameters
 
-| Parameter    | Type   | Required | Description                                |
-|--------------|--------|----------|--------------------------------------------|
+| Parameter    | Type   | Required | Description                                     |
+|--------------|--------|----------|-------------------------------------------------|
 | `media_type` | String | No       | Filter by: `picture`, `video`, `voice_recording` |
-| `user_id`    | String | No       | Filter by specific user (must have access) |
+| `user_id`    | String | No       | Filter by specific user (must have access)      |
 
 #### Example
 
@@ -229,8 +229,8 @@ Get only the current user's own files.
 
 #### Query Parameters
 
-| Parameter    | Type   | Required | Description                                |
-|--------------|--------|----------|--------------------------------------------|
+| Parameter    | Type   | Required | Description                                     |
+|--------------|--------|----------|-------------------------------------------------|
 | `media_type` | String | No       | Filter by: `picture`, `video`, `voice_recording` |
 
 #### Response (200 OK)

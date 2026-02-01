@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type MediaType = "picture" | "video" | "voice_recording";
 
@@ -71,6 +71,24 @@ export default function MediaModal({
   contactName,
 }: MediaModalProps) {
   const [previewFile, setPreviewFile] = useState<MediaFile | null>(null);
+  const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
+  const blobUrlsRef = useRef<Record<number, string>>({});
+
+  useEffect(() => {
+    if (!open) {
+      setPreviewFile(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    blobUrlsRef.current = blobUrls;
+  }, [blobUrls]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(blobUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   if (!open) return null;
 
@@ -87,6 +105,78 @@ export default function MediaModal({
   const getDownloadUrl = (fileId: number) => {
     return `${API_BASE_URL}/api/media/files/${fileId}/download`;
   };
+
+  const isSameOrigin = useMemo(() => {
+    if (!API_BASE_URL) return true;
+    try {
+      return new URL(API_BASE_URL, window.location.href).origin === window.location.origin;
+    } catch {
+      return true;
+    }
+  }, [API_BASE_URL]);
+
+  const fetchMediaBlob = async (fileId: number) => {
+    const response = await fetch(getDownloadUrl(fileId), {
+      credentials: "include",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch media");
+    }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  };
+
+  useEffect(() => {
+    if (!open || isSameOrigin || files.length === 0) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+      const nextUrls: Record<number, string> = {};
+      for (const file of files) {
+        if (blobUrlsRef.current[file.id]) continue;
+        try {
+          const url = await fetchMediaBlob(file.id);
+          if (cancelled) {
+            URL.revokeObjectURL(url);
+            continue;
+          }
+          nextUrls[file.id] = url;
+        } catch {
+          // keep fallback URL
+        }
+      }
+
+      if (!cancelled && Object.keys(nextUrls).length > 0) {
+        setBlobUrls((prev) => ({
+          ...prev,
+          ...nextUrls,
+        }));
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, files, isSameOrigin]);
+
+  useEffect(() => {
+    setBlobUrls((prev) => {
+      const next: Record<number, string> = {};
+      const keepIds = new Set(files.map((file) => file.id));
+      Object.entries(prev).forEach(([id, url]) => {
+        const numericId = Number(id);
+        if (keepIds.has(numericId)) {
+          next[numericId] = url;
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      });
+      return next;
+    });
+  }, [files]);
 
   return (
     <div className="modal media-modal-overlay" onClick={onClose}>
@@ -128,7 +218,7 @@ export default function MediaModal({
                     onClick={() => handleImageClick(file)}
                   >
                     <img
-                      src={getDownloadUrl(file.id)}
+                      src={blobUrls[file.id] || getDownloadUrl(file.id)}
                       alt={file.original_name}
                       loading="lazy"
                     />
@@ -138,7 +228,7 @@ export default function MediaModal({
                 {file.media_type === "video" && (
                   <div className="media-thumbnail video-thumbnail">
                     <video
-                      src={getDownloadUrl(file.id)}
+                      src={blobUrls[file.id] || getDownloadUrl(file.id)}
                       controls
                       preload="metadata"
                     >
@@ -153,7 +243,7 @@ export default function MediaModal({
                       <img src="/images/mic.svg" alt="Audio" />
                     </div>
                     <audio
-                      src={getDownloadUrl(file.id)}
+                      src={blobUrls[file.id] || getDownloadUrl(file.id)}
                       controls
                       preload="metadata"
                     >
@@ -183,13 +273,16 @@ export default function MediaModal({
 
       {/* Image Preview Modal */}
       {previewFile && (
-        <div className="image-preview-overlay" onClick={closePreview}>
+        <div className="image-preview-overlay" onClick={(e) => {
+          e.stopPropagation();
+          closePreview();
+        }}>
           <div className="image-preview-content" onClick={(e) => e.stopPropagation()}>
             <button className="preview-close-btn" onClick={closePreview} aria-label="Close preview">
               <img src="/images/close.svg" alt="Close" />
             </button>
             <img
-              src={getDownloadUrl(previewFile.id)}
+              src={blobUrls[previewFile.id] || getDownloadUrl(previewFile.id)}
               alt={previewFile.original_name}
               className="preview-image"
             />

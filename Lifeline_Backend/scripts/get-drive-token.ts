@@ -17,6 +17,15 @@
 import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
 
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 const clientId = process.env.GOOGLE_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -52,7 +61,7 @@ const server = createServer(async (req, res) => {
 
         if (error) {
             res.writeHead(400, { 'Content-Type': 'text/html' });
-            res.end(`<h1>Error</h1><p>${error}</p>`);
+            res.end(`<h1>Error</h1><p>${escapeHtml(error)}</p>`);
             console.error('Authorization error:', error);
             server.close();
             process.exit(1);

@@ -45,6 +45,10 @@ const FOLDER_NAMES: Record<MediaType, string> = {
     voice_recording: 'recordings'
 };
 
+function escapeDriveQueryValue(value: string): string {
+    return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 class GoogleDriveService {
     private drive: drive_v3.Drive;
     private rootFolderId: string;
@@ -113,7 +117,7 @@ class GoogleDriveService {
 
         // Search for existing folder
         const response = await this.drive.files.list({
-            q: `name='${userId}' and '${this.rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            q: `name='${escapeDriveQueryValue(userId)}' and '${escapeDriveQueryValue(this.rootFolderId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
             fields: 'files(id, name)',
         });
 
@@ -154,7 +158,7 @@ class GoogleDriveService {
 
         // Search for existing folder
         const response = await this.drive.files.list({
-            q: `name='${folderName}' and '${userFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            q: `name='${escapeDriveQueryValue(folderName)}' and '${escapeDriveQueryValue(userFolderId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
             fields: 'files(id, name)',
         });
 
@@ -298,33 +302,55 @@ class GoogleDriveService {
      */
     async listUserFiles(userId: string, mediaType?: MediaType): Promise<DriveFile[]> {
         try {
-            let folderId: string;
-            
             if (mediaType) {
-                folderId = await this.getOrCreateMediaFolder(userId, mediaType);
-            } else {
-                folderId = await this.getOrCreateUserFolder(userId);
+                const folderId = await this.getOrCreateMediaFolder(userId, mediaType);
+                const response = await this.drive.files.list({
+                    q: `'${escapeDriveQueryValue(folderId)}' in parents and trashed=false`,
+                    fields: 'files(id, name, mimeType, webViewLink, webContentLink, createdTime, size)',
+                    orderBy: 'createdTime desc',
+                });
+
+                return (response.data.files || []).map(file => ({
+                    id: file.id!,
+                    name: file.name!,
+                    mimeType: file.mimeType!,
+                    webViewLink: file.webViewLink || '',
+                    webContentLink: file.webContentLink || '',
+                    createdTime: file.createdTime || '',
+                    size: file.size || '0',
+                }));
             }
 
-            const query = mediaType 
-                ? `'${folderId}' in parents and trashed=false`
-                : `'${folderId}' in parents and trashed=false`;
+            const filesById = new Map<string, DriveFile>();
+            const mediaTypes = Object.keys(FOLDER_NAMES) as MediaType[];
 
-            const response = await this.drive.files.list({
-                q: query,
-                fields: 'files(id, name, mimeType, webViewLink, webContentLink, createdTime, size)',
-                orderBy: 'createdTime desc',
+            for (const type of mediaTypes) {
+                const folderId = await this.getOrCreateMediaFolder(userId, type);
+                const response = await this.drive.files.list({
+                    q: `'${escapeDriveQueryValue(folderId)}' in parents and trashed=false`,
+                    fields: 'files(id, name, mimeType, webViewLink, webContentLink, createdTime, size)',
+                    orderBy: 'createdTime desc',
+                });
+
+                (response.data.files || []).forEach(file => {
+                    if (!file.id) return;
+                    filesById.set(file.id, {
+                        id: file.id,
+                        name: file.name || '',
+                        mimeType: file.mimeType || '',
+                        webViewLink: file.webViewLink || '',
+                        webContentLink: file.webContentLink || '',
+                        createdTime: file.createdTime || '',
+                        size: file.size || '0',
+                    });
+                });
+            }
+
+            return Array.from(filesById.values()).sort((a, b) => {
+                const aTime = Date.parse(a.createdTime) || 0;
+                const bTime = Date.parse(b.createdTime) || 0;
+                return bTime - aTime;
             });
-
-            return (response.data.files || []).map(file => ({
-                id: file.id!,
-                name: file.name!,
-                mimeType: file.mimeType!,
-                webViewLink: file.webViewLink || '',
-                webContentLink: file.webContentLink || '',
-                createdTime: file.createdTime || '',
-                size: file.size || '0',
-            }));
         } catch (error) {
             return [];
         }
