@@ -13,6 +13,7 @@ interface ContactResponse {
 }
 
 interface ContactUser {
+    user_id: string | null;
     phone_no: string;
     name: string | null;
     email: string | null;
@@ -59,7 +60,7 @@ router.get("/contacts/users", async (c) => {
     const emergencyDetails: ContactUser[] = [];
     if (contactRow.emergency_contacts && contactRow.emergency_contacts.length > 0) {
         const emergencyResult = await dbPool.query(`
-            SELECT name, email, phone_no, image, role
+            SELECT id, name, email, phone_no, image, role
             FROM "user" 
             WHERE phone_no = ANY($1)
         `, [contactRow.emergency_contacts]);
@@ -68,6 +69,7 @@ router.get("/contacts/users", async (c) => {
         const userMap: { [key: string]: ContactUser } = {};
         emergencyResult.rows.forEach(row => {
             userMap[row.phone_no] = {
+                user_id: row.id,
                 phone_no: row.phone_no,
                 name: row.name,
                 email: row.email,
@@ -82,6 +84,7 @@ router.get("/contacts/users", async (c) => {
                 emergencyDetails.push(userMap[phone]);
             } else {
                 emergencyDetails.push({
+                    user_id: null,
                     phone_no: phone,
                     name: null,
                     email: null,
@@ -96,7 +99,7 @@ router.get("/contacts/users", async (c) => {
     const dependentDetails: ContactUser[] = [];
     if (contactRow.dependent_contacts && contactRow.dependent_contacts.length > 0) {
         const dependentResult = await dbPool.query(`
-            SELECT name, email, phone_no, image, role
+            SELECT id, name, email, phone_no, image, role
             FROM "user" 
             WHERE phone_no = ANY($1)
         `, [contactRow.dependent_contacts]);
@@ -105,6 +108,7 @@ router.get("/contacts/users", async (c) => {
         const userMap: { [key: string]: ContactUser } = {};
         dependentResult.rows.forEach(row => {
             userMap[row.phone_no] = {
+                user_id: row.id,
                 phone_no: row.phone_no,
                 name: row.name,
                 email: row.email,
@@ -119,6 +123,7 @@ router.get("/contacts/users", async (c) => {
                 dependentDetails.push(userMap[phone]);
             } else {
                 dependentDetails.push({
+                    user_id: null,
                     phone_no: phone,
                     name: null,
                     email: null,
