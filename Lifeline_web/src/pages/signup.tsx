@@ -1,8 +1,12 @@
+import React from "react";
 import "../styles/login.css";
 import "../styles/signup.css";
+import "../styles/profile.css";
 import { Link } from "react-router-dom";
 import { useSignup } from "../scripts/useSignup";
 import { googleAuth } from "../scripts/googleAuth";
+import { useState } from "react";
+import TermsCondition from "../components/termsAndCondition";
 
 function Signup() {
   const {
@@ -15,23 +19,53 @@ function Signup() {
     handleChange,
     handleSubmit,
   } = useSignup();
-  const {handleGoogleLogin} = googleAuth();
+  const { handleGoogleLogin } = googleAuth();
+
+  const [tcModal, setTCModal] = useState(false);      
+  const [tcAccepted, setTCAccepted] = useState(false);
+
+  const openTCModal = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setTCModal(true);
+  };
+
+  const closeTCModal = () => setTCModal(false);
+
+  const handleSubmitWithTC = (e: React.FormEvent<HTMLFormElement>) => {
+    if (step === 2 && !tcAccepted) {
+      e.preventDefault();
+      return;
+    }
+    handleSubmit(e);
+  };
 
   return (
     <main className="signup">
+      {tcModal && (
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeTCModal}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <TermsCondition
+              status={tcAccepted}
+              setStatus={setTCAccepted}
+              onClose={closeTCModal}
+            />
+          </div>
+        </div>
+      )}
+
       <section className="login-card">
         <div className="card">
-
           <div className="login-logo">
-            <img
-              src="/images/LifelineLogo.png"
-              alt="Lifeline"
-              className="lifeline-logo-mini"
-            />
+            <img src="/images/LifelineLogo.png" alt="Lifeline" className="lifeline-logo-mini"/>
             <h1 className="lifeline-text">SIGNUP</h1>
           </div>
 
-          <form className="form" onSubmit={handleSubmit}>
+          <form className="form" onSubmit={handleSubmitWithTC}>
             {step === 1 && (
               <>
                 <input
@@ -72,14 +106,13 @@ function Signup() {
                   <hr />
                 </div>
 
-                <button type="button" className="neg-btn" onClick={handleGoogleLogin}>
-                  <img src="/images/google.svg"  alt="Google-Logo" className="google-logo"/>
+                <button type="button" className="neg-btn" onClick={handleGoogleLogin} >
+                  <img src="/images/google.svg" alt="Google-Logo"  className="google-logo"/>
                   Signup with Google
                 </button>
               </>
             )}
 
-            
             {step === 2 && (
               <>
                 <input
@@ -104,35 +137,40 @@ function Signup() {
                   placeholder="Confirm Password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={invalidFields.includes("confirmPassword") ? "invalid" : ""}
+                  className={
+                    invalidFields.includes("confirmPassword") ? "invalid" : ""
+                  }
                 />
                 {error && <p className="error">{error}</p>}
               </>
-            )}  
+            )}
 
             {/* Buttons */}
-
             <div className="btn">
-              
-              {(step === 2) && (
-                  <button type="submit" className="pos-btn" disabled={loading}>
+              {step === 2 && (
+                <>
+                  <button type="submit" className="pos-btn" disabled={loading || !tcAccepted} title={!tcAccepted ? "Please agree to Terms and Conditions." : ""}>
                     {loading ? "Signing up..." : "Signup"}
-                  </button>   
-              )}
-              {(step === 2 ) && (
+                  </button>
+
                   <button type="button" className="neg-btn" onClick={() => setStep((prev) => prev - 1)} disabled={loading}>
                     Back
                   </button>
+                  <label htmlFor="terms-checkbox" className="termsConditions">
+                    <input type="checkbox" id="terms-checkbox" checked={tcAccepted} onChange={(e) => setTCAccepted(e.target.checked)}/>
+                      <p>I agree to the{" "} <a onClick={openTCModal}> Terms and Conditions</a></p>
+                  </label>
+                </>
               )}
             </div>
-
           </form>
         </div>
-          <div className="switch">
-            <p>
-              Already have an account? <Link to="/login">Login</Link>
-            </p>
-          </div>
+
+        <div className="switch">
+          <p>
+            Already have an account? <Link to="/login">Login</Link>
+          </p>
+        </div>
       </section>
     </main>
   );

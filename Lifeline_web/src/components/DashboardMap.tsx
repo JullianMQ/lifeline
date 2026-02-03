@@ -102,7 +102,7 @@ function DashboardMap({ markers, center, onSelectContact }: Props) {
       options={{
         disableDefaultUI: true,
         zoomControl: true,
-        mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
+        mapId: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
       }}
     />
   );

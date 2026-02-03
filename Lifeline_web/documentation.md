@@ -120,3 +120,9 @@ npm install
 - Added user and contact icon as Google Map pin
 - Implemented pin onclick function to view details
 - Fixed user location pin 
+
+### 2026-02-03
+
+- Added Terms and Conditions
+- Implement disable signup button
+- Terms and conditions modal passes value to signup

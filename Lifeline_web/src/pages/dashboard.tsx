@@ -188,7 +188,7 @@ function Dashboard() {
     });
     return contact || null;
   }, [selectedContactId, contactCards]);
-
+  
   // Handle selecting a contact - store the ID, not the object
   const handleSelectContact = (contact: ContactCard) => {
     console.log("[Dashboard] Selecting contact:", contact.id, contact.name);
@@ -232,6 +232,7 @@ function Dashboard() {
           name: c.name,
           phone: c.phone,
           location: { lat: c.location.coords.lat, lng: c.location.coords.lng },
+          image: c.image,
         });
       }
     });

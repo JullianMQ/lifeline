@@ -143,18 +143,21 @@ export default function DashboardContact({
       </button>
 
       <section className="dashboard-user">
-        <img
-          src={contact?.image || "/images/user-example.svg"}
-          alt={`${contact?.name}`}
-          className="dashboard-user-img avatar"
-        />
-        <div className="dashboard-cont-info">
-          <div className="dashboard-name-row">
-            <h1 className={contact.hasActiveAlert ? 'alert-text' : ''}>{contact?.name?.split(" ")[0] || "User"}</h1>
-            <span
+        <div className="relative">
+          <img
+            src={contact?.image || "/images/user-example.svg"}
+            alt={`${contact?.name}`}
+            className="dashboard-user-img avatar"
+          />
+          <span
               className={`presence-indicator ${isOnline ? "presence-online" : "presence-offline"}`}
               title={isOnline ? "Online" : "Offline"}
             />
+        </div>
+        <div className="dashboard-cont-info">
+          <div className="dashboard-name-row">
+            <h1 className={contact.hasActiveAlert ? 'alert-text' : ''}>{contact?.name?.split(" ")[0] || "User"}</h1>
+            
           </div>
           <p className={contact.hasActiveAlert ? 'alert-text' : ''}>{contact?.phone}</p>
           {!isOnline && lastSeen && (

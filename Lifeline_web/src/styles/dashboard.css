@@ -523,6 +523,9 @@ ul{
     right: 0;
     border: 5px solid var(--soft-white);
 }
+.dashboard-contact-wrapper .presence-indicator{
+    border: 5px solid var(--base-white);
+}
 
 .alert-badge {
     position: absolute;

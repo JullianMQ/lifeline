@@ -9,7 +9,7 @@ import {
   type StoredLocation,
   type LocationStore 
 } from "./locationStorage";
-import type { User, Contact } from "../types";
+import type { User } from "../types";
 import type { UseDashboardReturn, ContactCard, EmergencyAlert, LocationData } from "../types/realtime";
 
 /** Raw contact data from REST API */
@@ -29,7 +29,6 @@ export function useDashboard(): UseDashboardReturn {
 
   // REST API state
   const [user, setUser] = useState<User | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [rawContacts, setRawContacts] = useState<RawContact[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
