@@ -264,6 +264,10 @@ ul{
         padding: var(--space-md);
     }
 
+    .dashboard-buttons img{
+        width: 20%;
+    }
+
     .dashboard-content{
         gap: var(--space-sm);
     }
@@ -311,7 +315,6 @@ ul{
     gap: var(--space-xs);
     padding: var(--space-xxs) var(--space-xs);
     border-radius: 12px;
-    background-color: var(--soft-white);
     font-size: 0.75rem;
 }
 
@@ -550,40 +553,6 @@ ul{
 }
 
 /* ============================================================================
-   Alert Card Styling (Red background when SOS active)
-   ============================================================================ */
-
-.dashboard-card-alert {
-    background-color: var(--lifeline-red) !important;
-    animation: pulse-card 1.5s infinite;
-}
-
-.dashboard-card-alert h3,
-.dashboard-card-alert .alert-text {
-    color: var(--soft-white) !important;
-}
-
-.dashboard-card-alert .alert-label {
-    color: var(--soft-white);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    margin-top: var(--space-xxs);
-    text-transform: uppercase;
-}
-
-@keyframes pulse-card {
-    0%, 100% { 
-        transform: scale(1);
-        box-shadow: 0px 6px 4px rgba(0, 0, 0, 0.25);
-    }
-    50% { 
-        transform: scale(1.02);
-        box-shadow: 0px 8px 12px rgba(223, 55, 33, 0.4);
-    }
-}
-
-/* ============================================================================
    Emergency Alert Modal
    ============================================================================ */
 
@@ -805,7 +774,7 @@ ul{
 }
 
 .alert-indicator-btn:hover {
-    background-color: #c62d1a;
+    background-color: var(--muted-grey);
 }
 
 .alert-indicator-icon {
@@ -832,6 +801,7 @@ ul{
     }
 }
 
+
 /* ============================================================================
    Dashboard Contact Alert State (Red background when viewing SOS contact)
    ============================================================================ */
@@ -846,24 +816,6 @@ ul{
     padding: var(--space-sm);
     border-radius: var(--space-sm);
     transition: background-color 0.3s ease;
-}
-
-.dashboard-contact-alert {
-    background-color: var(--lifeline-red);
-    animation: pulse-contact-alert 2s infinite;
-}
-
-@keyframes pulse-contact-alert {
-    0%, 100% { 
-        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
-    }
-    50% { 
-        box-shadow: 0 0 20px 10px rgba(223, 55, 33, 0.2);
-    }
-}
-
-.dashboard-contact-alert .alert-text {
-    color: var(--soft-white) !important;
 }
 
 .dashboard-contact-alert .alert-text-muted {
@@ -935,9 +887,12 @@ ul{
 @media screen and (max-width: 768px) {
     .dashboard-contact-wrapper {
         padding: var(--space-xs);
-        gap: var(--space-sm);
+        gap: var(--space-xs);
     }
 
+    .dashboard-cont-ws{
+        gap: var(--space-xxs);
+    }
     .alert-banner-inline {
         flex-direction: column;
         text-align: center;

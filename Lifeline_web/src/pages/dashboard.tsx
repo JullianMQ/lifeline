@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import "../styles/dashboard.css";
+import "../styles/alertMode.css";
 import { useDashboard } from "../scripts/useDashboard";
 import { useNavigate } from "react-router-dom";
 import DashboardMap, { DEFAULT_MAP_CENTER } from "../components/DashboardMap";
@@ -139,13 +140,11 @@ function Dashboard() {
   const prevAlertsSignature = useRef<string>("");
 
   const {
-    markers,
     loading,
     handleLocation,
     getGeocode,
     setAddress,
     address,
-    updateMarker,
   } = useMap();
   const {
     user,
@@ -241,6 +240,7 @@ function Dashboard() {
     if (user?.location) {
       handleLocation(user);
     }
+    
   }, [contactCards, user]);
 
   // Update address and history when selected contact's location changes
@@ -352,7 +352,7 @@ function Dashboard() {
   };
 
   return (
-    <main className="dashboard">
+    <main className={`dashboard ${selectedContact?.hasActiveAlert ? "alert" : ""}`}>
       {/* Emergency Alert Modal */}
       {showAlertModal && activeAlerts.length > 0 && (
         <AlertModal
@@ -430,17 +430,16 @@ function Dashboard() {
               onBack={handleBack}
               geocode={address}
               history={history[selectedContact.phone] || []}
-              onAcknowledgeAlert={acknowledgeAlert}
             />
           )}
         </div>
 
         <div className="map">
           <DashboardMap
-            markers={markers}
             loading={loading}
             center={getMapCenter()}
             onSelectContact={handleSelectContact}
+            contacts={contactCards}
           />
         </div>
       </section>

@@ -133,9 +133,6 @@ export function useDashboard(): UseDashboardReturn {
         ...(data.dependent_contacts || []),
       ];
       setRawContacts(userContacts);
-
-      // Also format for backward compatibility
-
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load contacts";
       setError(errorMessage);
@@ -183,9 +180,8 @@ export function useDashboard(): UseDashboardReturn {
     return rawContacts.map((contact) => {
       // Use phone number as the primary key for matching
       const contactPhone = contact.phone_no;
-      const contactUserId = contact.user_id || contact.id || "";
+      const contactUserId = contact.user_id;
       const roomId = contact.room_id || null;
-
       // Get real-time location - match by phone number
       let locationData: LocationData | null = null;
       
@@ -231,7 +227,7 @@ export function useDashboard(): UseDashboardReturn {
       });
 
       return {
-        id: contactPhone || contactUserId || `contact_${contact.phone_no}`,
+        id: contactUserId || contactPhone || "",
         name: contact.name,
         phone: contact.phone_no,
         email: contact.email,

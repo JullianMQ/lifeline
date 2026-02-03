@@ -1,0 +1,107 @@
+/* Dashboard */
+.alert header > *, .alert footer, .alert .status-text{ color: var(--soft-white) !important; }
+.alert header, .alert footer{ background-color: var(--lifeline-red); }
+.alert .map, .alert .map > *{ border: 2px solid var(--lifeline-red) !important; }
+
+.alert .alert-indicator-btn{
+    background-color: var(--soft-white);
+    color: var(--lifeline-red);
+    animation: pulse-alert-btn-alert 1.5s infinite;
+}
+
+.alert .alert-indicator-icon{
+    background: var(--lifeline-red);
+    color: var(--soft-white);
+}
+
+@keyframes pulse-alert-btn-alert {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 255, 252, 0.55);
+    }
+    50% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 0 8px rgba(255, 255, 252, 0);
+    }
+}
+
+/* Fonts */
+.alert-mode h1{
+    font-size: clamp(2.25rem, 1.4308rem + 3.4951vw, 5.625rem) !important;
+    color: var(--lifeline-red);
+}
+
+.alert-mode p{
+    font-size: clamp(1.25rem, 1.068rem + 0.7767vw, 2rem) !important;
+}
+
+.alert .dashboard-content{
+    text-align: center;
+}
+
+/* Contact Card */
+.alert-mode .dashboard-user{
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.alert-mode .dashboard-user-img{
+    height: 180px;
+}
+
+.dashboard-card.alert-mode {
+    background-color: var(--lifeline-red) !important;
+    animation: pulse-card 1.5s infinite;
+}
+
+.dashboard-card.alert-mode h3,
+.dashboard-card.alert-mode .alert-text {
+    color: var(--soft-white) !important;
+}
+
+@keyframes pulse-card {
+    0%, 100% { 
+        transform: scale(1);
+    }
+    50% { 
+        transform: scale(0.98);
+    }
+}
+
+.map-pin.alert-mode {
+    animation: pulse-pin 1.5s infinite;
+}
+
+@keyframes pulse-pin {
+    0% { 
+        
+        transform: translateY(0);
+        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
+
+    }
+    25% { 
+        transform: translateY(5px);
+        box-shadow: 0 0 6px 8px rgba(223, 55, 33, 0);
+    }
+    75% { 
+        transform: translateY(5px);
+        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0);
+    }
+    100% { 
+        transform: translateY(0);
+        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .alert-mode .dashboard-user-img{
+        height: 60px;
+    }
+}
+
+@media screen and (min-width: 768px) and (max-width: 1023px) {
+    .alert-mode .dashboard-user-img{
+        height: 100px;
+    }
+}
