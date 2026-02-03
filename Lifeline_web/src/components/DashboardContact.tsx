@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { ContactCard, EmergencyAlert } from "../types/realtime";
+import type { ContactCard } from "../types/realtime";
 import MediaModal, { type MediaFile, type MediaType } from "./MediaModal";
 import { debugMedia } from "../scripts/debug";
 

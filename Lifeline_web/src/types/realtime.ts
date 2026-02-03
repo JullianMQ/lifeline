@@ -232,7 +232,6 @@ export interface EmergencyAlert {
     id: string;
     emergencyUserId: string;
     emergencyUserName: string;
-    phone_no: string;
     roomId: string;
     message: string;
     timestamp: string;

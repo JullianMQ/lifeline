@@ -25,6 +25,7 @@ const createInitialState = (): WebSocketState => ({
   locations: new Map(),
   presence: new Map(),
   alerts: [],
+  stateVersion: 0,
 });
 
 const mockUser: BackendUser = {

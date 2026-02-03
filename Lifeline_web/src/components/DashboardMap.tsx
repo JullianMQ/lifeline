@@ -2,7 +2,7 @@ import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { useEffect, useState } from "react";
 import "../styles/dashboard.css";
 import "../styles/pin.css";
-import type { LatLng, pinMarker } from "../types";
+import type { LatLng } from "../types";
 import type { ContactCard } from "../types/realtime";
 
 const containerStyle = {
