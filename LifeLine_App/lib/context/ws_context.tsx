@@ -4,7 +4,9 @@ import { AppState } from "react-native";
 import {
     connectWS,
     disconnectWS,
+    resetWSForAuthSwitch,
     createRoom,
+    joinRoom,
     getJoinedRooms,
     getActiveRoom,
     setActiveRoom,
@@ -14,164 +16,161 @@ import {
     type ServerMessage,
 } from "@/lib/services/websocket";
 
+import { getToken } from "@/lib/api/storage/user";
+import { getOwnerRoomId, setOwnerRoomId, clearOwnerRoomId } from "@/lib/api/storage/ws_rooms";
+
 export type AppNotification = {
-    id: string;
-    type: string;
+    type: "info" | "error" | "join-request" | "emergency-alert" | "emergency-confirmed";
     message: string;
     timestamp?: string;
     roomId?: string;
-    read: boolean;
     fromUser?: { id: string; name?: string };
+    clientId?: string;
 };
 
 type WSContextValue = {
     isConnected: boolean;
-    clientId: string | null;
-    user: any | null;
-    rooms: string[];
     activeRoomId: string | null;
+    rooms: string[];
     serverTimestamp: string | null;
     lastError: string | null;
 
     roomUsers: Record<string, any[]>;
     notifications: AppNotification[];
 
-    ensureMyRoom: () => void;
-    sos: () => void;
-    refreshUsers: (roomId?: string) => void;
-
-    markNotifRead: (id: string) => void;
-    deleteNotif: (id: string) => void;
-    clearNotifs: () => void;
-
+    ensureMyRoom: () => Promise<void>;
     setActiveRoomId: (roomId: string) => void;
+    requestUsers: (roomId: string) => void;
+
+    sos: () => Promise<void> | void;
 };
 
 const WSContext = createContext<WSContextValue | null>(null);
 
-export function WSProvider({ children }: { children: React.ReactNode }) {
+type WSProviderProps = {
+    children: React.ReactNode;
+    authToken?: string | null;
+    headers?: Record<string, string>;
+};
+
+// ---- deterministic room id helper (32 hex) ----
+function fnv1a32(input: string, seed = 0x811c9dc5) {
+    let h = seed >>> 0;
+    for (let i = 0; i < input.length; i++) {
+        h ^= input.charCodeAt(i);
+        h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h >>> 0;
+}
+function hex32(x: number) {
+    return (x >>> 0).toString(16).padStart(8, "0");
+}
+function deterministicRoomIdForUser(userId: string) {
+    const h1 = fnv1a32(userId, 0x811c9dc5);
+    const h2 = fnv1a32(`lifeline:${userId}`, 0x811c9dc5);
+    const h3 = fnv1a32(`owner:${userId}`, 0x811c9dc5);
+    const h4 = fnv1a32(`room:${userId}`, 0x811c9dc5);
+    return `${hex32(h1)}${hex32(h2)}${hex32(h3)}${hex32(h4)}`;
+}
+function isValidRoomId(roomId: string) {
+    return /^[a-f0-9]{32}$/i.test(roomId);
+}
+
+export function WSProvider({ children, authToken, headers }: WSProviderProps) {
+    const [resolvedToken, setResolvedToken] = useState<string | null>(authToken ?? null);
+
     const [isConnected, setIsConnected] = useState(false);
-    const [clientId, setClientId] = useState<string | null>(null);
-    const [user, setUser] = useState<any | null>(null);
-
-    // Keep latest identity values for WS message handlers that may outlive a render.
-    const userRef = useRef<any | null>(null);
-    const clientIdRef = useRef<string | null>(null);
-
-    useEffect(() => {
-        userRef.current = user;
-    }, [user]);
-
-    useEffect(() => {
-        clientIdRef.current = clientId;
-    }, [clientId]);
-
     const [rooms, setRooms] = useState<string[]>([]);
     const [activeRoomIdState, setActiveRoomIdState] = useState<string | null>(null);
-
     const [serverTimestamp, setServerTimestamp] = useState<string | null>(null);
     const [lastError, setLastError] = useState<string | null>(null);
 
     const [roomUsers, setRoomUsers] = useState<Record<string, any[]>>({});
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-    // legacy refs kept, but we no longer invent custom room IDs
-    const myRoomIdRef = useRef<string | null>(null);
-    const myRoomCreatedRef = useRef(false);
-    const creatingMyRoomRef = useRef(false);
-
-    // WS handshake + lifecycle
     const hasHandshakeRef = useRef(false);
+    const userRef = useRef<any>(null);
+    const clientIdRef = useRef<string | null>(null);
 
-    const addNotif = (partial: Omit<AppNotification, "id" | "read">) => {
-        setNotifications((prev) => [
-            {
-                id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-                read: false,
-                ...partial,
-            },
-            ...prev,
-        ]);
+    const ensureInFlightRef = useRef(false);
+    const ensureRequestedBeforeHandshakeRef = useRef(false);
+    const ownedRoomReadyRef = useRef(false);
+
+    const ownerRecoveryRef = useRef<{ userId: string; roomId: string } | null>(null);
+
+    // NEW: suppress WS onError logging during logout / auth-switch teardown
+    const suppressErrorLogsRef = useRef(false);
+
+    const addNotif = (n: AppNotification) => {
+        setNotifications((prev) => [n, ...prev].slice(0, 50));
     };
 
-    const markNotifRead = (id: string) => {
-        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    const getCurrentUserId = () => {
+        return (userRef.current?.id ?? clientIdRef.current ?? null) as string | null;
     };
-
-    const deleteNotif = (id: string) => {
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
-    };
-
-    const clearNotifs = () => setNotifications([]);
 
     const syncRooms = () => {
         const joined = getJoinedRooms();
-        if (Array.isArray(joined)) setRooms(joined);
+        setRooms(joined);
 
         const active = getActiveRoom();
-        setActiveRoomIdState(active ?? null);
-    };
-
-    const refreshUsers = (roomId?: string) => {
-        const target = roomId ?? activeRoomIdState ?? getActiveRoom();
-        if (!target) return;
-        getRoomUsers(target);
-    };
-
-    const ensureMyRoom = async () => {
-        // Prevent loops: only request once until server confirms via "room-created"
-        if (creatingMyRoomRef.current) return;
-        if (myRoomCreatedRef.current) return;
-
-        creatingMyRoomRef.current = true;
-        setLastError(null);
-
-        try {
-            await createRoom();
-        } catch (err: any) {
-            // If WS is down and cannot be opened, createRoom() can now throw (via waitForOpen).
-            // Reset the guard so the user can retry once connectivity is back.
-            creatingMyRoomRef.current = false;
-            setLastError(err?.message ?? "Failed to create room (WebSocket not ready)");
-        } finally {
-            // keep "creating" true until server confirms via "room-created"
+        if (active && joined.includes(active)) {
+            setActiveRoomIdState(active);
+        } else if (!activeRoomIdState && joined.length) {
+            setActiveRoom(joined[0]);
+            setActiveRoomIdState(joined[0]);
         }
     };
 
+    const ensureOwnerRoom = async () => {
+        if (!hasHandshakeRef.current) {
+            ensureRequestedBeforeHandshakeRef.current = true;
+            return;
+        }
+        if (ensureInFlightRef.current || ownedRoomReadyRef.current) return;
+
+        const userId = getCurrentUserId();
+        if (!userId) return;
+
+        ensureInFlightRef.current = true;
+
+        const saved = await getOwnerRoomId(userId).catch(() => null);
+        const desired = saved && isValidRoomId(saved) ? saved : deterministicRoomIdForUser(userId);
+
+        ownerRecoveryRef.current = { userId, roomId: desired };
+
+        try {
+            await joinRoom(desired);
+        } catch {
+            // join result handled via messages
+        }
+    };
+
+    const ensureMyRoom = async () => {
+        await ensureOwnerRoom();
+    };
+
     const handleMessage = (msg: ServerMessage) => {
-        if ("timestamp" in msg) setServerTimestamp((msg as any).timestamp);
+        if ("timestamp" in msg) setServerTimestamp((msg as any).timestamp ?? null);
 
         switch (msg.type) {
             case "connected": {
-                const nextClientId = (msg as any).clientId ?? null;
-                const nextUser = (msg as any).user ?? null;
-
-                // Update refs first so the rest of this handler reads fresh values.
-                clientIdRef.current = nextClientId;
-                userRef.current = nextUser;
-
-                setClientId(nextClientId);
-                setUser(nextUser);
-                setLastError(null);
+                clientIdRef.current = (msg as any).clientId ?? null;
+                userRef.current = (msg as any).user ?? null;
 
                 hasHandshakeRef.current = true;
+                ownedRoomReadyRef.current = false;
+                ensureInFlightRef.current = false;
+                ownerRecoveryRef.current = null;
 
-                // server truth (doc)
-                const roomIds: string[] = Array.isArray((msg as any).roomIds) ? (msg as any).roomIds : [];
-                setRooms(roomIds);
+                setLastError(null);
+                syncRooms();
 
-                // pick an active room if we don't have one
-                const active = activeRoomIdState ?? getActiveRoom();
-                if (!active && roomIds.length) {
-                    setActiveRoom(roomIds[0]);
-                    setActiveRoomIdState(roomIds[0]);
+                if (ensureRequestedBeforeHandshakeRef.current) {
+                    ensureRequestedBeforeHandshakeRef.current = false;
                 }
 
-                // reset per-connection flags
-                myRoomCreatedRef.current = false;
-                creatingMyRoomRef.current = false;
-                myRoomIdRef.current = null;
-
+                ensureOwnerRoom().catch(() => { });
                 break;
             }
 
@@ -181,17 +180,73 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 break;
             }
 
-            case "room-created":
+            case "room-created": {
+                const roomId = (msg as any).roomId as string | undefined;
+                const userId = getCurrentUserId();
+
+                if (roomId && userId) {
+                    setOwnerRoomId(userId, roomId).catch(() => { });
+                    ownedRoomReadyRef.current = true;
+
+                    setActiveRoom(roomId);
+                    setActiveRoomIdState(roomId);
+
+                    setRooms((prev) => Array.from(new Set<string>([...prev, roomId])));
+                }
+
+                ensureInFlightRef.current = false;
+                ownerRecoveryRef.current = null;
+                syncRooms();
+                break;
+            }
+
             case "join-approved": {
-                creatingMyRoomRef.current = false;
-                myRoomCreatedRef.current = true;
+                const roomId = (msg as any).roomId as string | undefined;
+                const userId = getCurrentUserId();
+
+                if (roomId) setRooms((prev) => Array.from(new Set<string>([...prev, roomId])));
+
+                const rec = ownerRecoveryRef.current;
+                if (rec && userId && rec.userId === userId && roomId === rec.roomId) {
+                    setOwnerRoomId(userId, roomId!).catch(() => { });
+                    ownedRoomReadyRef.current = true;
+                    ensureInFlightRef.current = false;
+                    ownerRecoveryRef.current = null;
+
+                    setActiveRoom(roomId!);
+                    setActiveRoomIdState(roomId!);
+                }
+
                 syncRooms();
                 break;
             }
 
             case "join-denied": {
-                setLastError((msg as any).message ?? "Join denied");
-                creatingMyRoomRef.current = false;
+                const message = ((msg as any).message ?? "Join denied") as string;
+                const deniedRoomId = ((msg as any).roomId ?? null) as string | null;
+
+                setLastError(message);
+
+                const userId = getCurrentUserId();
+                const rec = ownerRecoveryRef.current;
+
+                const matchesRecovery =
+                    !!rec &&
+                    !!userId &&
+                    rec.userId === userId &&
+                    (!deniedRoomId || deniedRoomId === rec.roomId);
+
+                if (matchesRecovery) {
+                    clearOwnerRoomId(userId).catch(() => { });
+                    createRoom(rec.roomId)
+                        .catch((err: any) => setLastError(err?.message ?? "Failed to create owner room"))
+                        .finally(() => {
+                            ensureInFlightRef.current = false;
+                        });
+                    return;
+                }
+
+                ensureInFlightRef.current = false;
                 break;
             }
 
@@ -203,9 +258,7 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
             case "emergency-alert": {
                 const m = msg as any;
-
-                // IMPORTANT: use refs to avoid stale closure values.
-                const myId = userRef.current?.id ?? clientIdRef.current ?? null;
+                const myId = getCurrentUserId();
                 if (myId && m.emergencyUserId === myId) break;
 
                 addNotif({
@@ -222,45 +275,21 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 const m = msg as any;
                 addNotif({
                     type: "emergency-confirmed",
-                    message: `Emergency confirmed${Array.isArray(m.activatedRooms) ? ` (${m.activatedRooms.length} room(s))` : ""
-                        }`,
+                    message: m.message ?? "Emergency confirmed",
                     timestamp: m.timestamp,
                 });
                 break;
             }
 
-            case "emergency-activated": {
+            case "join-request": {
                 const m = msg as any;
                 addNotif({
-                    type: "emergency-activated",
-                    message: `Emergency activated in room ${m.roomId}`,
+                    type: "join-request",
+                    message: `${m.user?.name ?? "A user"} wants to join`,
                     timestamp: m.timestamp,
                     roomId: m.roomId,
-                    fromUser: { id: m.clientId, name: m.userName },
-                });
-                break;
-            }
-
-            case "room-message": {
-                const m = msg as any;
-                addNotif({
-                    type: "room-message",
-                    message: m.content ?? "",
-                    timestamp: m.timestamp,
-                    roomId: m.roomId,
-                    fromUser: { id: m.clientId, name: m.userName },
-                });
-                break;
-            }
-
-            case "user-left": {
-                const m = msg as any;
-                addNotif({
-                    type: "user-left",
-                    message: `${m.userName ?? "A user"} left`,
-                    timestamp: m.timestamp,
-                    roomId: m.roomId,
-                    fromUser: { id: m.clientId, name: m.userName },
+                    fromUser: { id: m.clientId, name: m.user?.name },
+                    clientId: m.clientId,
                 });
                 break;
             }
@@ -268,7 +297,7 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
             case "user-joined": {
                 const m = msg as any;
                 addNotif({
-                    type: "user-joined",
+                    type: "info",
                     message: `${m.user?.name ?? "A user"} joined`,
                     timestamp: m.timestamp,
                     roomId: m.roomId,
@@ -277,19 +306,8 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 break;
             }
 
-            case "location-update": {
-                // your app likely handles this elsewhere; keep as-is if present
-                break;
-            }
-
-            case "pong": {
-                // optional: could update a last-seen timestamp if you want
-                break;
-            }
-
             case "error": {
-                setLastError((msg as any).message ?? "WS error");
-                creatingMyRoomRef.current = false;
+                setLastError((msg as any).message ?? "WebSocket error");
                 break;
             }
 
@@ -298,90 +316,161 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const connectOnce = () => {
+    const connectOnce = (token: string) => {
         connectWS({
+            authToken: token,
+            headers,
             onOpen: () => setIsConnected(true),
             onMessage: handleMessage,
             onClose: () => {
                 setIsConnected(false);
-
-                // Keep last-known rooms/active room for mobile REST fallback.
-                // The next "connected" handshake will rehydrate server-truth anyway.
-                myRoomIdRef.current = null;
-                myRoomCreatedRef.current = false;
-                creatingMyRoomRef.current = false;
-
                 hasHandshakeRef.current = false;
+                ensureInFlightRef.current = false;
+                ownedRoomReadyRef.current = false;
             },
+
+            // ✅ FIX: don’t log teardown errors during logout/auth switch
             onError: (e) => {
-                console.log("WS onError", e);
+                if (suppressErrorLogsRef.current) return;
+
+                // RN WebSocket error can fire after a normal close; ignore if not connected.
+                if (!isWSConnected()) return;
+
+                // Optional: keep a small dev log instead of dumping the whole event
+                if (__DEV__) {
+                    const rs =
+                        (e as any)?.currentTarget?.readyState ??
+                        (e as any)?.target?.readyState ??
+                        "unknown";
+                    console.log("[WS] onError", { readyState: rs });
+                }
             },
         });
     };
 
-    // Connect once when provider mounts
+    // Resolve token if parent didn't pass it
     useEffect(() => {
-        connectOnce();
-        return () => disconnectWS();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        let cancelled = false;
 
-    // Background/foreground handling (doc-friendly)
+        (async () => {
+            if (authToken !== undefined) {
+                setResolvedToken(authToken ?? null);
+                return;
+            }
+            const t = await getToken().catch(() => null);
+            if (!cancelled) setResolvedToken(t ?? null);
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [authToken]);
+
+    // Reconnect/reset whenever token changes
+    const prevTokenRef = useRef<string | null | undefined>(undefined);
     useEffect(() => {
-        const sub = AppState.addEventListener("change", (nextState) => {
-            if (nextState === "active") {
-                if (!isWSConnected()) connectOnce();
-            } else {
-                // we keep it connected unless you explicitly want to disconnect here
+        const prev = prevTokenRef.current;
+        prevTokenRef.current = resolvedToken;
+
+        // first render
+        if (prev === undefined) {
+            if (resolvedToken) connectOnce(resolvedToken);
+            return;
+        }
+
+        // Any auth transition -> hard reset
+        suppressErrorLogsRef.current = true;
+
+        resetWSForAuthSwitch();
+
+        setIsConnected(false);
+        setRooms([]);
+        setActiveRoomIdState(null);
+        setServerTimestamp(null);
+        setLastError(null);
+        setRoomUsers({});
+        setNotifications([]);
+
+        hasHandshakeRef.current = false;
+        ensureInFlightRef.current = false;
+        ownedRoomReadyRef.current = false;
+        ownerRecoveryRef.current = null;
+
+        userRef.current = null;
+        clientIdRef.current = null;
+
+        // allow errors again after teardown settles
+        setTimeout(() => {
+            suppressErrorLogsRef.current = false;
+        }, 750);
+
+        if (resolvedToken) connectOnce(resolvedToken);
+    }, [resolvedToken]);
+
+    // Foreground reconnect + (if token unmanaged) refresh token
+    useEffect(() => {
+        const sub = AppState.addEventListener("change", async (state) => {
+            if (state !== "active") return;
+
+            if (authToken === undefined) {
+                const latest = await getToken().catch(() => null);
+                if (latest !== resolvedToken) {
+                    setResolvedToken(latest ?? null);
+                    return;
+                }
+            }
+
+            if (resolvedToken && !isWSConnected()) {
+                connectOnce(resolvedToken);
+            }
+
+            if (resolvedToken) {
+                ensureOwnerRoom().catch(() => { });
             }
         });
 
         return () => sub.remove();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [authToken, resolvedToken]);
 
-    const sos = () => {
-        sendEmergencySOS();
-    };
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            // also suppress logs during unmount teardown
+            suppressErrorLogsRef.current = true;
+            disconnectWS({ wipeKnownRooms: true, wipePending: true });
+        };
+    }, []);
 
     const setActiveRoomId = (roomId: string) => {
         setActiveRoom(roomId);
         setActiveRoomIdState(roomId);
+        syncRooms();
+    };
+
+    const requestUsers = (roomId: string) => {
+        getRoomUsers(roomId);
+    };
+
+    const sos = async () => {
+        await ensureOwnerRoom();
+        sendEmergencySOS();
     };
 
     const value = useMemo<WSContextValue>(
         () => ({
             isConnected,
-            clientId,
-            user,
-            rooms,
             activeRoomId: activeRoomIdState ?? getActiveRoom(),
-            serverTimestamp,
-            lastError,
-            roomUsers,
-            notifications,
-
-            ensureMyRoom,
-            sos,
-            refreshUsers,
-
-            markNotifRead,
-            deleteNotif,
-            clearNotifs,
-
-            setActiveRoomId,
-        }),
-        [
-            isConnected,
-            clientId,
-            user,
             rooms,
-            activeRoomIdState,
             serverTimestamp,
             lastError,
             roomUsers,
             notifications,
-        ]
+            ensureMyRoom,
+            setActiveRoomId,
+            requestUsers,
+            sos,
+        }),
+        [isConnected, activeRoomIdState, rooms, serverTimestamp, lastError, roomUsers, notifications]
     );
 
     return <WSContext.Provider value={value}>{children}</WSContext.Provider>;

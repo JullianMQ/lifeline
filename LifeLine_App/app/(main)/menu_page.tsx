@@ -5,7 +5,8 @@ import { SensorContext } from "@/lib/context/sensor_context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { logout } from "../../lib/api/auth";
-import { getUser, clearUser } from "../../lib/api/storage/user";
+import { getUser } from "../../lib/api/storage/user";
+import { resetWSForAuthSwitch } from "@/lib/services/websocket";
 
 const MenuPage = () => {
     const { stopMonitoring } = useContext(SensorContext);
@@ -24,9 +25,15 @@ const MenuPage = () => {
 
     const handleLogout = async () => {
         try {
+            // Stop any sensors/foreground work first
             await stopMonitoring();
+
+            // Hard reset WS state BEFORE clearing auth so no cached rooms leak
+            resetWSForAuthSwitch();
+
+            // Clears SecureStore token/user inside logout() finally block
             await logout();
-            await clearUser();
+
             router.replace("/(auth)/login");
         } catch (err) {
             console.error("Logout failed:", err);
@@ -43,16 +50,7 @@ const MenuPage = () => {
                     className="w-12 h-12 rounded-full"
                 />
                 <View className="ml-4">
-                    <Text className="text-base font-semibold">
-                        {user?.name ?? "User"}
-                    </Text>
-
-                    {/* Email if gusto isama */}
-                    {/* {user?.email && (
-                        <Text className="text-sm text-gray-500">
-                            {user.email}
-                        </Text>
-                    )} */}
+                    <Text className="text-base font-semibold">{user?.name ?? "User"}</Text>
                 </View>
             </View>
 

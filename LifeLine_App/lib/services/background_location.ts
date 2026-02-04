@@ -186,3 +186,11 @@ export async function stopBackgroundLocationUploads() {
     if (!started) return;
     await Location.stopLocationUpdatesAsync(TASK_NAME);
 }
+
+export async function clearRoomIdFallbackCache() {
+    try {
+        await AsyncStorage.removeItem(ROOM_ID_KEY);
+    } catch {
+        // ignore
+    }
+}
