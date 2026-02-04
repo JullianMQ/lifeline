@@ -1,57 +1,114 @@
 import { WS_BASE_URL } from "@/lib/api/config";
 
+/**
+ * WebSocket client for the LifeLine backend.
+ *
+ * Includes:
+ * - Safe auth switching: queued/outbox messages are wiped when auth changes.
+ * - Room state scoped per authenticated user to prevent cross-account leakage.
+ * - RN WebSocket header handling.
+ * - sendLocationUpdate() export.
+ * - Suppress noisy onError events on intentional close (logout/disconnect).
+ */
+
 const WS_URL = `${WS_BASE_URL.replace(/\/$/, "")}/ws`;
 
+// React Native WebSocket event typings differ from DOM; keep these permissive.
 type WebSocketCloseEvent = any;
 
 let socket: WebSocket | null = null;
 
-// "current" = only valid for the current WS connection.
-// "lastKnown" = survives disconnects so mobile clients can keep a roomId for
-// REST fallback location uploads when WS is disconnected (see websocket-api.md).
+/** Rooms known for the CURRENT socket connection (server truth for this connection). */
 let currentRoomIds: string[] = [];
 let currentActiveRoomId: string | null = null;
 
-let lastKnownRoomIds: string[] = [];
-let lastKnownActiveRoomId: string | null = null;
+/** Which authenticated user the CURRENT connection belongs to (from `connected`). */
+let currentHandshakeUserId: string | null = null;
 
-// Queue/outbox (client-side only).
+/**
+ * Per-user room cache.
+ * Critical for account switching: user A's roomIds shouldn't be wiped/overwritten
+ * when user B logs in on the same device.
+ */
+type UserRoomState = {
+    roomIds: string[];
+    activeRoomId: string | null;
+};
+const roomStateByUser = new Map<string, UserRoomState>();
+
+/**
+ * Queue/outbox (client-side only).
+ * MUST be cleared when switching authenticated users to prevent cross-session leakage.
+ */
 let pending: string[] = [];
 const MAX_PENDING = 100;
 
+/** Handlers */
 let onMessageRef: ((msg: ServerMessage) => void) | null = null;
 let onOpenRef: (() => void) | null = null;
 let onCloseRef: ((e: WebSocketCloseEvent) => void) | null = null;
-let onErrorRef: ((e: Event) => void) | null = null;
+let onErrorRef: ((e: any) => void) | null = null;
 
-// Remember the last successful connect parameters so waitForOpen() can
-// initiate a connection when callers emit messages before a socket exists.
-type ConnectWSArgs = {
+/** Remember last connect params so waitForOpen() can initiate a connection automatically. */
+export type ConnectWSArgs = {
     onMessage: (msg: ServerMessage) => void;
     onOpen?: () => void;
     onClose?: (e: WebSocketCloseEvent) => void;
-    onError?: (e: Event) => void;
+    onError?: (e: any) => void;
+
+    /**
+     * Mobile auth alternative from websocket-api.md:
+     * Authorization: Bearer <token>
+     */
     authToken?: string;
+
+    /**
+     * Extra headers if needed. If authToken is provided and Authorization isn't set,
+     * Authorization will be auto-filled.
+     */
     headers?: Record<string, string>;
 };
-
 let lastConnectArgs: ConnectWSArgs | null = null;
 
 let openPromise: Promise<void> | null = null;
 let openResolve: (() => void) | null = null;
 let openReject: ((err: any) => void) | null = null;
 
+/**
+ * When we intentionally close (logout / disconnect / auth switch), RN may still emit
+ * a WebSocket "error" event as part of teardown. We suppress that noise.
+ */
+let intentionalClose = false;
+
+function isWSOpen() {
+    return socket?.readyState === WebSocket.OPEN;
+}
+
+function wipePending() {
+    pending = [];
+}
+
 function resetConnectionState() {
     socket = null;
     currentRoomIds = [];
     currentActiveRoomId = null;
+    currentHandshakeUserId = null;
+
     openPromise = null;
     openResolve = null;
     openReject = null;
+
+    // reset close intent marker after teardown is complete
+    intentionalClose = false;
 }
 
-function isWSOpen() {
-    return socket?.readyState === WebSocket.OPEN;
+function getOrCreateUserState(userId: string): UserRoomState {
+    const existing = roomStateByUser.get(userId);
+    if (existing) return existing;
+
+    const next: UserRoomState = { roomIds: [], activeRoomId: null };
+    roomStateByUser.set(userId, next);
+    return next;
 }
 
 function mergeRoomIds(a: string[], b: string[]) {
@@ -62,11 +119,44 @@ function mergeRoomIds(a: string[], b: string[]) {
 }
 
 function setRoomTruthFromConnected(roomIds: string[]) {
-    currentRoomIds = Array.isArray(roomIds) ? roomIds : [];
-    lastKnownRoomIds = Array.isArray(roomIds) ? roomIds : [];
+    const incoming = Array.isArray(roomIds) ? roomIds : [];
+    currentRoomIds = incoming;
 
-    if (!currentActiveRoomId && currentRoomIds.length) currentActiveRoomId = currentRoomIds[0];
-    if (!lastKnownActiveRoomId && lastKnownRoomIds.length) lastKnownActiveRoomId = lastKnownRoomIds[0];
+    if (incoming.length) {
+        if (!currentActiveRoomId || !incoming.includes(currentActiveRoomId)) {
+            currentActiveRoomId = incoming[0];
+        }
+    } else {
+        currentActiveRoomId = null;
+    }
+
+    if (currentHandshakeUserId) {
+        const st = getOrCreateUserState(currentHandshakeUserId);
+        st.roomIds = incoming;
+
+        if (incoming.length) {
+            if (!st.activeRoomId || !incoming.includes(st.activeRoomId)) st.activeRoomId = incoming[0];
+        } else {
+            st.activeRoomId = null;
+        }
+    }
+}
+
+function upsertKnownRoom(roomId: string | undefined | null) {
+    if (!roomId || typeof roomId !== "string") return;
+    const id = roomId.trim();
+    if (!id) return;
+
+    // Connection-scoped
+    currentRoomIds = mergeRoomIds(currentRoomIds, [id]);
+    if (!currentActiveRoomId) currentActiveRoomId = id;
+
+    // Per-user
+    if (currentHandshakeUserId) {
+        const st = getOrCreateUserState(currentHandshakeUserId);
+        st.roomIds = mergeRoomIds(st.roomIds, [id]);
+        if (!st.activeRoomId) st.activeRoomId = id;
+    }
 }
 
 export type ServerMessage =
@@ -77,133 +167,84 @@ export type ServerMessage =
         roomIds: string[];
         user?: any;
     }
+    | { type: "auto-joined"; roomId: string; timestamp?: string }
     | {
         type: "auto-join-summary";
         timestamp?: string;
-        roomsJoined: Array<{
-            roomId: string;
-            status: "joined" | "requested";
-        }>;
+        roomsJoined: Array<{ roomId: string; status: "joined" | "requested" }>;
     }
-    | {
-        type: "room-created";
-        roomId: string;
-        timestamp?: string;
-    }
-    | {
-        type: "join-approved";
-        roomId: string;
-        timestamp?: string;
-    }
-    | {
-        type: "join-denied";
-        roomId: string;
-        message: string;
-        timestamp?: string;
-    }
-    | {
-        type: "room-users";
-        roomId: string;
-        users: any[];
-        timestamp?: string;
-    }
+    | { type: "room-created"; roomId: string; timestamp?: string }
+    | { type: "room-users"; roomId: string; users: any[]; timestamp?: string }
+    | { type: "join-request"; roomId: string; clientId: string; user?: any; timestamp?: string }
+    | { type: "join-approved"; roomId: string; clientId?: string; timestamp?: string }
+    | { type: "join-denied"; roomId: string; clientId?: string; message?: string; timestamp?: string }
+    | { type: "user-joined"; roomId: string; clientId: string; user?: any; timestamp?: string }
+    | { type: "user-left"; roomId: string; clientId: string; userName?: string; timestamp?: string }
+    | { type: "room-message"; roomId: string; content: string; userId?: string; userName?: string; timestamp?: string }
     | {
         type: "location-update";
+        roomId?: string;
+        latitude?: number;
+        longitude?: number;
+        timestamp?: string;
+        accuracy?: number;
+        data?: any;
         userId?: string;
         userName?: string;
-        clientId?: string;
-        latitude: number;
-        longitude: number;
-        timestamp: string;
-        accuracy?: number;
-        roomId?: string;
     }
     | {
         type: "emergency-alert";
-        emergencyUserId: string;
+        roomId?: string;
+        emergencyUserId?: string;
         emergencyUserName?: string;
         message?: string;
         timestamp?: string;
+    }
+    | { type: "emergency-activated"; roomId?: string; message?: string; timestamp?: string }
+    | { type: "emergency-confirmed"; activatedRooms?: string[]; message?: string; timestamp?: string }
+    | { type: "error"; message: string; timestamp?: string }
+    | { type: "pong"; timestamp?: string };
+
+type ClientMessage =
+    | { type: "create-room"; roomId?: string }
+    | { type: "join-room"; roomId: string }
+    | { type: "approve-join"; roomId: string; clientId: string }
+    | { type: "deny-join"; roomId: string; clientId: string }
+    | { type: "get-users"; roomId: string }
+    | {
+        type: "location-update";
         roomId?: string;
-    }
-    | {
-        type: "emergency-confirmed";
-        activatedRooms?: string[];
-        timestamp?: string;
-    }
-    | {
-        type: "emergency-activated";
-        roomId: string;
-        clientId: string;
+        latitude: number;
+        longitude: number;
+        timestamp?: string | number;
+        accuracy?: number;
+        userId?: string;
         userName?: string;
-        timestamp?: string;
     }
-    | {
-        type: "room-message";
-        roomId: string;
-        clientId: string;
-        userName?: string;
-        content: string;
-        timestamp?: string;
-    }
-    | {
-        type: "user-left";
-        roomId: string;
-        clientId: string;
-        userName?: string;
-        timestamp?: string;
-    }
-    | {
-        type: "user-joined";
-        roomId: string;
-        clientId: string;
-        user?: any;
-        timestamp?: string;
-    }
-    | {
-        type: "pong";
-        timestamp?: string;
-    }
-    | {
-        type: "error";
-        message: string;
-        timestamp?: string;
-    }
-    | any;
-
-function queue(msg: any) {
-    const payload = JSON.stringify(msg);
-    if (pending.length >= MAX_PENDING) {
-        pending = pending.slice(pending.length - (MAX_PENDING - 1));
-    }
-    pending.push(payload);
-}
-
-function safeEmit(msg: any) {
-    if (!isWSOpen()) {
-        queue(msg);
-        return;
-    }
-
-    try {
-        socket!.send(JSON.stringify(msg));
-    } catch {
-        queue(msg);
-    }
-}
+    | { type: "emergency-sos" }
+    | { type: "ping" };
 
 export function getJoinedRooms() {
-    return lastKnownRoomIds;
+    if (!currentHandshakeUserId) return [];
+    return getOrCreateUserState(currentHandshakeUserId).roomIds;
 }
 
 export function getActiveRoom() {
-    return lastKnownActiveRoomId;
+    if (!currentHandshakeUserId) return null;
+    return getOrCreateUserState(currentHandshakeUserId).activeRoomId;
 }
 
 export function setActiveRoom(roomId: string) {
-    if (!roomId) return;
-    lastKnownActiveRoomId = roomId;
-    currentActiveRoomId = roomId;
+    const id = (roomId ?? "").trim();
+    if (!id) return;
+
+    currentActiveRoomId = id;
+
+    if (currentHandshakeUserId) {
+        const st = getOrCreateUserState(currentHandshakeUserId);
+        st.activeRoomId = id;
+        st.roomIds = mergeRoomIds(st.roomIds, [id]);
+    }
 }
 
 export function getRoomUsers(roomId: string) {
@@ -211,207 +252,253 @@ export function getRoomUsers(roomId: string) {
     safeEmit({ type: "get-users", roomId });
 }
 
+/**
+ * Foreground location can be WS; background should prefer REST fallback.
+ */
 export async function sendLocationUpdate(payload: {
+    roomId?: string;
     latitude: number;
     longitude: number;
-    timestamp: string;
+    timestamp?: string | number;
     accuracy?: number;
-    roomId?: string;
+    userId?: string;
+    userName?: string;
 }) {
     safeEmit({ type: "location-update", ...payload });
 }
 
-export async function sendEmergencySOS() {
+export function sendEmergencySOS() {
     safeEmit({ type: "emergency-sos" });
 }
 
-export function connectWS(args: {
-    onMessage: (msg: ServerMessage) => void;
-    onOpen?: () => void;
-    onClose?: (e: WebSocketCloseEvent) => void;
-    onError?: (e: Event) => void;
-    authToken?: string;
-    headers?: Record<string, string>;
-}) {
+export function isWSConnected() {
+    return isWSOpen();
+}
+
+/**
+ * Logout/account switch helper:
+ * - Disconnect socket
+ * - Clear queued messages (prevents cross-account leakage)
+ * - Reset only current connection state
+ * - Keep per-user cache intact
+ */
+export function resetWSForAuthSwitch() {
+    wipePending();
+    intentionalClose = true;
+    try {
+        socket?.close();
+    } catch {
+        // ignore
+    } finally {
+        // resetConnectionState() will run on close too, but keep it safe.
+        resetConnectionState();
+    }
+}
+
+/** Optional debug: wipe ALL per-user cached room state. */
+export function clearKnownRooms() {
+    roomStateByUser.clear();
+}
+
+function safeQueue(msg: ClientMessage) {
+    if (pending.length >= MAX_PENDING) pending.shift();
+    pending.push(JSON.stringify(msg));
+}
+
+function safeEmit(msg: ClientMessage) {
+    const ws = socket;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+            ws.send(JSON.stringify(msg));
+        } catch {
+            safeQueue(msg);
+        }
+    } else {
+        safeQueue(msg);
+    }
+}
+
+function buildHeaderArgs(args: ConnectWSArgs) {
+    const headers: Record<string, string> = { ...(args.headers ?? {}) };
+    if (args.authToken && !headers.Authorization) {
+        headers.Authorization = `Bearer ${args.authToken}`;
+    }
+    return headers;
+}
+
+function getHandshakeUserId(msg: any): string | null {
+    return msg?.user?.id ?? msg?.clientId ?? null;
+}
+
+function handleConnectedMessage(msg: any) {
+    const nextUserId = getHandshakeUserId(msg);
+    currentHandshakeUserId = nextUserId;
+    setRoomTruthFromConnected(Array.isArray(msg.roomIds) ? msg.roomIds : []);
+}
+
+export function connectWS(args: ConnectWSArgs) {
+    lastConnectArgs = args;
+
     onMessageRef = args.onMessage;
     onOpenRef = args.onOpen ?? null;
     onCloseRef = args.onClose ?? null;
     onErrorRef = args.onError ?? null;
 
-    // Save connect params so waitForOpen() can reconnect if needed.
-    lastConnectArgs = args;
+    const desiredHeaders = buildHeaderArgs(args);
+    const desiredAuthKey = JSON.stringify(desiredHeaders);
 
-    // already open or connecting
-    if (
-        socket &&
-        (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
-    ) {
-        return;
+    // If already open/connecting BUT auth changed, force reconnect and wipe pending.
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+        const currentKey = (socket as any).__authKey as string | undefined;
+        if (currentKey && currentKey !== desiredAuthKey) {
+            wipePending();
+            intentionalClose = true;
+            try {
+                socket.close();
+            } catch {
+                // ignore
+            } finally {
+                resetConnectionState();
+            }
+        } else {
+            return;
+        }
     }
 
-    resetConnectionState();
-
-    openPromise = new Promise<void>((resolve, reject) => {
-        openResolve = resolve;
-        openReject = reject;
-    });
-
-    const mergedHeaders: Record<string, string> = {
-        ...(args.headers ?? {}),
-        ...(args.authToken ? { Authorization: `Bearer ${args.authToken}` } : {}),
-    };
-
-    const WS: any = WebSocket;
-
-    // ✅ Create a NON-NULL local socket, attach handlers to it, then store it globally.
-    const ws: WebSocket =
-        Object.keys(mergedHeaders).length > 0
-            ? new WS(WS_URL, [], { headers: mergedHeaders })
-            : new WS(WS_URL);
-
-    ws.onopen = () => {
-        onOpenRef?.();
-        openResolve?.();
-
-        // Flush queued messages (using ws, not global socket)
-        if (pending.length) {
-            const toSend = pending;
-            pending = [];
-
-            // IMPORTANT: if a send fails, re-queue the failed message AND all remaining
-            // messages in original order to avoid dropping anything.
-            for (let i = 0; i < toSend.length; i++) {
-                const p = toSend[i];
-                try {
-                    ws.send(p);
-                } catch (err) {
-                    pending = toSend.slice(i).concat(pending);
-                    break;
-                }
-            }
-        }
-    };
-
-    ws.onmessage = (e) => {
-        try {
-            const parsed = JSON.parse(e.data);
-
-            if (parsed?.type === "connected" && Array.isArray(parsed.roomIds)) {
-                setRoomTruthFromConnected(parsed.roomIds);
-            }
-
-            if (parsed?.type === "auto-join-summary" && Array.isArray(parsed.roomsJoined)) {
-                const joined = parsed.roomsJoined
-                    .map((r: any) => r?.roomId)
-                    .filter((r: any) => typeof r === "string" && r.trim());
-                currentRoomIds = mergeRoomIds(currentRoomIds, joined);
-                lastKnownRoomIds = mergeRoomIds(lastKnownRoomIds, joined);
-                if (!lastKnownActiveRoomId && lastKnownRoomIds.length) {
-                    lastKnownActiveRoomId = lastKnownRoomIds[0];
-                    currentActiveRoomId = lastKnownActiveRoomId;
-                }
-            }
-
-            if (
-                (parsed?.type === "join-approved" ||
-                    parsed?.type === "room-created" ||
-                    parsed?.type === "auto-joined") &&
-                typeof parsed.roomId === "string"
-            ) {
-                currentRoomIds = mergeRoomIds(currentRoomIds, [parsed.roomId]);
-                lastKnownRoomIds = mergeRoomIds(lastKnownRoomIds, [parsed.roomId]);
-                if (!lastKnownActiveRoomId) {
-                    lastKnownActiveRoomId = parsed.roomId;
-                    currentActiveRoomId = parsed.roomId;
-                }
-            }
-
-            onMessageRef?.(parsed);
-        } catch {
-            // ignore parse errors
-        }
-    };
-
-    ws.onclose = (e) => {
-        onCloseRef?.(e);
-
-        // Keep lastKnown* for REST fallback.
+    // If we already have a socket object in CLOSING/CLOSED, reset.
+    if (socket && (socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED)) {
         resetConnectionState();
-    };
-
-    ws.onerror = (e) => {
-        onErrorRef?.(e);
-        openReject?.(e);
-    };
-
-    // store after handlers are attached
-    socket = ws;
-}
-
-export function disconnectWS() {
-    const s = socket;
-    if (s) {
-        try {
-            s.close();
-        } catch {
-            // ignore
-        }
     }
-    resetConnectionState();
-    pending = [];
+
+    try {
+        // New connection = not an intentional close.
+        intentionalClose = false;
+
+        let ws: WebSocket;
+
+        if (Object.keys(desiredHeaders).length) {
+            try {
+                ws = new (WebSocket as any)(WS_URL, undefined, { headers: desiredHeaders });
+            } catch {
+                ws = new WebSocket(WS_URL);
+            }
+        } else {
+            ws = new WebSocket(WS_URL);
+        }
+
+        (ws as any).__authKey = desiredAuthKey;
+        socket = ws;
+
+        socket.onopen = async () => {
+            // Flush queued messages
+            if (pending.length) {
+                const copy = pending.slice();
+                pending = [];
+                for (const raw of copy) {
+                    try {
+                        socket?.send(raw);
+                    } catch {
+                        pending.unshift(raw);
+                        break;
+                    }
+                }
+            }
+
+            onOpenRef?.();
+            openResolve?.();
+            openResolve = null;
+            openReject = null;
+        };
+
+        socket.onmessage = (evt) => {
+            try {
+                const msg = JSON.parse((evt as any).data) as ServerMessage;
+
+                if (msg.type === "connected") {
+                    handleConnectedMessage(msg as any);
+                } else {
+                    const anyMsg = msg as any;
+                    if (typeof anyMsg.roomId === "string") {
+                        upsertKnownRoom(anyMsg.roomId);
+                    }
+                }
+
+                onMessageRef?.(msg);
+            } catch {
+                // ignore malformed messages
+            }
+        };
+
+        socket.onclose = (e) => {
+            onCloseRef?.(e);
+            resetConnectionState();
+        };
+
+        socket.onerror = (e) => {
+            // Suppress teardown noise on logout/disconnect.
+            if (intentionalClose) return;
+            onErrorRef?.(e as any);
+        };
+    } catch (err) {
+        if (!intentionalClose) onErrorRef?.(err as any);
+        resetConnectionState();
+    }
 }
 
-export async function waitForOpen() {
+export function disconnectWS(opts?: { wipeKnownRooms?: boolean; wipePending?: boolean }) {
+    try {
+        if (opts?.wipePending) wipePending();
+        intentionalClose = true;
+        socket?.close();
+    } catch {
+        // ignore
+    } finally {
+        resetConnectionState();
+        if (opts?.wipeKnownRooms) clearKnownRooms();
+    }
+}
+
+async function waitForOpen() {
     if (isWSOpen()) return;
 
-    // If we already have an in-flight open promise, await it.
-    if (openPromise) {
-        await openPromise;
-        return;
-    }
+    if (!openPromise) {
+        openPromise = new Promise<void>((resolve, reject) => {
+            openResolve = resolve;
+            openReject = reject;
+        });
 
-    // No socket + no openPromise: attempt to initiate a connection using the last known args.
-    if (lastConnectArgs) {
-        try {
+        if (!socket && lastConnectArgs) {
             connectWS(lastConnectArgs);
-        } catch (err: any) {
-            throw new Error(
-                `WebSocket connect attempt failed: ${err?.message ?? String(err)}`
-            );
         }
-
-        if (!openPromise) {
-            throw new Error("WebSocket connection could not be initiated (no openPromise created).");
-        }
-
-        await openPromise;
-        return;
     }
 
-    // No connect parameters available: fail fast so callers can surface/fallback instead of queueing forever.
-    throw new Error("WebSocket not connected and cannot auto-connect: call connectWS() first.");
+    if (!socket) {
+        openReject?.(new Error("WS not initialized: call connectWS() first."));
+        openReject = null;
+    }
+
+    return openPromise;
 }
 
 export async function createRoom(roomId?: string) {
     await waitForOpen();
-    safeEmit(roomId ? { type: "create-room", roomId } : { type: "create-room" });
+    safeEmit({ type: "create-room", roomId });
 }
 
 export async function joinRoom(roomId: string) {
+    if (!roomId) return;
     await waitForOpen();
     safeEmit({ type: "join-room", roomId });
 }
 
-export async function requestJoin(roomId: string) {
+export async function approveJoin(roomId: string, clientId: string) {
+    if (!roomId || !clientId) return;
     await waitForOpen();
-    safeEmit({ type: "request-join", roomId });
+    safeEmit({ type: "approve-join", roomId, clientId });
 }
 
-export async function leaveRoom(roomId: string) {
+export async function denyJoin(roomId: string, clientId: string) {
+    if (!roomId || !clientId) return;
     await waitForOpen();
-    safeEmit({ type: "leave-room", roomId });
-}
-
-export function isWSConnected() {
-    return isWSOpen();
+    safeEmit({ type: "deny-join", roomId, clientId });
 }

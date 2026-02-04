@@ -1,4 +1,3 @@
-// app/(main)/home_page.tsx
 import React, { useContext, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
@@ -19,7 +18,7 @@ import {
 
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
-    const { isConnected, activeRoomId, serverTimestamp, lastError, ensureMyRoom, sos } = useWS();
+    const { isConnected, activeRoomId, lastError, ensureMyRoom, sos } = useWS();
 
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
@@ -138,10 +137,10 @@ export default function HomePage() {
                     {isConnected ? `connected | ${activeRoomId ?? "no room"}` : "disconnected"}
                 </Text>
 
-                <Text className="text-gray-600 mt-2">Server Time:</Text>
+                {/* <Text className="text-gray-600 mt-2">Server Time:</Text>
                 <Text className="text-lg font-semibold">
                     {serverTimestamp ? new Date(serverTimestamp).toLocaleTimeString() : "—"}
-                </Text>
+                </Text> */}
 
                 {lastError ? <Text className="text-red-600 mt-2">{lastError}</Text> : null}
             </View>

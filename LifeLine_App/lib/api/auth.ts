@@ -1,6 +1,6 @@
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { API_BASE_URL } from "./config";
-import { saveUser } from "./storage/user";
+import { saveUser, saveToken, clearUser, clearToken } from "./storage/user";
 import * as Linking from "expo-linking";
 import { Alert } from "react-native";
 import { jwtDecode } from "jwt-decode";
@@ -73,7 +73,8 @@ export async function signInWithGoogle({
         if (!res.ok) throw new Error(data?.message || "Google login failed");
 
         if (data.user) await saveUser(data.user);
-
+        const token = data?.token || data?.accessToken || data?.sessionToken;
+        if (token) await saveToken(token);
         // Redirect based on flow
         const targetURL =
             flow === "signup"
@@ -100,24 +101,20 @@ export async function signInWithGoogle({
 export async function login(email: string, password: string) {
     const res = await fetch(`${API_BASE_URL}/api/auth/sign-in/email`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Origin": API_BASE_URL,
-        },
+        headers: { "Content-Type": "application/json", Origin: API_BASE_URL },
         credentials: "include",
         body: JSON.stringify({ email, password }),
-
     });
 
     const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to login");
 
-    if (!res.ok) {
-        throw new Error(data.message || "Failed to login");
-    }
+
+    const token = data?.token || data?.accessToken || data?.sessionToken;
+    if (token) await saveToken(token);
 
     return data;
 }
-
 
 export const loginWithToken = async (token: string) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/magic-link/verify?token=${token}`, {
@@ -159,24 +156,42 @@ export const signUp = async (payload: SignUpPayload) => {
 
 // Logout
 export async function logout() {
-    const res = await fetch(`${API_BASE_URL}/api/auth/sign-out`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Origin": API_BASE_URL,
+    let serverOk = false;
 
-        },
-        credentials: "include",
-        body: JSON.stringify({}),
-    });
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/sign-out`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Origin: API_BASE_URL,
+            },
+            credentials: "include",
+            body: JSON.stringify({}),
+        });
 
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to log out");
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to log out");
+        }
+
+        serverOk = true;
+        return await res.json();
+    } finally {
+        // Always clear local auth state so the next login cannot inherit old WS state
+        await clearUser().catch(() => { });
+        await clearToken().catch(() => { });
+
+        // Optional: also sign out Google session to avoid “sticky” Google accounts
+        await GoogleSignin.signOut().catch(() => { });
+
+        // If you want, you can throw if server failed AFTER clearing local state:
+        // (but your caller can also handle this)
+        if (!serverOk) {
+            // no-op here, because we already threw above
+        }
     }
-
-    return await res.json();
 }
+
 
 // Check if email already exists
 export async function checkEmail(email: string) {
