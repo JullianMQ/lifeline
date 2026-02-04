@@ -5,7 +5,7 @@ export default {
   expo: {
     name: "Lifeline",
     slug: "Lifeline_App",
-    owner: "lifeline_emergency_app",
+    owner: "lifeline-emergency-app",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/LifelineLogo.png",

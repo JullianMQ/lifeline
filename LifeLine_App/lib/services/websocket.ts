@@ -24,6 +24,19 @@ let onOpenRef: (() => void) | null = null;
 let onCloseRef: ((e: WebSocketCloseEvent) => void) | null = null;
 let onErrorRef: ((e: Event) => void) | null = null;
 
+// Remember the last successful connect parameters so waitForOpen() can
+// initiate a connection when callers emit messages before a socket exists.
+type ConnectWSArgs = {
+    onMessage: (msg: ServerMessage) => void;
+    onOpen?: () => void;
+    onClose?: (e: WebSocketCloseEvent) => void;
+    onError?: (e: Event) => void;
+    authToken?: string;
+    headers?: Record<string, string>;
+};
+
+let lastConnectArgs: ConnectWSArgs | null = null;
+
 let openPromise: Promise<void> | null = null;
 let openResolve: (() => void) | null = null;
 let openReject: ((err: any) => void) | null = null;
@@ -37,222 +50,146 @@ function resetConnectionState() {
     openReject = null;
 }
 
-function mergeRoomIds(into: string[], add: string[]) {
-    const set = new Set(into);
-    for (const id of add) {
-        if (typeof id === "string" && id.trim()) set.add(id);
-    }
-    return Array.from(set);
+function isWSOpen() {
+    return socket?.readyState === WebSocket.OPEN;
+}
+
+function mergeRoomIds(a: string[], b: string[]) {
+    const out = new Set<string>();
+    for (const x of a) if (typeof x === "string" && x.trim()) out.add(x);
+    for (const x of b) if (typeof x === "string" && x.trim()) out.add(x);
+    return Array.from(out);
 }
 
 function setRoomTruthFromConnected(roomIds: string[]) {
-    const normalized = (Array.isArray(roomIds) ? roomIds : []).filter(
-        (r) => typeof r === "string" && r.trim()
-    );
-    currentRoomIds = normalized;
-    lastKnownRoomIds = normalized;
+    currentRoomIds = Array.isArray(roomIds) ? roomIds : [];
+    lastKnownRoomIds = Array.isArray(roomIds) ? roomIds : [];
 
-    const active = lastKnownActiveRoomId ?? currentActiveRoomId;
-    if (active && normalized.includes(active)) {
-        currentActiveRoomId = active;
-        lastKnownActiveRoomId = active;
-    } else {
-        const next = normalized.length ? normalized[0] : null;
-        currentActiveRoomId = next;
-        lastKnownActiveRoomId = next;
-    }
+    if (!currentActiveRoomId && currentRoomIds.length) currentActiveRoomId = currentRoomIds[0];
+    if (!lastKnownActiveRoomId && lastKnownRoomIds.length) lastKnownActiveRoomId = lastKnownRoomIds[0];
 }
 
-// ---- Message types (STRICTLY aligned to websocket-api.md) ----
-
-export type ConnectedMsg = {
-    type: "connected";
-    clientId: string;
-    user: any;
-    roomIds: string[];
-    timestamp: string;
-};
-
-export type AutoJoinedMsg = {
-    type: "auto-joined";
-    roomId: string;
-    roomOwner: string;
-    message: string;
-    timestamp: string;
-};
-
-export type AutoJoinSummaryMsg = {
-    type: "auto-join-summary";
-    roomsJoined: { roomId: string; owner: string }[];
-    message: string;
-    timestamp: string;
-};
-
-export type RoomCreatedMsg = {
-    type: "room-created";
-    roomId: string;
-    owner: string;
-    emergencyContacts: string[];
-    timestamp: string;
-};
-
-export type JoinApprovedMsg = {
-    type: "join-approved";
-    roomId: string;
-    timestamp: string;
-};
-
-export type JoinDeniedMsg = {
-    type: "join-denied";
-    message: string;
-    timestamp: string;
-};
-
-export type JoinRequestMsg = {
-    type: "join-request";
-    requesterId: string;
-    requesterName: string;
-    requesterUser: any;
-    roomId: string;
-    timestamp: string;
-};
-
-export type RoomUsersMsg = {
-    type: "room-users";
-    roomId: string;
-    users: any[];
-    timestamp: string;
-};
-
-export type RoomMessageMsg = {
-    type: "room-message";
-    roomId: string;
-    content: any;
-    clientId: string;
-    userName: string;
-    user: any;
-    timestamp: string;
-};
-
-export type EmergencyConfirmedMsg = {
-    type: "emergency-confirmed";
-    activatedRooms: string[];
-    timestamp: string;
-};
-
-export type EmergencyAlertMsg = {
-    type: "emergency-alert";
-    emergencyUserId: string;
-    emergencyUserName: string;
-    roomId: string;
-    message: string;
-    timestamp: string;
-};
-
-export type EmergencyActivatedMsg = {
-    type: "emergency-activated";
-    roomId: string;
-    clientId: string;
-    userName: string;
-    user: any;
-    timestamp: string;
-};
-
-export type LocationUpdateClientMsg = {
-    type: "location-update";
-    roomId?: string;
-    latitude: number;
-    longitude: number;
-    timestamp?: string | number;
-    accuracy?: number;
-};
-
-export type LocationUpdateConfirmedMsg = {
-    type: "location-update-confirmed";
-    rooms: string[];
-    timestamp: string;
-};
-
-export type LocationUpdateBroadcastMsg = {
-    type: "location-update";
-    data: {
-        visiblePhone: string;
-        userName: string;
+export type ServerMessage =
+    | {
+        type: "connected";
+        clientId: string;
+        timestamp?: string;
+        roomIds: string[];
+        user?: any;
+    }
+    | {
+        type: "auto-join-summary";
+        timestamp?: string;
+        roomsJoined: Array<{
+            roomId: string;
+            status: "joined" | "requested";
+        }>;
+    }
+    | {
+        type: "room-created";
+        roomId: string;
+        timestamp?: string;
+    }
+    | {
+        type: "join-approved";
+        roomId: string;
+        timestamp?: string;
+    }
+    | {
+        type: "join-denied";
+        roomId: string;
+        message: string;
+        timestamp?: string;
+    }
+    | {
+        type: "room-users";
+        roomId: string;
+        users: any[];
+        timestamp?: string;
+    }
+    | {
+        type: "location-update";
+        userId?: string;
+        userName?: string;
+        clientId?: string;
         latitude: number;
         longitude: number;
         timestamp: string;
         accuracy?: number;
-    };
-    timestamp: string;
-};
+        roomId?: string;
+    }
+    | {
+        type: "emergency-alert";
+        emergencyUserId: string;
+        emergencyUserName?: string;
+        message?: string;
+        timestamp?: string;
+        roomId?: string;
+    }
+    | {
+        type: "emergency-confirmed";
+        activatedRooms?: string[];
+        timestamp?: string;
+    }
+    | {
+        type: "emergency-activated";
+        roomId: string;
+        clientId: string;
+        userName?: string;
+        timestamp?: string;
+    }
+    | {
+        type: "room-message";
+        roomId: string;
+        clientId: string;
+        userName?: string;
+        content: string;
+        timestamp?: string;
+    }
+    | {
+        type: "user-left";
+        roomId: string;
+        clientId: string;
+        userName?: string;
+        timestamp?: string;
+    }
+    | {
+        type: "user-joined";
+        roomId: string;
+        clientId: string;
+        user?: any;
+        timestamp?: string;
+    }
+    | {
+        type: "pong";
+        timestamp?: string;
+    }
+    | {
+        type: "error";
+        message: string;
+        timestamp?: string;
+    }
+    | any;
 
-export type UserJoinedMsg = {
-    type: "user-joined";
-    clientId: string;
-    user: any;
-    timestamp: string;
-};
+function queue(msg: any) {
+    const payload = JSON.stringify(msg);
+    if (pending.length >= MAX_PENDING) {
+        pending = pending.slice(pending.length - (MAX_PENDING - 1));
+    }
+    pending.push(payload);
+}
 
-export type UserLeftMsg = {
-    type: "user-left";
-    clientId: string;
-    userName: string;
-    timestamp: string;
-};
+function safeEmit(msg: any) {
+    if (!isWSOpen()) {
+        queue(msg);
+        return;
+    }
 
-export type EmergencyContactJoinedMsg = {
-    type: "emergency-contact-joined";
-    contactId: string;
-    contactName: string;
-    timestamp: string;
-};
-
-export type PongMsg = {
-    type: "pong";
-    timestamp: string;
-};
-
-export type ErrorMsg = {
-    type: "error";
-    message: string;
-    timestamp?: string;
-};
-
-export type ServerMessage =
-    | ConnectedMsg
-    | AutoJoinedMsg
-    | AutoJoinSummaryMsg
-    | RoomCreatedMsg
-    | JoinApprovedMsg
-    | JoinDeniedMsg
-    | JoinRequestMsg
-    | RoomUsersMsg
-    | RoomMessageMsg
-    | EmergencyConfirmedMsg
-    | EmergencyAlertMsg
-    | EmergencyActivatedMsg
-    | LocationUpdateConfirmedMsg
-    | LocationUpdateBroadcastMsg
-    | UserJoinedMsg
-    | UserLeftMsg
-    | EmergencyContactJoinedMsg
-    | PongMsg
-    | ErrorMsg;
-
-export type ClientMessage =
-    | { type: "create-room"; roomId?: string }
-    | { type: "join-room"; roomId: string }
-    | { type: "request-join"; roomId: string }
-    | { type: "approve-join"; roomId: string; requesterId: string }
-    | { type: "room-message"; roomId: string; content: any }
-    | { type: "emergency-sos" }
-    | { type: "get_users"; roomId: string }
-    | { type: "ping" }
-    | LocationUpdateClientMsg;
-
-function isWSOpen() {
-    const s = socket;
-    return !!s && s.readyState === WebSocket.OPEN;
+    try {
+        socket!.send(JSON.stringify(msg));
+    } catch {
+        queue(msg);
+    }
 }
 
 export function getJoinedRooms() {
@@ -264,30 +201,28 @@ export function getActiveRoom() {
 }
 
 export function setActiveRoom(roomId: string) {
+    if (!roomId) return;
     lastKnownActiveRoomId = roomId;
-    if (socket) currentActiveRoomId = roomId;
-
-    if (!lastKnownRoomIds.includes(roomId)) {
-        lastKnownRoomIds = [roomId, ...lastKnownRoomIds];
-    }
-    if (socket && !currentRoomIds.includes(roomId)) {
-        currentRoomIds = [roomId, ...currentRoomIds];
-    }
+    currentActiveRoomId = roomId;
 }
 
-function safeEmit(msg: ClientMessage) {
-    const payload = JSON.stringify(msg);
-    const s = socket;
+export function getRoomUsers(roomId: string) {
+    if (!roomId) return;
+    safeEmit({ type: "get-users", roomId });
+}
 
-    if (!s || s.readyState !== WebSocket.OPEN) {
-        pending.push(payload);
-        if (pending.length > MAX_PENDING) {
-            pending = pending.slice(pending.length - MAX_PENDING);
-        }
-        return;
-    }
+export async function sendLocationUpdate(payload: {
+    latitude: number;
+    longitude: number;
+    timestamp: string;
+    accuracy?: number;
+    roomId?: string;
+}) {
+    safeEmit({ type: "location-update", ...payload });
+}
 
-    s.send(payload);
+export async function sendEmergencySOS() {
+    safeEmit({ type: "emergency-sos" });
 }
 
 export function connectWS(args: {
@@ -302,6 +237,9 @@ export function connectWS(args: {
     onOpenRef = args.onOpen ?? null;
     onCloseRef = args.onClose ?? null;
     onErrorRef = args.onError ?? null;
+
+    // Save connect params so waitForOpen() can reconnect if needed.
+    lastConnectArgs = args;
 
     // already open or connecting
     if (
@@ -339,11 +277,15 @@ export function connectWS(args: {
         if (pending.length) {
             const toSend = pending;
             pending = [];
-            for (const p of toSend) {
+
+            // IMPORTANT: if a send fails, re-queue the failed message AND all remaining
+            // messages in original order to avoid dropping anything.
+            for (let i = 0; i < toSend.length; i++) {
+                const p = toSend[i];
                 try {
                     ws.send(p);
-                } catch {
-                    pending.push(p);
+                } catch (err) {
+                    pending = toSend.slice(i).concat(pending);
                     break;
                 }
             }
@@ -374,34 +316,32 @@ export function connectWS(args: {
                 (parsed?.type === "join-approved" ||
                     parsed?.type === "room-created" ||
                     parsed?.type === "auto-joined") &&
-                typeof parsed.roomId === "string" &&
-                parsed.roomId.trim()
+                typeof parsed.roomId === "string"
             ) {
-                const rid = parsed.roomId;
-                currentRoomIds = mergeRoomIds(currentRoomIds, [rid]);
-                lastKnownRoomIds = mergeRoomIds(lastKnownRoomIds, [rid]);
+                currentRoomIds = mergeRoomIds(currentRoomIds, [parsed.roomId]);
+                lastKnownRoomIds = mergeRoomIds(lastKnownRoomIds, [parsed.roomId]);
                 if (!lastKnownActiveRoomId) {
-                    lastKnownActiveRoomId = rid;
-                    currentActiveRoomId = rid;
+                    lastKnownActiveRoomId = parsed.roomId;
+                    currentActiveRoomId = parsed.roomId;
                 }
             }
 
             onMessageRef?.(parsed);
         } catch {
-            // ignore non-json
+            // ignore parse errors
         }
-    };
-
-    ws.onerror = (e) => {
-        onErrorRef?.(e);
-        openReject?.(e);
     };
 
     ws.onclose = (e) => {
         onCloseRef?.(e);
 
-        // Only clear the global socket if THIS ws is the one stored.
-        if (socket === ws) resetConnectionState();
+        // Keep lastKnown* for REST fallback.
+        resetConnectionState();
+    };
+
+    ws.onerror = (e) => {
+        onErrorRef?.(e);
+        openReject?.(e);
     };
 
     // store after handlers are attached
@@ -423,8 +363,33 @@ export function disconnectWS() {
 
 export async function waitForOpen() {
     if (isWSOpen()) return;
-    if (!openPromise) return;
-    await openPromise;
+
+    // If we already have an in-flight open promise, await it.
+    if (openPromise) {
+        await openPromise;
+        return;
+    }
+
+    // No socket + no openPromise: attempt to initiate a connection using the last known args.
+    if (lastConnectArgs) {
+        try {
+            connectWS(lastConnectArgs);
+        } catch (err: any) {
+            throw new Error(
+                `WebSocket connect attempt failed: ${err?.message ?? String(err)}`
+            );
+        }
+
+        if (!openPromise) {
+            throw new Error("WebSocket connection could not be initiated (no openPromise created).");
+        }
+
+        await openPromise;
+        return;
+    }
+
+    // No connect parameters available: fail fast so callers can surface/fallback instead of queueing forever.
+    throw new Error("WebSocket not connected and cannot auto-connect: call connectWS() first.");
 }
 
 export async function createRoom(roomId?: string) {
@@ -442,34 +407,9 @@ export async function requestJoin(roomId: string) {
     safeEmit({ type: "request-join", roomId });
 }
 
-export async function approveJoin(roomId: string, requesterId: string) {
+export async function leaveRoom(roomId: string) {
     await waitForOpen();
-    safeEmit({ type: "approve-join", roomId, requesterId });
-}
-
-export async function getRoomUsers(roomId: string) {
-    await waitForOpen();
-    safeEmit({ type: "get_users", roomId });
-}
-
-export async function sendRoomMessage(content: any, roomId: string) {
-    await waitForOpen();
-    safeEmit({ type: "room-message", roomId, content });
-}
-
-export async function sendEmergencySOS() {
-    await waitForOpen();
-    safeEmit({ type: "emergency-sos" });
-}
-
-export async function sendPing() {
-    await waitForOpen();
-    safeEmit({ type: "ping" });
-}
-
-export async function sendLocationUpdate(payload: Omit<LocationUpdateClientMsg, "type">) {
-    await waitForOpen();
-    safeEmit({ type: "location-update", ...payload });
+    safeEmit({ type: "leave-room", roomId });
 }
 
 export function isWSConnected() {

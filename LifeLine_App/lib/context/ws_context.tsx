@@ -1,6 +1,3 @@
-// lib/context/ws_context.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 
@@ -57,6 +54,18 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
     const [clientId, setClientId] = useState<string | null>(null);
     const [user, setUser] = useState<any | null>(null);
 
+    // Keep latest identity values for WS message handlers that may outlive a render.
+    const userRef = useRef<any | null>(null);
+    const clientIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
+
+    useEffect(() => {
+        clientIdRef.current = clientId;
+    }, [clientId]);
+
     const [rooms, setRooms] = useState<string[]>([]);
     const [activeRoomIdState, setActiveRoomIdState] = useState<string | null>(null);
 
@@ -71,30 +80,16 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
     const myRoomCreatedRef = useRef(false);
     const creatingMyRoomRef = useRef(false);
 
-    // We only treat the server room list as truth after we receive "connected".
+    // WS handshake + lifecycle
     const hasHandshakeRef = useRef(false);
 
-    // de-dupe notifications
-    const seenNotifRef = useRef<Set<string>>(new Set());
-
-    function syncRooms() {
-        const r = getJoinedRooms();
-        setRooms(r);
-
-        const active = activeRoomIdState ?? getActiveRoom();
-        if (!active && r.length) {
-            setActiveRoom(r[0]);
-            setActiveRoomIdState(r[0]);
-        }
-    }
-
-    const addNotif = (n: Omit<AppNotification, "id" | "read">) => {
-        const signature = `${n.type}|${n.timestamp}|${n.roomId ?? ""}|${n.message}`;
-        if (seenNotifRef.current.has(signature)) return;
-        seenNotifRef.current.add(signature);
-
+    const addNotif = (partial: Omit<AppNotification, "id" | "read">) => {
         setNotifications((prev) => [
-            { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, read: false, ...n },
+            {
+                id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                read: false,
+                ...partial,
+            },
             ...prev,
         ]);
     };
@@ -107,24 +102,37 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
     };
 
-    const clearNotifs = () => {
-        setNotifications([]);
-        seenNotifRef.current.clear();
+    const clearNotifs = () => setNotifications([]);
+
+    const syncRooms = () => {
+        const joined = getJoinedRooms();
+        if (Array.isArray(joined)) setRooms(joined);
+
+        const active = getActiveRoom();
+        setActiveRoomIdState(active ?? null);
     };
 
-    const ensureMyRoomInternal = async () => {
-        // Spec: roomIds in the "connected" handshake is server-truth.
-        // Do NOT create a room until we have received that handshake.
-        if (!hasHandshakeRef.current) return;
+    const refreshUsers = (roomId?: string) => {
+        const target = roomId ?? activeRoomIdState ?? getActiveRoom();
+        if (!target) return;
+        getRoomUsers(target);
+    };
 
-        // Doc: only create a room when we truly have none.
-        // Let the server generate the roomId to avoid "Room already exists".
-        if (getJoinedRooms().length > 0) return;
+    const ensureMyRoom = async () => {
+        // Prevent loops: only request once until server confirms via "room-created"
         if (creatingMyRoomRef.current) return;
+        if (myRoomCreatedRef.current) return;
 
         creatingMyRoomRef.current = true;
+        setLastError(null);
+
         try {
             await createRoom();
+        } catch (err: any) {
+            // If WS is down and cannot be opened, createRoom() can now throw (via waitForOpen).
+            // Reset the guard so the user can retry once connectivity is back.
+            creatingMyRoomRef.current = false;
+            setLastError(err?.message ?? "Failed to create room (WebSocket not ready)");
         } finally {
             // keep "creating" true until server confirms via "room-created"
         }
@@ -135,8 +143,15 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
         switch (msg.type) {
             case "connected": {
-                setClientId((msg as any).clientId);
-                setUser((msg as any).user);
+                const nextClientId = (msg as any).clientId ?? null;
+                const nextUser = (msg as any).user ?? null;
+
+                // Update refs first so the rest of this handler reads fresh values.
+                clientIdRef.current = nextClientId;
+                userRef.current = nextUser;
+
+                setClientId(nextClientId);
+                setUser(nextUser);
                 setLastError(null);
 
                 hasHandshakeRef.current = true;
@@ -188,7 +203,9 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
             case "emergency-alert": {
                 const m = msg as any;
-                const myId = user?.id ?? clientId ?? null;
+
+                // IMPORTANT: use refs to avoid stale closure values.
+                const myId = userRef.current?.id ?? clientIdRef.current ?? null;
                 if (myId && m.emergencyUserId === myId) break;
 
                 addNotif({
@@ -224,13 +241,14 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 break;
             }
 
-            case "user-joined": {
+            case "room-message": {
                 const m = msg as any;
                 addNotif({
-                    type: "user-joined",
-                    message: `${m.user?.name ?? "A user"} joined`,
+                    type: "room-message",
+                    message: m.content ?? "",
                     timestamp: m.timestamp,
-                    fromUser: { id: m.clientId, name: m.user?.name },
+                    roomId: m.roomId,
+                    fromUser: { id: m.clientId, name: m.userName },
                 });
                 break;
             }
@@ -241,19 +259,31 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                     type: "user-left",
                     message: `${m.userName ?? "A user"} left`,
                     timestamp: m.timestamp,
+                    roomId: m.roomId,
                     fromUser: { id: m.clientId, name: m.userName },
                 });
                 break;
             }
 
-            case "emergency-contact-joined": {
+            case "user-joined": {
                 const m = msg as any;
                 addNotif({
-                    type: "emergency-contact-joined",
-                    message: `${m.contactName ?? "Emergency contact"} joined`,
+                    type: "user-joined",
+                    message: `${m.user?.name ?? "A user"} joined`,
                     timestamp: m.timestamp,
-                    fromUser: { id: m.contactId, name: m.contactName },
+                    roomId: m.roomId,
+                    fromUser: { id: m.clientId, name: m.user?.name },
                 });
+                break;
+            }
+
+            case "location-update": {
+                // your app likely handles this elsewhere; keep as-is if present
+                break;
+            }
+
+            case "pong": {
+                // optional: could update a last-seen timestamp if you want
                 break;
             }
 
@@ -301,6 +331,8 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
         const sub = AppState.addEventListener("change", (nextState) => {
             if (nextState === "active") {
                 if (!isWSConnected()) connectOnce();
+            } else {
+                // we keep it connected unless you explicitly want to disconnect here
             }
         });
 
@@ -308,26 +340,13 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ---- actions ----
+    const sos = () => {
+        sendEmergencySOS();
+    };
 
     const setActiveRoomId = (roomId: string) => {
         setActiveRoom(roomId);
         setActiveRoomIdState(roomId);
-    };
-
-    const ensureMyRoom = () => {
-        ensureMyRoomInternal();
-    };
-
-    const sos = () => sendEmergencySOS();
-
-    const refreshUsers = (roomId?: string) => {
-        const rid = roomId ?? activeRoomIdState ?? getActiveRoom();
-        if (!rid) {
-            setLastError("No active room selected.");
-            return;
-        }
-        getRoomUsers(rid);
     };
 
     const value = useMemo<WSContextValue>(
@@ -341,12 +360,15 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
             lastError,
             roomUsers,
             notifications,
+
             ensureMyRoom,
             sos,
             refreshUsers,
+
             markNotifRead,
             deleteNotif,
             clearNotifs,
+
             setActiveRoomId,
         }),
         [
@@ -367,6 +389,6 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
 export function useWS() {
     const ctx = useContext(WSContext);
-    if (!ctx) throw new Error("useWS must be used inside WSProvider");
+    if (!ctx) throw new Error("useWS must be used within WSProvider");
     return ctx;
 }
