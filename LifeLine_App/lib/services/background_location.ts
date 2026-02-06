@@ -123,15 +123,16 @@ export async function startForegroundLocationSharing() {
             await cacheRoomIdForFallback(activeRoomId);
 
             if (isWSConnected()) {
-                // WS payload: do not invent userId/userName fields; server should derive from auth/session.
-                // If you want to broadcast to all rooms you're in, omit roomId.
-                // If you want to scope to one room only, include roomId.
+                // Spec requires roomId for WS location updates.
+                const roomId = activeRoomId ?? (await AsyncStorage.getItem(ROOM_ID_KEY));
+                if (!roomId) return;
+
                 await sendLocationUpdate({
+                    roomId,
                     latitude,
                     longitude,
                     accuracy,
                     timestamp,
-                    ...(activeRoomId ? { roomId: activeRoomId } : {}),
                 });
             } else {
                 // REST fallback requires roomId
@@ -182,9 +183,21 @@ export async function startBackgroundLocationUploads() {
 }
 
 export async function stopBackgroundLocationUploads() {
-    const started = await Location.hasStartedLocationUpdatesAsync(TASK_NAME);
-    if (!started) return;
-    await Location.stopLocationUpdatesAsync(TASK_NAME);
+    // Avoid throwing when the task isn't registered in the current JS runtime
+    // (common during dev reloads / if this module wasn't imported on startup).
+    const isDefined = TaskManager.isTaskDefined(TASK_NAME);
+    if (!isDefined) return;
+
+    try {
+        const started = await Location.hasStartedLocationUpdatesAsync(TASK_NAME);
+        if (!started) return;
+        await Location.stopLocationUpdatesAsync(TASK_NAME);
+    } catch (e: any) {
+        // If the native side doesn't know about this task, treat it as already-stopped.
+        const msg = String(e?.message ?? "");
+        if (msg.includes("TaskNotFoundException") || msg.includes("TaskNotFound")) return;
+        throw e;
+    }
 }
 
 export async function clearRoomIdFallbackCache() {

@@ -53,25 +53,7 @@ type WSProviderProps = {
     headers?: Record<string, string>;
 };
 
-// ---- deterministic room id helper (32 hex) ----
-function fnv1a32(input: string, seed = 0x811c9dc5) {
-    let h = seed >>> 0;
-    for (let i = 0; i < input.length; i++) {
-        h ^= input.charCodeAt(i);
-        h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-    }
-    return h >>> 0;
-}
-function hex32(x: number) {
-    return (x >>> 0).toString(16).padStart(8, "0");
-}
-function deterministicRoomIdForUser(userId: string) {
-    const h1 = fnv1a32(userId, 0x811c9dc5);
-    const h2 = fnv1a32(`lifeline:${userId}`, 0x811c9dc5);
-    const h3 = fnv1a32(`owner:${userId}`, 0x811c9dc5);
-    const h4 = fnv1a32(`room:${userId}`, 0x811c9dc5);
-    return `${hex32(h1)}${hex32(h2)}${hex32(h3)}${hex32(h4)}`;
-}
+// Room IDs are 32 hex characters (16 random bytes → hex) per websocket-api.md
 function isValidRoomId(roomId: string) {
     return /^[a-f0-9]{32}$/i.test(roomId);
 }
@@ -96,9 +78,9 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
     const ensureRequestedBeforeHandshakeRef = useRef(false);
     const ownedRoomReadyRef = useRef(false);
 
-    const ownerRecoveryRef = useRef<{ userId: string; roomId: string } | null>(null);
+    const ownerRecoveryRef = useRef<{ userId: string; roomId: string | null; mode: "join" | "create" } | null>(null);
 
-    // NEW: suppress WS onError logging during logout / auth-switch teardown
+    // suppress WS onError logging during logout / auth-switch teardown
     const suppressErrorLogsRef = useRef(false);
 
     const addNotif = (n: AppNotification) => {
@@ -135,14 +117,25 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         ensureInFlightRef.current = true;
 
         const saved = await getOwnerRoomId(userId).catch(() => null);
-        const desired = saved && isValidRoomId(saved) ? saved : deterministicRoomIdForUser(userId);
 
-        ownerRecoveryRef.current = { userId, roomId: desired };
+        // Spec: room IDs are cryptographically random (server-generated). Avoid deterministic IDs.
+        // If we have a saved owner roomId, try to re-join it. Otherwise, create a new room.
+        if (saved && isValidRoomId(saved)) {
+            ownerRecoveryRef.current = { userId, roomId: saved, mode: "join" };
+            try {
+                await joinRoom(saved);
+            } catch {
+                // join result handled via messages
+            }
+            return;
+        }
 
+        ownerRecoveryRef.current = { userId, roomId: null, mode: "create" };
         try {
-            await joinRoom(desired);
-        } catch {
-            // join result handled via messages
+            await createRoom();
+        } catch (err: any) {
+            ensureInFlightRef.current = false;
+            setLastError(err?.message ?? "Failed to create room");
         }
     };
 
@@ -164,7 +157,23 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                 ownerRecoveryRef.current = null;
 
                 setLastError(null);
-                syncRooms();
+
+                // Server truth: connected.roomIds
+                const serverRoomIds = (msg as any).roomIds;
+                if (Array.isArray(serverRoomIds)) {
+                    setRooms(serverRoomIds);
+                    const active = getActiveRoom();
+                    if (active && serverRoomIds.includes(active)) {
+                        setActiveRoomIdState(active);
+                    } else if (serverRoomIds.length) {
+                        setActiveRoom(serverRoomIds[0]);
+                        setActiveRoomIdState(serverRoomIds[0]);
+                    } else {
+                        setActiveRoomIdState(null);
+                    }
+                } else {
+                    syncRooms();
+                }
 
                 if (ensureRequestedBeforeHandshakeRef.current) {
                     ensureRequestedBeforeHandshakeRef.current = false;
@@ -207,7 +216,8 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                 if (roomId) setRooms((prev) => Array.from(new Set<string>([...prev, roomId])));
 
                 const rec = ownerRecoveryRef.current;
-                if (rec && userId && rec.userId === userId && roomId === rec.roomId) {
+
+                if (rec && userId && rec.userId === userId && rec.mode === "join" && roomId && rec.roomId && roomId === rec.roomId) {
                     setOwnerRoomId(userId, roomId!).catch(() => { });
                     ownedRoomReadyRef.current = true;
                     ensureInFlightRef.current = false;
@@ -223,22 +233,26 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
             case "join-denied": {
                 const message = ((msg as any).message ?? "Join denied") as string;
-                const deniedRoomId = ((msg as any).roomId ?? null) as string | null;
 
                 setLastError(message);
 
                 const userId = getCurrentUserId();
                 const rec = ownerRecoveryRef.current;
 
-                const matchesRecovery =
+                // If we tried to re-join a previously saved owner room and it no longer exists (or is not accessible),
+                // clear the saved value and create a fresh server-generated room.
+                const shouldRecreateOwnerRoom =
                     !!rec &&
                     !!userId &&
                     rec.userId === userId &&
-                    (!deniedRoomId || deniedRoomId === rec.roomId);
+                    rec.mode === "join" &&
+                    /room not found|not authorized/i.test(message);
 
-                if (matchesRecovery) {
+                if (shouldRecreateOwnerRoom) {
                     clearOwnerRoomId(userId).catch(() => { });
-                    createRoom(rec.roomId)
+                    ownerRecoveryRef.current = { userId, roomId: null, mode: "create" };
+
+                    createRoom()
                         .catch((err: any) => setLastError(err?.message ?? "Failed to create owner room"))
                         .finally(() => {
                             ensureInFlightRef.current = false;
@@ -285,11 +299,11 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                 const m = msg as any;
                 addNotif({
                     type: "join-request",
-                    message: `${m.user?.name ?? "A user"} wants to join`,
+                    message: `${m.requesterName ?? m.requesterUser?.name ?? "A user"} wants to join`,
                     timestamp: m.timestamp,
                     roomId: m.roomId,
-                    fromUser: { id: m.clientId, name: m.user?.name },
-                    clientId: m.clientId,
+                    fromUser: { id: m.requesterId, name: m.requesterName ?? m.requesterUser?.name },
+                    clientId: m.requesterId,
                 });
                 break;
             }
@@ -329,14 +343,10 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                 ownedRoomReadyRef.current = false;
             },
 
-            // ✅ FIX: don’t log teardown errors during logout/auth switch
             onError: (e) => {
                 if (suppressErrorLogsRef.current) return;
-
-                // RN WebSocket error can fire after a normal close; ignore if not connected.
                 if (!isWSConnected()) return;
 
-                // Optional: keep a small dev log instead of dumping the whole event
                 if (__DEV__) {
                     const rs =
                         (e as any)?.currentTarget?.readyState ??
@@ -372,13 +382,11 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         const prev = prevTokenRef.current;
         prevTokenRef.current = resolvedToken;
 
-        // first render
         if (prev === undefined) {
             if (resolvedToken) connectOnce(resolvedToken);
             return;
         }
 
-        // Any auth transition -> hard reset
         suppressErrorLogsRef.current = true;
 
         resetWSForAuthSwitch();
@@ -399,7 +407,6 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         userRef.current = null;
         clientIdRef.current = null;
 
-        // allow errors again after teardown settles
         setTimeout(() => {
             suppressErrorLogsRef.current = false;
         }, 750);
@@ -407,11 +414,31 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         if (resolvedToken) connectOnce(resolvedToken);
     }, [resolvedToken]);
 
+    const lastStateRef = useRef<string>(AppState.currentState);
     // Foreground reconnect + (if token unmanaged) refresh token
     useEffect(() => {
         const sub = AppState.addEventListener("change", async (state) => {
-            if (state !== "active") return;
+            const prev = lastStateRef.current;
+            lastStateRef.current = state;
 
+            // IMPORTANT:
+            // "inactive" often happens during permission dialogs.
+            // Do NOT disconnect WS on inactive, or you will thrash connections.
+            if (state === "background") {
+                // disconnectWS({ wipeKnownRooms: false, wipePending: false });
+                // setIsConnected(false);
+                hasHandshakeRef.current = false;
+                ensureInFlightRef.current = false;
+                ownedRoomReadyRef.current = false;
+                return;
+            }
+
+            if (state !== "active") {
+                // ignore "inactive" and other transient states
+                return;
+            }
+
+            // state === "active"
             if (authToken === undefined) {
                 const latest = await getToken().catch(() => null);
                 if (latest !== resolvedToken) {
@@ -435,7 +462,6 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            // also suppress logs during unmount teardown
             suppressErrorLogsRef.current = true;
             disconnectWS({ wipeKnownRooms: true, wipePending: true });
         };
