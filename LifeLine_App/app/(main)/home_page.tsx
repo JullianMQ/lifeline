@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
-import MapView, { Marker } from "react-native-maps";
+import MapView from "react-native-maps";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import reverseGeocodeWithGoogle from "@/lib/services/geocode";
@@ -107,7 +107,6 @@ export default function HomePage() {
                         showsUserLocation
                         provider="google"
                     >
-                        <Marker coordinate={location} title="You are here" />
                     </MapView>
                 ) : (
                     <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#eee" }}>
@@ -143,7 +142,7 @@ export default function HomePage() {
                     {serverTimestamp ? new Date(serverTimestamp).toLocaleTimeString() : "—"}
                 </Text> */}
 
-                {lastError ? <Text className="text-red-600 mt-2">{lastError}</Text> : null}
+                {/* {lastError ? <Text className="text-red-600 mt-2">{lastError}</Text> : null} */}
             </View>
 
             <View style={{ flex: 1 }} />

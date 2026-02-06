@@ -9,9 +9,21 @@ import { WS_BASE_URL } from "@/lib/api/config";
  * - RN WebSocket header handling.
  * - sendLocationUpdate() export.
  * - Suppress noisy onError events on intentional close (logout/disconnect).
+ *
+ * NOTE: Protocol message types/fields MUST match websocket-api.md exactly.
  */
 
-const WS_URL = `${WS_BASE_URL.replace(/\/$/, "")}/ws`;
+function resolveWsUrl() {
+    const base = (WS_BASE_URL ?? "").replace(/\/$/, "");
+    if (!base) return "/api/ws";
+
+    // Spec endpoint: ws://<host>/api/ws
+    // If WS_BASE_URL already includes /api, avoid /api/api.
+    if (base.endsWith("/api")) return `${base}/ws`;
+    return `${base}/api/ws`;
+}
+
+const WS_URL = resolveWsUrl();
 
 // React Native WebSocket event typings differ from DOM; keep these permissive.
 type WebSocketCloseEvent = any;
@@ -22,100 +34,96 @@ let socket: WebSocket | null = null;
 let currentRoomIds: string[] = [];
 let currentActiveRoomId: string | null = null;
 
-/** Which authenticated user the CURRENT connection belongs to (from `connected`). */
+/** Server handshake identity (for per-user room state memory). */
 let currentHandshakeUserId: string | null = null;
 
-/**
- * Per-user room cache.
- * Critical for account switching: user A's roomIds shouldn't be wiped/overwritten
- * when user B logs in on the same device.
- */
-type UserRoomState = {
+type UserState = {
     roomIds: string[];
     activeRoomId: string | null;
 };
-const roomStateByUser = new Map<string, UserRoomState>();
 
-/**
- * Queue/outbox (client-side only).
- * MUST be cleared when switching authenticated users to prevent cross-session leakage.
- */
-let pending: string[] = [];
-const MAX_PENDING = 100;
+const userStateById = new Map<string, UserState>();
 
-/** Handlers */
 let onMessageRef: ((msg: ServerMessage) => void) | null = null;
 let onOpenRef: (() => void) | null = null;
 let onCloseRef: ((e: WebSocketCloseEvent) => void) | null = null;
 let onErrorRef: ((e: any) => void) | null = null;
 
-/** Remember last connect params so waitForOpen() can initiate a connection automatically. */
-export type ConnectWSArgs = {
-    onMessage: (msg: ServerMessage) => void;
-    onOpen?: () => void;
-    onClose?: (e: WebSocketCloseEvent) => void;
-    onError?: (e: any) => void;
-
-    /**
-     * Mobile auth alternative from websocket-api.md:
-     * Authorization: Bearer <token>
-     */
-    authToken?: string;
-
-    /**
-     * Extra headers if needed. If authToken is provided and Authorization isn't set,
-     * Authorization will be auto-filled.
-     */
-    headers?: Record<string, string>;
-};
-let lastConnectArgs: ConnectWSArgs | null = null;
-
 let openPromise: Promise<void> | null = null;
 let openResolve: (() => void) | null = null;
 let openReject: ((err: any) => void) | null = null;
 
-/**
- * When we intentionally close (logout / disconnect / auth switch), RN may still emit
- * a WebSocket "error" event as part of teardown. We suppress that noise.
- */
 let intentionalClose = false;
 
-function isWSOpen() {
-    return socket?.readyState === WebSocket.OPEN;
-}
+let pending: string[] = [];
+
+export type ClientMessage =
+    | { type: "ping" }
+    | { type: "create-room"; roomId?: string }
+    | { type: "join-room"; roomId: string }
+    | { type: "request-join"; roomId: string }
+    | { type: "approve-join"; roomId: string; requesterId: string }
+    | { type: "room-message"; roomId: string; content: string }
+    | { type: "emergency-sos" }
+    | { type: "get_users"; roomId: string }
+    | { type: "location-update"; roomId?: string; latitude: number; longitude: number; timestamp?: string | number; accuracy?: number };
+
+export type ServerMessage =
+    | { type: "connected"; clientId: string; user?: any; roomIds: string[]; timestamp?: string }
+    | { type: "auto-joined"; roomId: string; roomOwner: string; message: string; timestamp?: string }
+    | { type: "auto-join-summary"; roomsJoined: Array<{ roomId: string; owner: string }>; message: string; timestamp?: string }
+    | { type: "room-created"; roomId: string; owner: string; emergencyContacts: string[]; timestamp?: string }
+    | { type: "join-request"; roomId: string; requesterId?: string; requesterUser?: any; requesterName?: string; timestamp?: string }
+    | { type: "join-approved"; roomId: string; timestamp?: string }
+    | { type: "join-denied"; message: string; timestamp: string }
+    | { type: "room-users"; roomId: string; users: any[]; timestamp?: string }
+    | { type: "location-update-confirmed"; rooms: string[]; timestamp?: string }
+    | { type: "location-update"; data: any; timestamp?: string }
+    | { type: "pong"; timestamp?: string }
+    | { type: "error"; message: string; timestamp?: string }
+    | { type: string;[k: string]: any };
 
 function wipePending() {
     pending = [];
 }
 
 function resetConnectionState() {
-    socket = null;
-    currentRoomIds = [];
-    currentActiveRoomId = null;
-    currentHandshakeUserId = null;
-
     openPromise = null;
     openResolve = null;
     openReject = null;
-
-    // reset close intent marker after teardown is complete
+    socket = null;
     intentionalClose = false;
+
+    // connection-scoped truth
+    currentRoomIds = [];
+    currentActiveRoomId = null;
+
+    // handshake-scoped identity
+    currentHandshakeUserId = null;
 }
 
-function getOrCreateUserState(userId: string): UserRoomState {
-    const existing = roomStateByUser.get(userId);
+function getOrCreateUserState(userId: string): UserState {
+    const existing = userStateById.get(userId);
     if (existing) return existing;
-
-    const next: UserRoomState = { roomIds: [], activeRoomId: null };
-    roomStateByUser.set(userId, next);
-    return next;
+    const st: UserState = { roomIds: [], activeRoomId: null };
+    userStateById.set(userId, st);
+    return st;
 }
 
-function mergeRoomIds(a: string[], b: string[]) {
-    const out = new Set<string>();
-    for (const x of a) if (typeof x === "string" && x.trim()) out.add(x);
-    for (const x of b) if (typeof x === "string" && x.trim()) out.add(x);
-    return Array.from(out);
+function getHandshakeUserId(msg: any): string | null {
+    // Prefer msg.user.id if present; fallback to msg.clientId.
+    const u = msg?.user;
+    const id = (u?.id ?? msg?.clientId ?? null) as string | null;
+    return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
+function mergeRoomIds(prev: string[], next: string[]) {
+    const s = new Set<string>(prev);
+    for (const r of next) {
+        const id = String(r ?? "").trim();
+        if (id) s.add(id);
+    }
+    return Array.from(s);
 }
 
 function setRoomTruthFromConnected(roomIds: string[]) {
@@ -147,11 +155,9 @@ function upsertKnownRoom(roomId: string | undefined | null) {
     const id = roomId.trim();
     if (!id) return;
 
-    // Connection-scoped
     currentRoomIds = mergeRoomIds(currentRoomIds, [id]);
     if (!currentActiveRoomId) currentActiveRoomId = id;
 
-    // Per-user
     if (currentHandshakeUserId) {
         const st = getOrCreateUserState(currentHandshakeUserId);
         st.roomIds = mergeRoomIds(st.roomIds, [id]);
@@ -159,149 +165,8 @@ function upsertKnownRoom(roomId: string | undefined | null) {
     }
 }
 
-export type ServerMessage =
-    | {
-        type: "connected";
-        clientId: string;
-        timestamp?: string;
-        roomIds: string[];
-        user?: any;
-    }
-    | { type: "auto-joined"; roomId: string; timestamp?: string }
-    | {
-        type: "auto-join-summary";
-        timestamp?: string;
-        roomsJoined: Array<{ roomId: string; status: "joined" | "requested" }>;
-    }
-    | { type: "room-created"; roomId: string; timestamp?: string }
-    | { type: "room-users"; roomId: string; users: any[]; timestamp?: string }
-    | { type: "join-request"; roomId: string; clientId: string; user?: any; timestamp?: string }
-    | { type: "join-approved"; roomId: string; clientId?: string; timestamp?: string }
-    | { type: "join-denied"; roomId: string; clientId?: string; message?: string; timestamp?: string }
-    | { type: "user-joined"; roomId: string; clientId: string; user?: any; timestamp?: string }
-    | { type: "user-left"; roomId: string; clientId: string; userName?: string; timestamp?: string }
-    | { type: "room-message"; roomId: string; content: string; userId?: string; userName?: string; timestamp?: string }
-    | {
-        type: "location-update";
-        roomId?: string;
-        latitude?: number;
-        longitude?: number;
-        timestamp?: string;
-        accuracy?: number;
-        data?: any;
-        userId?: string;
-        userName?: string;
-    }
-    | {
-        type: "emergency-alert";
-        roomId?: string;
-        emergencyUserId?: string;
-        emergencyUserName?: string;
-        message?: string;
-        timestamp?: string;
-    }
-    | { type: "emergency-activated"; roomId?: string; message?: string; timestamp?: string }
-    | { type: "emergency-confirmed"; activatedRooms?: string[]; message?: string; timestamp?: string }
-    | { type: "error"; message: string; timestamp?: string }
-    | { type: "pong"; timestamp?: string };
-
-type ClientMessage =
-    | { type: "create-room"; roomId?: string }
-    | { type: "join-room"; roomId: string }
-    | { type: "approve-join"; roomId: string; clientId: string }
-    | { type: "deny-join"; roomId: string; clientId: string }
-    | { type: "get-users"; roomId: string }
-    | {
-        type: "location-update";
-        roomId?: string;
-        latitude: number;
-        longitude: number;
-        timestamp?: string | number;
-        accuracy?: number;
-        userId?: string;
-        userName?: string;
-    }
-    | { type: "emergency-sos" }
-    | { type: "ping" };
-
-export function getJoinedRooms() {
-    if (!currentHandshakeUserId) return [];
-    return getOrCreateUserState(currentHandshakeUserId).roomIds;
-}
-
-export function getActiveRoom() {
-    if (!currentHandshakeUserId) return null;
-    return getOrCreateUserState(currentHandshakeUserId).activeRoomId;
-}
-
-export function setActiveRoom(roomId: string) {
-    const id = (roomId ?? "").trim();
-    if (!id) return;
-
-    currentActiveRoomId = id;
-
-    if (currentHandshakeUserId) {
-        const st = getOrCreateUserState(currentHandshakeUserId);
-        st.activeRoomId = id;
-        st.roomIds = mergeRoomIds(st.roomIds, [id]);
-    }
-}
-
-export function getRoomUsers(roomId: string) {
-    if (!roomId) return;
-    safeEmit({ type: "get-users", roomId });
-}
-
-/**
- * Foreground location can be WS; background should prefer REST fallback.
- */
-export async function sendLocationUpdate(payload: {
-    roomId?: string;
-    latitude: number;
-    longitude: number;
-    timestamp?: string | number;
-    accuracy?: number;
-    userId?: string;
-    userName?: string;
-}) {
-    safeEmit({ type: "location-update", ...payload });
-}
-
-export function sendEmergencySOS() {
-    safeEmit({ type: "emergency-sos" });
-}
-
-export function isWSConnected() {
-    return isWSOpen();
-}
-
-/**
- * Logout/account switch helper:
- * - Disconnect socket
- * - Clear queued messages (prevents cross-account leakage)
- * - Reset only current connection state
- * - Keep per-user cache intact
- */
-export function resetWSForAuthSwitch() {
-    wipePending();
-    intentionalClose = true;
-    try {
-        socket?.close();
-    } catch {
-        // ignore
-    } finally {
-        // resetConnectionState() will run on close too, but keep it safe.
-        resetConnectionState();
-    }
-}
-
-/** Optional debug: wipe ALL per-user cached room state. */
-export function clearKnownRooms() {
-    roomStateByUser.clear();
-}
-
 function safeQueue(msg: ClientMessage) {
-    if (pending.length >= MAX_PENDING) pending.shift();
+    // Doc does not define an outbox, but this is protocol-safe as it does not invent messages.
     pending.push(JSON.stringify(msg));
 }
 
@@ -323,126 +188,110 @@ function buildHeaderArgs(args: ConnectWSArgs) {
     if (args.authToken && !headers.Authorization) {
         headers.Authorization = `Bearer ${args.authToken}`;
     }
-    return headers;
+    return Object.keys(headers).length ? ({ headers } as any) : undefined;
 }
 
-function getHandshakeUserId(msg: any): string | null {
-    return msg?.user?.id ?? msg?.clientId ?? null;
-}
+type ConnectWSArgs = {
+    authToken?: string | null;
+    headers?: Record<string, string>;
+    onMessage?: (msg: ServerMessage) => void;
+    onOpen?: () => void;
+    onClose?: (e: WebSocketCloseEvent) => void;
+    onError?: (e: any) => void;
+};
 
-function handleConnectedMessage(msg: any) {
-    const nextUserId = getHandshakeUserId(msg);
-    currentHandshakeUserId = nextUserId;
-    setRoomTruthFromConnected(Array.isArray(msg.roomIds) ? msg.roomIds : []);
-}
+/**
+ * Connect to WS. Safe for repeated calls; if same auth key & socket open/connecting, it reuses.
+ */
+export async function connectWS(args: ConnectWSArgs) {
+    const desiredAuthKey = args.authToken ?? JSON.stringify(args.headers ?? {});
+    const existingKey = (socket as any)?.__authKey;
 
-export function connectWS(args: ConnectWSArgs) {
-    lastConnectArgs = args;
-
-    onMessageRef = args.onMessage;
+    onMessageRef = args.onMessage ?? null;
     onOpenRef = args.onOpen ?? null;
     onCloseRef = args.onClose ?? null;
     onErrorRef = args.onError ?? null;
 
-    const desiredHeaders = buildHeaderArgs(args);
-    const desiredAuthKey = JSON.stringify(desiredHeaders);
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) && existingKey === desiredAuthKey) {
+        return;
+    }
 
-    // If already open/connecting BUT auth changed, force reconnect and wipe pending.
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-        const currentKey = (socket as any).__authKey as string | undefined;
-        if (currentKey && currentKey !== desiredAuthKey) {
-            wipePending();
-            intentionalClose = true;
-            try {
-                socket.close();
-            } catch {
-                // ignore
-            } finally {
+    if (socket && existingKey !== desiredAuthKey) {
+        // Different auth context; tear down to prevent cross-user leakage.
+        resetWSForAuthSwitch();
+    }
+
+    if (openPromise) return openPromise;
+
+    openPromise = new Promise<void>((resolve, reject) => {
+        openResolve = resolve;
+        openReject = reject;
+
+        try {
+            const options = buildHeaderArgs(args);
+            const ws = new (WebSocket as any)(WS_URL, undefined, options);
+
+            (ws as any).__authKey = desiredAuthKey;
+            socket = ws;
+
+            ws.onopen = async () => {
+                // Flush queued messages (preserve order; no drops on partial failure)
+                if (pending.length) {
+                    const copy = pending.slice();
+                    pending = [];
+
+                    for (let i = 0; i < copy.length; i++) {
+                        const raw = copy[i];
+                        try {
+                            ws.send(raw);
+                        } catch {
+                            // Re-queue the failed item AND everything after it (in order).
+                            pending = copy.slice(i).concat(pending);
+                            break;
+                        }
+                    }
+                }
+
+                onOpenRef?.();
+                openResolve?.();
+                openResolve = null;
+                openReject = null;
+            };
+
+            ws.onmessage = (evt: any) => {
+                try {
+                    const msg = JSON.parse(evt.data) as ServerMessage;
+
+                    if (msg.type === "connected") {
+                        handleConnectedMessage(msg as any);
+                    } else {
+                        const anyMsg = msg as any;
+                        if (typeof anyMsg.roomId === "string") upsertKnownRoom(anyMsg.roomId);
+                    }
+
+                    onMessageRef?.(msg);
+                } catch {
+                    // ignore malformed messages
+                }
+            };
+
+            ws.onclose = (e: any) => {
+                onCloseRef?.(e);
                 resetConnectionState();
-            }
-        } else {
-            return;
-        }
-    }
+            };
 
-    // If we already have a socket object in CLOSING/CLOSED, reset.
-    if (socket && (socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED)) {
-        resetConnectionState();
-    }
-
-    try {
-        // New connection = not an intentional close.
-        intentionalClose = false;
-
-        let ws: WebSocket;
-
-        if (Object.keys(desiredHeaders).length) {
-            try {
-                ws = new (WebSocket as any)(WS_URL, undefined, { headers: desiredHeaders });
-            } catch {
-                ws = new WebSocket(WS_URL);
-            }
-        } else {
-            ws = new WebSocket(WS_URL);
-        }
-
-        (ws as any).__authKey = desiredAuthKey;
-        socket = ws;
-
-        socket.onopen = async () => {
-            // Flush queued messages
-            if (pending.length) {
-                const copy = pending.slice();
-                pending = [];
-                for (const raw of copy) {
-                    try {
-                        socket?.send(raw);
-                    } catch {
-                        pending.unshift(raw);
-                        break;
-                    }
-                }
-            }
-
-            onOpenRef?.();
-            openResolve?.();
-            openResolve = null;
-            openReject = null;
-        };
-
-        socket.onmessage = (evt) => {
-            try {
-                const msg = JSON.parse((evt as any).data) as ServerMessage;
-
-                if (msg.type === "connected") {
-                    handleConnectedMessage(msg as any);
-                } else {
-                    const anyMsg = msg as any;
-                    if (typeof anyMsg.roomId === "string") {
-                        upsertKnownRoom(anyMsg.roomId);
-                    }
-                }
-
-                onMessageRef?.(msg);
-            } catch {
-                // ignore malformed messages
-            }
-        };
-
-        socket.onclose = (e) => {
-            onCloseRef?.(e);
+            ws.onerror = (e: any) => {
+                if (intentionalClose) return;
+                onErrorRef?.(e);
+            };
+        } catch (err) {
+            if (!intentionalClose) onErrorRef?.(err as any);
             resetConnectionState();
-        };
+            reject(err);
+        }
+    });
 
-        socket.onerror = (e) => {
-            // Suppress teardown noise on logout/disconnect.
-            if (intentionalClose) return;
-            onErrorRef?.(e as any);
-        };
-    } catch (err) {
-        if (!intentionalClose) onErrorRef?.(err as any);
-        resetConnectionState();
-    }
+    return openPromise;
 }
 
 export function disconnectWS(opts?: { wipeKnownRooms?: boolean; wipePending?: boolean }) {
@@ -453,31 +302,90 @@ export function disconnectWS(opts?: { wipeKnownRooms?: boolean; wipePending?: bo
     } catch {
         // ignore
     } finally {
-        resetConnectionState();
         if (opts?.wipeKnownRooms) clearKnownRooms();
+        resetConnectionState();
+    }
+}
+
+function handleConnectedMessage(msg: any) {
+    const nextUserId = getHandshakeUserId(msg);
+    currentHandshakeUserId = nextUserId;
+    setRoomTruthFromConnected(Array.isArray(msg.roomIds) ? msg.roomIds : []);
+}
+
+export function getJoinedRooms() {
+    if (!currentHandshakeUserId) return [];
+    return getOrCreateUserState(currentHandshakeUserId).roomIds;
+}
+
+export function getActiveRoom() {
+    if (!currentHandshakeUserId) return null;
+    return getOrCreateUserState(currentHandshakeUserId).activeRoomId;
+}
+
+export function setActiveRoom(roomId: string) {
+    if (!currentHandshakeUserId) return;
+    const st = getOrCreateUserState(currentHandshakeUserId);
+    if (st.roomIds.includes(roomId)) st.activeRoomId = roomId;
+}
+
+export function getRoomUsers(roomId: string) {
+    if (!roomId) return;
+    safeEmit({ type: "get_users", roomId });
+}
+
+/**
+ * Foreground location can be WS; background should prefer REST fallback.
+ */
+export async function sendLocationUpdate(payload: {
+    roomId?: string;
+    latitude: number;
+    longitude: number;
+    timestamp?: string | number;
+    accuracy?: number;
+}) {
+    safeEmit({ type: "location-update", ...payload });
+}
+
+export function sendRoomMessage(roomId: string, content: string) {
+    if (!roomId || !content) return;
+    safeEmit({ type: "room-message", roomId, content });
+}
+
+export function sendEmergencySOS() {
+    safeEmit({ type: "emergency-sos" });
+}
+
+export function isWSConnected() {
+    return !!socket && socket.readyState === WebSocket.OPEN;
+}
+
+export function resetWSForAuthSwitch() {
+    wipePending();
+    try {
+        intentionalClose = true;
+        socket?.close();
+    } catch {
+        // ignore
+    } finally {
+        resetConnectionState();
+    }
+}
+
+export function clearKnownRooms() {
+    currentRoomIds = [];
+    currentActiveRoomId = null;
+    if (currentHandshakeUserId) {
+        const st = getOrCreateUserState(currentHandshakeUserId);
+        st.roomIds = [];
+        st.activeRoomId = null;
     }
 }
 
 async function waitForOpen() {
-    if (isWSOpen()) return;
-
-    if (!openPromise) {
-        openPromise = new Promise<void>((resolve, reject) => {
-            openResolve = resolve;
-            openReject = reject;
-        });
-
-        if (!socket && lastConnectArgs) {
-            connectWS(lastConnectArgs);
-        }
-    }
-
-    if (!socket) {
-        openReject?.(new Error("WS not initialized: call connectWS() first."));
-        openReject = null;
-    }
-
-    return openPromise;
+    if (socket && socket.readyState === WebSocket.OPEN) return;
+    if (!openPromise) throw new Error("WebSocket not connected. Call connectWS first.");
+    await openPromise;
 }
 
 export async function createRoom(roomId?: string) {
@@ -486,19 +394,21 @@ export async function createRoom(roomId?: string) {
 }
 
 export async function joinRoom(roomId: string) {
-    if (!roomId) return;
     await waitForOpen();
     safeEmit({ type: "join-room", roomId });
 }
 
-export async function approveJoin(roomId: string, clientId: string) {
-    if (!roomId || !clientId) return;
+export async function requestJoin(roomId: string) {
     await waitForOpen();
-    safeEmit({ type: "approve-join", roomId, clientId });
+    safeEmit({ type: "request-join", roomId });
 }
 
-export async function denyJoin(roomId: string, clientId: string) {
-    if (!roomId || !clientId) return;
+export async function approveJoin(roomId: string, requesterId: string) {
     await waitForOpen();
-    safeEmit({ type: "deny-join", roomId, clientId });
+    safeEmit({ type: "approve-join", roomId, requesterId });
+}
+
+export async function ping() {
+    await waitForOpen();
+    safeEmit({ type: "ping" });
 }
