@@ -139,3 +139,4 @@ npm install
 - Added map location preview
 - Implemented onclick and onhover for location preview
 - Implemented online, offline, and preview state for map markers
+- Fixed location history updating even when not online

@@ -263,11 +263,13 @@ function Dashboard() {
 
     const lat = selectedContact.location.coords.lat;
     const lng = selectedContact.location.coords.lng;
+    const isOnline = selectedContact.presence?.status === "online";
 
     console.log("[Dashboard] Selected contact location changed:", {
       name: selectedContact.name,
       lat,
       lng,
+      isOnline,
     });
 
     const updateAddress = async () => {
@@ -276,33 +278,57 @@ function Dashboard() {
       const timestamp = new Date().toLocaleTimeString();
       console.log("[Dashboard] Geocode result:", res);
       setAddress(res);
-      setHistory((prev) => ({
-        ...prev,
-        [selectedContact.phone]: [
-          { time: timestamp, lat, lng },
-          ...(prev[selectedContact.phone] || []).slice(0, 49), // Keep last 50 entries
-        ],
-      }));
+      
+      if (isOnline) {
+        setHistory((prev) => ({
+          ...prev,
+          [selectedContact.phone]: [
+            { time: timestamp, lat, lng },
+            ...(prev[selectedContact.phone] || []).slice(0, 49), // Keep last 50 entries
+          ],
+        }));
+      }
     };
 
-    updateAddress();
-
-    // Only poll for address updates, not location updates (WebSocket handles that)
-    const interval = setInterval(() => {
-      // Re-fetch geocode in case the location has changed
-      if (selectedContact.location?.coords) {
-        updateAddress();
+    setHistory((prev) => {
+      const existingHistory = prev[selectedContact.phone] || [];
+      const locationExists = existingHistory.some(
+        (h) => h.lat === lat && h.lng === lng
+      );
+      if (!locationExists && existingHistory.length === 0) {
+        const timestamp = new Date().toLocaleTimeString();
+        return {
+          ...prev,
+          [selectedContact.phone]: [
+            { time: timestamp, lat, lng },
+            ...existingHistory,
+          ],
+        };
       }
-    }, 30000); // Poll less frequently since WebSocket provides real-time updates
+      return prev;
+    });
 
-    return () => clearInterval(interval);
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isOnline) {
+      updateAddress();
+      interval = setInterval(() => {
+        if (selectedContact.location?.coords) {
+          updateAddress();
+        }
+      }, 30000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [
     selectedContact?.id,
     selectedContact?.location?.coords?.lat,
     selectedContact?.location?.coords?.lng,
+    selectedContact?.presence?.status,
   ]);
 
-  // Handle viewing a contact from alert modal
   const handleViewAlertContact = (contact: ContactCard) => {
     console.log(
       "[Dashboard] handleViewAlertContact:",
@@ -315,7 +341,6 @@ function Dashboard() {
     }
   };
 
-  // Get connection status indicator
   const getConnectionIndicator = () => {
     switch (connectionStatus) {
       case "connected":
@@ -335,7 +360,6 @@ function Dashboard() {
 
   const connectionIndicator = getConnectionIndicator();
 
-  // Get map center based on selected contact or user location
   const getMapCenter = () => {
     if (selectedContact?.location?.coords) {
       return {
@@ -343,7 +367,6 @@ function Dashboard() {
         lng: selectedContact.location.coords.lng,
       };
     }
-    // Try to get first contact with location
     const contactWithLocation = contactCards.find((c) => c.location?.coords);
     if (contactWithLocation?.location?.coords) {
       return {
@@ -351,7 +374,6 @@ function Dashboard() {
         lng: contactWithLocation.location.coords.lng,
       };
     }
-    // Fall back to user location or default
     return user?.location || DEFAULT_MAP_CENTER;
   };
 
