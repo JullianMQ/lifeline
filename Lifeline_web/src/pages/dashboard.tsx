@@ -308,10 +308,11 @@ function Dashboard() {
       return prev;
     });
 
+    updateAddress();
+
     let interval: NodeJS.Timeout | null = null;
     
     if (isOnline) {
-      updateAddress();
       interval = setInterval(() => {
         if (selectedContact.location?.coords) {
           updateAddress();
