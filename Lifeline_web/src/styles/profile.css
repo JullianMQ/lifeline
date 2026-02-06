@@ -154,6 +154,11 @@ form.profile-user{
     text-align: center;
 }
 
+.confirm-modal{
+    text-align: center;
+    gap: var(--space-sm);
+}
+
 .avatar-grid{
     gap: var(--space-sm);
     height: 100%;
@@ -254,7 +259,7 @@ form.profile-user{
         padding: var(--space-xs);
     }
     .modal-content{
-        width: 80%;
+        width: 80% !important;
         gap: var(--space-sm);
     }
 }
@@ -275,6 +280,9 @@ form.profile-user{
     .vr{
         width: 1px;
         height: 100%;
+    }
+    .modal-content{
+        width: 60%;
     }
 }
 @media screen and (min-width: 1024px){
