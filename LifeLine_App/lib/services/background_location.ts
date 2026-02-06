@@ -3,6 +3,7 @@ import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "@/lib/api/config";
 import { getActiveRoom, isWSConnected, sendLocationUpdate } from "@/lib/services/websocket";
+import { getToken } from "@/lib/api/storage/user";
 
 const TASK_NAME = "bg-location-upload";
 const ROOM_ID_KEY = "activeRoomIdForUploads";
@@ -35,12 +36,20 @@ async function postLocationHTTP(payload: {
     if (!url) return;
 
     try {
+        const token = await getToken().catch(() => null);
+
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+
+        // Keep cookie-based auth behavior, but also add Bearer token when available
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
         await fetch(url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            // If auth is cookie-based:
+            headers,
             credentials: "include",
-            // If you use bearer tokens, add Authorization header here instead.
             body: JSON.stringify(payload),
         });
     } catch {
@@ -63,7 +72,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
     if (error) return;
 
     const now = Date.now();
-    if (now - lastBgUploadAt < 55_000) return; // throttle if OS delivers faster
+    if (now - lastBgUploadAt < 55_000) return;
     lastBgUploadAt = now;
 
     const locations = (data as any)?.locations as Location.LocationObject[] | undefined;

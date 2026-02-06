@@ -10,17 +10,56 @@ import { WS_BASE_URL } from "@/lib/api/config";
  * - sendLocationUpdate() export.
  * - Suppress noisy onError events on intentional close (logout/disconnect).
  *
- * NOTE: Protocol message types/fields MUST match websocket-api.md exactly.
  */
 
-function resolveWsUrl() {
-    const base = (WS_BASE_URL ?? "").replace(/\/$/, "");
-    if (!base) return "/api/ws";
+function normalizeToWsBase(input: string) {
+    const base = (input ?? "").trim().replace(/\/$/, "");
+    if (!base) return "";
 
-    // Spec endpoint: ws://<host>/api/ws
-    // If WS_BASE_URL already includes /api, avoid /api/api.
-    if (base.endsWith("/api")) return `${base}/ws`;
-    return `${base}/api/ws`;
+    // If user provides http(s), convert to ws(s)
+    if (base.startsWith("http://")) return "ws://" + base.slice("http://".length);
+    if (base.startsWith("https://")) return "wss://" + base.slice("https://".length);
+
+    // If already ws(s) or something else, keep as-is
+    return base;
+}
+
+function resolveWsUrl() {
+    const baseRaw = (WS_BASE_URL ?? "").trim();
+    const base = normalizeToWsBase(baseRaw);
+
+    // If WS_BASE_URL is provided, keep existing logic (but ensure absolute ws(s) scheme).
+    if (base) {
+        // Spec endpoint: ws(s)://<host>/api/ws
+        // If WS_BASE_URL already includes /api, avoid /api/api.
+        if (base.endsWith("/api")) return `${base}/ws`;
+        return `${base}/api/ws`;
+    }
+
+    const hasWindow = typeof window !== "undefined";
+    const loc = hasWindow ? (window as any).location : undefined;
+
+    if (loc?.host) {
+        const proto = loc.protocol === "https:" ? "wss:" : "ws:";
+        return `${proto}//${loc.host}/api/ws`;
+    }
+
+    // React Native fallback
+    const envUrl =
+        (typeof process !== "undefined" && (process as any)?.env?.EXPO_PUBLIC_WS_URL) ||
+        (typeof process !== "undefined" && (process as any)?.env?.WS_URL) ||
+        "";
+
+    if (typeof envUrl === "string" && envUrl.trim()) {
+        const normalized = normalizeToWsBase(envUrl.trim()).replace(/\/$/, "");
+        // If env already points to .../api/ws, keep it as-is. Otherwise append /api/ws.
+        if (normalized.endsWith("/api/ws")) return normalized;
+        if (normalized.endsWith("/api")) return `${normalized}/ws`;
+        return `${normalized}/api/ws`;
+    }
+
+    // Sensible default for local dev (RN emulator/device will need host reachable)
+    return "ws://localhost:3000/api/ws";
 }
 
 const WS_URL = resolveWsUrl();
@@ -92,7 +131,10 @@ function resetConnectionState() {
     openResolve = null;
     openReject = null;
     socket = null;
-    intentionalClose = false;
+
+    // IMPORTANT: do not force intentionalClose=false here, because onclose can fire after reset.
+    // We'll clear it when starting a new connection instead.
+    // intentionalClose = false;
 
     // connection-scoped truth
     currentRoomIds = [];
@@ -111,7 +153,6 @@ function getOrCreateUserState(userId: string): UserState {
 }
 
 function getHandshakeUserId(msg: any): string | null {
-    // Prefer msg.user.id if present; fallback to msg.clientId.
     const u = msg?.user;
     const id = (u?.id ?? msg?.clientId ?? null) as string | null;
     return typeof id === "string" && id.trim() ? id.trim() : null;
@@ -166,7 +207,6 @@ function upsertKnownRoom(roomId: string | undefined | null) {
 }
 
 function safeQueue(msg: ClientMessage) {
-    // Doc does not define an outbox, but this is protocol-safe as it does not invent messages.
     pending.push(JSON.stringify(msg));
 }
 
@@ -200,6 +240,11 @@ type ConnectWSArgs = {
     onError?: (e: any) => void;
 };
 
+function isIntentionalCloseFor(ws: any) {
+    // Per-socket marker prevents races with resetConnectionState()
+    return !!ws?.__intentionalClose || intentionalClose;
+}
+
 /**
  * Connect to WS. Safe for repeated calls; if same auth key & socket open/connecting, it reuses.
  */
@@ -217,11 +262,13 @@ export async function connectWS(args: ConnectWSArgs) {
     }
 
     if (socket && existingKey !== desiredAuthKey) {
-        // Different auth context; tear down to prevent cross-user leakage.
+
         resetWSForAuthSwitch();
     }
 
     if (openPromise) return openPromise;
+
+    intentionalClose = false;
 
     openPromise = new Promise<void>((resolve, reject) => {
         openResolve = resolve;
@@ -232,6 +279,8 @@ export async function connectWS(args: ConnectWSArgs) {
             const ws = new (WebSocket as any)(WS_URL, undefined, options);
 
             (ws as any).__authKey = desiredAuthKey;
+            (ws as any).__intentionalClose = false;
+
             socket = ws;
 
             ws.onopen = async () => {
@@ -253,6 +302,7 @@ export async function connectWS(args: ConnectWSArgs) {
                 }
 
                 onOpenRef?.();
+
                 openResolve?.();
                 openResolve = null;
                 openReject = null;
@@ -271,17 +321,31 @@ export async function connectWS(args: ConnectWSArgs) {
 
                     onMessageRef?.(msg);
                 } catch {
-                    // ignore malformed messages
+                    // ignore invalid messages
                 }
             };
 
             ws.onclose = (e: any) => {
+                if (!isIntentionalCloseFor(ws) && openReject) {
+                    const err = new Error(
+                        `WebSocket closed before open (code=${String(e?.code ?? "unknown")}, reason=${String(e?.reason ?? "")})`
+                    );
+                    (err as any).event = e;
+                    try {
+                        openReject(err);
+                    } catch {
+                        // ignore
+                    }
+                }
+
                 onCloseRef?.(e);
+
+                // Reset after we reject (or after open already resolved)
                 resetConnectionState();
             };
 
             ws.onerror = (e: any) => {
-                if (intentionalClose) return;
+                if (isIntentionalCloseFor(ws)) return;
                 onErrorRef?.(e);
             };
         } catch (err) {
@@ -298,6 +362,7 @@ export function disconnectWS(opts?: { wipeKnownRooms?: boolean; wipePending?: bo
     try {
         if (opts?.wipePending) wipePending();
         intentionalClose = true;
+        if (socket) (socket as any).__intentionalClose = true;
         socket?.close();
     } catch {
         // ignore
@@ -364,6 +429,7 @@ export function resetWSForAuthSwitch() {
     wipePending();
     try {
         intentionalClose = true;
+        if (socket) (socket as any).__intentionalClose = true;
         socket?.close();
     } catch {
         // ignore
