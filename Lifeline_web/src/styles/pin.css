@@ -35,7 +35,7 @@
   filter: drop-shadow(0 4px 4px rgba(0,0,0,0.2));
 }
 
-.map-pin:hover, .map-pin.preview-marker {
+.map-pin:hover {
     scale: 1.1;
 }
 
@@ -51,15 +51,16 @@
 .map-pin.preview-marker .map-pin-tail { border-top-color: var(--highlight-green); }
 
 .map-pin.preview-marker {
-  animation: pinDrop .4s ease-in-out;
+  scale: 1.1;
+  animation: pinDrop .4s ease-in-out forwards;
 }
 
 @keyframes pinDrop {
   0% {
-    transform: translateY(-10px) scale(0.9) ;  
+    transform: translateY(-10px) scale(0.9);  
   }
   100% {
-    transform: translateY(-10px) scale(1);
+    transform: translateY(-10px) scale(1.1);
   }
 }
 

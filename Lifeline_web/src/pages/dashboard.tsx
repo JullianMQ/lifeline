@@ -143,7 +143,6 @@ function Dashboard() {
   const prevAlertsSignature = useRef<string>("");
 
   const {
-    loading,
     handleLocation,
     getGeocode,
     setAddress,
@@ -447,7 +446,6 @@ function Dashboard() {
 
         <div className="map">
           <DashboardMap
-            loading={loading}
             center={getMapCenter()}
             onSelectContact={handleSelectContact}
             contacts={contactCards}
