@@ -73,75 +73,139 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-    const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+    // FIX (coderabbit): avoid stale activeRoomIdState in message handlers
+    const activeRoomIdRef = useRef<string | null>(activeRoomIdState);
+    const setActiveRoomIdStateSafe = (next: string | null) => {
+        activeRoomIdRef.current = next;
+        setActiveRoomIdState(next);
+    };
 
-    // create-my-room is a one-shot per connection
-    const myRoomIdRef = useRef<string | null>(null);
-    const myRoomCreatedRef = useRef(false);
-    const creatingMyRoomRef = useRef(false);
-
-    // We only treat the server room list as truth after we receive "connected".
     const hasHandshakeRef = useRef(false);
+    const userRef = useRef<any>(null);
+    const clientIdRef = useRef<string | null>(null);
 
-    // de-dupe notifications
-    const seenNotifRef = useRef<Set<string>>(new Set());
+    const ensureInFlightRef = useRef(false);
+    const ensureRequestedBeforeHandshakeRef = useRef(false);
+    const ownedRoomReadyRef = useRef(false);
 
-    function syncRooms() {
-        const r = getJoinedRooms();
-        setRooms(r);
+    const ownerRecoveryRef = useRef<{ userId: string; roomId: string | null; mode: "join" | "create" } | null>(null);
 
-        const active = activeRoomIdState ?? getActiveRoom();
-        if (!active && r.length) {
-            setActiveRoom(r[0]);
-            setActiveRoomIdState(r[0]);
+    // FIX (coderabbit): safety timeout so ensureInFlight never sticks forever
+    const ensureTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const ENSURE_TIMEOUT_MS = 10_000;
+
+    // suppress WS onError logging during logout / auth-switch teardown
+    const suppressErrorLogsRef = useRef(false);
+
+    const addNotif = (n: AppNotification) => {
+        setNotifications((prev) => [n, ...prev].slice(0, 50));
+    };
+
+    const getCurrentUserId = () => {
+        return (userRef.current?.id ?? clientIdRef.current ?? null) as string | null;
+    };
+
+    const clearEnsureTimeout = () => {
+        if (ensureTimeoutIdRef.current) {
+            clearTimeout(ensureTimeoutIdRef.current);
+            ensureTimeoutIdRef.current = null;
         }
-    }
-
-    const addNotif = (n: Omit<AppNotification, "id" | "read">) => {
-        const signature = `${n.type}|${n.timestamp}|${n.roomId ?? ""}|${n.message}`;
-        if (seenNotifRef.current.has(signature)) return;
-        seenNotifRef.current.add(signature);
-
-        setNotifications((prev) => [
-            { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, read: false, ...n },
-            ...prev,
-        ]);
     };
 
-    const markNotifRead = (id: string) => {
-        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    const clearEnsureInFlight = (opts?: { clearRecovery?: boolean; setError?: string | null }) => {
+        clearEnsureTimeout();
+        ensureInFlightRef.current = false;
+
+        if (opts?.clearRecovery) {
+            ownerRecoveryRef.current = null;
+        }
+        if (opts?.setError !== undefined) {
+            setLastError(opts.setError);
+        }
     };
 
-    const deleteNotif = (id: string) => {
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
+    const beginEnsureAttempt = (opts?: { onTimeoutError?: string; clearRecoveryOnTimeout?: boolean }) => {
+        clearEnsureTimeout();
+        ensureInFlightRef.current = true;
+
+        ensureTimeoutIdRef.current = setTimeout(() => {
+            // If server never responds, unblock future attempts
+            ensureInFlightRef.current = false;
+
+            if (opts?.clearRecoveryOnTimeout) {
+                ownerRecoveryRef.current = null;
+            }
+
+            setLastError(opts?.onTimeoutError ?? "Room recovery timed out. Please try again.");
+            ensureTimeoutIdRef.current = null;
+        }, ENSURE_TIMEOUT_MS);
     };
 
-    const clearNotifs = () => {
-        setNotifications([]);
-        seenNotifRef.current.clear();
+    const syncRooms = () => {
+        const joined = getJoinedRooms();
+        setRooms(joined);
+
+        const active = getActiveRoom();
+        if (active && joined.includes(active)) {
+            setActiveRoomIdStateSafe(active);
+        } else if (!activeRoomIdRef.current && joined.length) {
+            setActiveRoom(joined[0]);
+            setActiveRoomIdStateSafe(joined[0]);
+        }
     };
 
-    const ensureMyRoomInternal = async () => {
-        // Spec: roomIds in the "connected" handshake is server-truth.
-        // Do NOT create a room until we have received that handshake.
-        if (!hasHandshakeRef.current) return;
+    const ensureOwnerRoom = async () => {
+        if (!hasHandshakeRef.current) {
+            ensureRequestedBeforeHandshakeRef.current = true;
+            return;
+        }
+        if (ensureInFlightRef.current || ownedRoomReadyRef.current) return;
 
-        // Doc: only create a room when we truly have none.
-        // Let the server generate the roomId to avoid "Room already exists".
-        if (getJoinedRooms().length > 0) return;
-        if (creatingMyRoomRef.current) return;
+        const userId = getCurrentUserId();
+        if (!userId) return;
 
-        creatingMyRoomRef.current = true;
+        const saved = await getOwnerRoomId(userId).catch(() => null);
 
-        // IMPORTANT: Create first.
-        // If backend replies "room already exists", you can then join (optional).
-        // But most backends auto-join the creator on "room-created".
+        // Spec: room IDs are cryptographically random (server-generated). Avoid deterministic IDs.
+        // If we have a saved owner roomId, try to re-join it. Otherwise, create a new room.
+        if (saved && isValidRoomId(saved)) {
+            ownerRecoveryRef.current = { userId, roomId: saved, mode: "join" };
+
+            // Start ensure attempt timeout; will be cleared on join-approved/join-denied/close
+            beginEnsureAttempt({
+                onTimeoutError: "Could not rejoin your room (timeout). Please try again.",
+                clearRecoveryOnTimeout: true,
+            });
+
+            try {
+                // joinRoom only sends; server response is handled in handleMessage
+                await joinRoom(saved);
+            } catch {
+                // If sending fails immediately, clear and allow retry
+                clearEnsureInFlight({ clearRecovery: true, setError: "Failed to send join request." });
+            }
+            return;
+        }
+
+        ownerRecoveryRef.current = { userId, roomId: null, mode: "create" };
+
+        beginEnsureAttempt({
+            onTimeoutError: "Could not create your room (timeout). Please try again.",
+            clearRecoveryOnTimeout: true,
+        });
+
         try {
-            await createRoom(myRoomId);
-        } finally {
-            // keep "creating" true until server confirms via "room-created" or "join-approved"
-            // We'll clear it in handleMessage.
+            await createRoom();
+        } catch (err: any) {
+            clearEnsureInFlight({
+                clearRecovery: true,
+                setError: err?.message ?? "Failed to create room",
+            });
         }
+    };
+
+    const ensureMyRoom = async () => {
+        await ensureOwnerRoom();
     };
 
     const handleMessage = (msg: ServerMessage) => {
@@ -155,37 +219,31 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
                 setLastError(null);
 
                 hasHandshakeRef.current = true;
+                ownedRoomReadyRef.current = false;
 
-                // server truth (doc)
-                const roomIds: string[] = Array.isArray((msg as any).roomIds) ? (msg as any).roomIds : [];
-                setRooms(roomIds);
+                // terminal reset for any in-flight recovery attempt
+                clearEnsureInFlight({ clearRecovery: true, setError: null });
 
-                // pick an active room if we don't have one
-                const active = activeRoomIdState ?? getActiveRoom();
-                if (!active && roomIds.length) {
-                    setActiveRoom(roomIds[0]);
-                    setActiveRoomIdState(roomIds[0]);
+                // Server truth: connected.roomIds
+                const serverRoomIds = (msg as any).roomIds;
+                if (Array.isArray(serverRoomIds)) {
+                    setRooms(serverRoomIds);
+
+                    const active = getActiveRoom();
+                    if (active && serverRoomIds.includes(active)) {
+                        setActiveRoomIdStateSafe(active);
+                    } else if (serverRoomIds.length) {
+                        setActiveRoom(serverRoomIds[0]);
+                        setActiveRoomIdStateSafe(serverRoomIds[0]);
+                    } else {
+                        setActiveRoomIdStateSafe(null);
+                    }
+                } else {
+                    syncRooms();
                 }
 
-                // reset per-connection flags
-                myRoomCreatedRef.current = false;
-                creatingMyRoomRef.current = false;
-
-                myRoomIdRef.current = `user:${(msg as any).clientId}`;
-
-                syncRooms();
-
-                // ensure I have an owned room so SOS works for this user
-                ensureMyRoomInternal();
-                break;
-            }
-
-            // room success signals
-            case "room-created":
-            case "join-approved": {
-                if ((msg as any).roomId && (msg as any).roomId === myRoomIdRef.current) {
-                    myRoomCreatedRef.current = true;
-                    creatingMyRoomRef.current = false;
+                if (ensureRequestedBeforeHandshakeRef.current) {
+                    ensureRequestedBeforeHandshakeRef.current = false;
                 }
                 syncRooms();
                 break;
@@ -194,6 +252,93 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
             case "auto-joined":
             case "auto-join-summary": {
                 syncRooms();
+                break;
+            }
+
+            case "room-created": {
+                const roomId = (msg as any).roomId as string | undefined;
+                const userId = getCurrentUserId();
+
+                if (roomId && userId) {
+                    setOwnerRoomId(userId, roomId).catch(() => { });
+                    ownedRoomReadyRef.current = true;
+
+                    setActiveRoom(roomId);
+                    setActiveRoomIdStateSafe(roomId);
+
+                    setRooms((prev) => Array.from(new Set<string>([...prev, roomId])));
+                }
+
+                // terminal success: clear ensure + recovery
+                clearEnsureInFlight({ clearRecovery: true });
+
+                syncRooms();
+                break;
+            }
+
+            case "join-approved": {
+                const roomId = (msg as any).roomId as string | undefined;
+                const userId = getCurrentUserId();
+
+                if (roomId) setRooms((prev) => Array.from(new Set<string>([...prev, roomId])));
+
+                const rec = ownerRecoveryRef.current;
+
+                // If this approval corresponds to our owner-room recovery, mark ready and clear in-flight
+                if (rec && userId && rec.userId === userId && rec.mode === "join" && roomId && rec.roomId && roomId === rec.roomId) {
+                    setOwnerRoomId(userId, roomId).catch(() => { });
+                    ownedRoomReadyRef.current = true;
+
+                    setActiveRoom(roomId);
+                    setActiveRoomIdStateSafe(roomId);
+
+                    // terminal success: clear ensure + recovery
+                    clearEnsureInFlight({ clearRecovery: true, setError: null });
+                }
+
+                syncRooms();
+                break;
+            }
+
+            case "join-denied": {
+                const message = ((msg as any).message ?? "Join denied") as string;
+                setLastError(message);
+
+                const userId = getCurrentUserId();
+                const rec = ownerRecoveryRef.current;
+
+                // If we tried to re-join a previously saved owner room and it no longer exists (or is not accessible),
+                // clear the saved value and create a fresh server-generated room.
+                const shouldRecreateOwnerRoom =
+                    !!rec &&
+                    !!userId &&
+                    rec.userId === userId &&
+                    rec.mode === "join" &&
+                    /room not found|not authorized/i.test(message);
+
+                if (shouldRecreateOwnerRoom) {
+                    clearOwnerRoomId(userId).catch(() => { });
+
+                    ownerRecoveryRef.current = { userId, roomId: null, mode: "create" };
+
+                    // Keep ensure in-flight but restart timeout for the create attempt
+                    beginEnsureAttempt({
+                        onTimeoutError: "Could not create a new room (timeout). Please try again.",
+                        clearRecoveryOnTimeout: true,
+                    });
+
+                    createRoom().catch((err: any) => {
+                        clearEnsureInFlight({
+                            clearRecovery: true,
+                            setError: err?.message ?? "Failed to create owner room",
+                        });
+                    });
+
+                    return;
+                }
+
+                // terminal failure: clear ensure + recovery (allow future attempts)
+                clearEnsureInFlight({ clearRecovery: true });
                 break;
             }
 
@@ -295,20 +440,20 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const connectOnce = () => {
+    const handleClose = () => {
+        setIsConnected(false);
+        hasHandshakeRef.current = false;
+        ownedRoomReadyRef.current = false;
+
+        // FIX (coderabbit): explicitly clear ensureInFlight and recovery on close
+        clearEnsureInFlight({ clearRecovery: true });
+    };
+
+    const connectOnce = (token: string) => {
         connectWS({
             onMessage: handleMessage,
-            onClose: () => {
-                setIsConnected(false);
+            onClose: handleClose,
 
-                // Keep last-known rooms/active room for mobile REST fallback.
-                // The next "connected" handshake will rehydrate server-truth anyway.
-                myRoomIdRef.current = null;
-                myRoomCreatedRef.current = false;
-                creatingMyRoomRef.current = false;
-
-                hasHandshakeRef.current = false;
-            },
             onError: (e) => {
                 console.log("WS onError", e);
             },
@@ -324,21 +469,107 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
     // Optional: background/foreground handling (do NOT disconnect on "inactive" which happens during navigation)
     useEffect(() => {
-        const sub = AppState.addEventListener("change", (nextState) => {
-            if (nextState === "active") {
-                if (!isWSConnected()) connectOnce();
+        const prev = prevTokenRef.current;
+        prevTokenRef.current = resolvedToken;
+
+        if (prev === undefined) {
+            if (resolvedToken) connectOnce(resolvedToken);
+            return;
+        }
+
+        suppressErrorLogsRef.current = true;
+
+        resetWSForAuthSwitch();
+
+        setIsConnected(false);
+        setRooms([]);
+        setActiveRoomIdStateSafe(null);
+        setServerTimestamp(null);
+        setLastError(null);
+        setRoomUsers({});
+        setNotifications([]);
+
+        hasHandshakeRef.current = false;
+        ownedRoomReadyRef.current = false;
+        ownerRecoveryRef.current = null;
+
+        // ensure flags should always be cleared on auth changes
+        clearEnsureInFlight({ clearRecovery: true });
+
+        userRef.current = null;
+        clientIdRef.current = null;
+
+        setTimeout(() => {
+            suppressErrorLogsRef.current = false;
+        }, 750);
+
+        if (resolvedToken) connectOnce(resolvedToken);
+    }, [resolvedToken]);
+
+    const lastStateRef = useRef<string>(AppState.currentState);
+    // Foreground reconnect + (if token unmanaged) refresh token
+    useEffect(() => {
+        const sub = AppState.addEventListener("change", async (state) => {
+            const prev = lastStateRef.current;
+            lastStateRef.current = state;
+
+            // IMPORTANT:
+            // "inactive" often happens during permission dialogs.
+            // Do NOT disconnect WS on inactive, or you will thrash connections.
+            if (state === "background") {
+                // disconnectWS({ wipeKnownRooms: false, wipePending: false });
+                // setIsConnected(false);
+                hasHandshakeRef.current = false;
+                ownedRoomReadyRef.current = false;
+
+                // clear in-flight ensure so it doesn't get stuck while backgrounded
+                clearEnsureInFlight({ clearRecovery: true });
+
+                return;
+            }
+
+            if (state !== "active") {
+                return;
+            }
+
+            // state === "active"
+            if (authToken === undefined) {
+                const latest = await getToken().catch(() => null);
+                if (latest !== resolvedToken) {
+                    setResolvedToken(latest ?? null);
+                    return;
+                }
+            }
+
+            if (resolvedToken && !isWSConnected()) {
+                connectOnce(resolvedToken);
+            }
+
+            if (resolvedToken) {
+                ensureOwnerRoom().catch(() => { });
             }
         });
 
         return () => sub.remove();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authToken, resolvedToken]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            suppressErrorLogsRef.current = true;
+
+            // clear ensure timers/refs to avoid setState after unmount
+            clearEnsureInFlight({ clearRecovery: true });
+
+            disconnectWS({ wipeKnownRooms: true, wipePending: true });
+        };
     }, []);
 
     // ---- actions ----
 
     const setActiveRoomId = (roomId: string) => {
         setActiveRoom(roomId);
-        setActiveRoomIdState(roomId);
+        setActiveRoomIdStateSafe(roomId);
         syncRooms();
     };
 

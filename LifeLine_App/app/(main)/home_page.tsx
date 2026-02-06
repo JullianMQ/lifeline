@@ -1,6 +1,5 @@
-// app/(main)/home_page.tsx
-import React, { useContext, useEffect, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useContext, useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
 import MapView from "react-native-maps";
 import * as Location from "expo-location";
@@ -25,6 +24,8 @@ export default function HomePage() {
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
+    const [incident, setIncident] = useState(incidentManager.getActive());
+
     const [isSOSSending, setIsSOSSending] = useState(false);
 
     // Fetch user location (for the map UI only)
@@ -85,41 +86,21 @@ export default function HomePage() {
     }, [isMonitoring]);
 
     const handleSOS = async () => {
-        // guard: avoid confusing warnings + guarantee room scoped actions
-        if (!isConnected) {
-            setMessageReply("WebSocket not connected yet.");
-            return;
-        }
-        if (!activeRoomId) {
-            setMessageReply("Connected, but you are not in a room yet.");
-            return;
-        }
+        if (isSOSSending) return;
 
-        const parts: string[] = [];
-        if (address) parts.push(address);
-        if (location) parts.push(`(${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`);
-
-        const text = parts.length > 0 ? `SOS! Current location: ${parts.join(" ")}` : "SOS pressed! Help needed.";
-
-        // 1) Trigger emergency workflow
-        sos();
-
-        // 2) Broadcast to current room
-        sendToRoom(
-            {
-                text,
-                address,
-                location: location ? { ...location } : null,
-                createdAt: new Date().toISOString(),
-            },
-            activeRoomId
-        );
-
-        // 3) Optional: POST /api/location to trigger WS location-update broadcasts (matches test Suite 6)
+        setIsSOSSending(true);
         try {
-            await postLocationToApi();
-        } catch (e) {
-            console.log("Failed to POST /api/location", e);
+            await sos();
+        } catch (err) {
+            console.error("SOS failed:", err);
+
+            Alert.alert(
+                "SOS failed",
+                "We couldn’t send your SOS right now. Please check your connection and try again.",
+                [{ text: "OK" }]
+            );
+        } finally {
+            setIsSOSSending(false);
         }
     };
 
@@ -144,7 +125,7 @@ export default function HomePage() {
                         }}
                         showsUserLocation
                         provider="google"
-                    />
+                    ></MapView>
                 ) : (
                     <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#eee" }}>
                         <Text className="text-gray-600">Location not available</Text>
@@ -175,11 +156,6 @@ export default function HomePage() {
                     {isConnected ? `connected | ${activeRoomId ?? "no room"}` : "disconnected"}
                 </Text>
 
-                <Text className="text-gray-600 mt-2">Server Time:</Text>
-                <Text className="text-lg font-semibold">
-                    {serverTimestamp ? new Date(serverTimestamp).toLocaleTimeString() : "—"}
-                </Text>
-
                 {lastError ? <Text className="text-red-600 mt-1">{lastError}</Text> : null}
             </View>
 
@@ -188,6 +164,20 @@ export default function HomePage() {
 
             {/* SOS and STOP BUTTON */}
             <View className="items-center mt-12">
+                <TouchableOpacity
+                    className="w-52 h-52 rounded-full items-center justify-center bg-red-600 mb-6"
+                    onPress={handleSOS}
+                    disabled={isSOSSending}
+                    style={{ opacity: isSOSSending ? 0.7 : 1 }}
+                >
+                    {isSOSSending ? (
+                        <ActivityIndicator size="large" color="white" />
+                    ) : (
+                        <>
+                            <Ionicons name="call" size={50} color="white" />
+                            <Text className="text-white font-bold mt-1 text-3xl">SOS</Text>
+                        </>
+                    )}
                 <TouchableOpacity
                     className="w-52 h-52 rounded-full items-center justify-center bg-red-600 mb-6"
                     onPress={handleSOS}
