@@ -134,3 +134,8 @@ npm install
 - Responsive adjustments for contact alert state
 - Alert mode and regular state for contacts
 
+### 2026-02-06
+
+- Added map location preview
+- Implemented onclick and onhover for location preview
+- Implemented online, offline, and preview state for map markers

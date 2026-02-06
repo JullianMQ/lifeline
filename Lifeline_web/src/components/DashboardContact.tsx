@@ -8,6 +8,9 @@ type Props = {
   onBack: () => void;
   geocode: string;
   history: { time: string; lat: number; lng: number }[];
+  onHistoryHover?: (location: { lat: number; lng: number; image: string } | null) => void;
+  onHistoryClick?: (location: { lat: number; lng: number; image: string } | null, index: number) => void;
+  selectedRowIndex?: number | null;
 };
 
 function formatLastSeen(timestamp: string): string {
@@ -36,6 +39,9 @@ export default function DashboardContact({
   onBack,
   geocode,
   history,
+  onHistoryHover,
+  onHistoryClick,
+  selectedRowIndex,
 }: Props) {
   const location = contact.location?.coords ?? null;
   const isOnline = contact.presence?.status === "online";
@@ -196,16 +202,26 @@ export default function DashboardContact({
                   <td>Time Stamp</td>
                   <td>Location</td>
                 </tr>
-                {history.map((row, i) => (
-                  <tr key={i}>
-                    <td>{row.time}</td>
-                    <td>
-                      {row.lng}
-                      <br />
-                      {row.lat}
-                    </td>
-                  </tr>
-                ))}
+                {history.map((row, i) => {
+                  const isSelected = selectedRowIndex === i;
+                  return (
+                    <tr
+                      key={i}
+                      onMouseEnter={() => onHistoryHover?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' })}
+                      onMouseLeave={() => onHistoryHover?.(null)}
+                      onClick={() => onHistoryClick?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' }, i)}
+                      className={`history-row-hoverable ${isSelected ? 'selected' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>{row.time}</td>
+                      <td>
+                        {row.lng}
+                        <br />
+                        {row.lat}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </article>

@@ -137,6 +137,9 @@ function Dashboard() {
   >({});
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
+  const [hoveredHistoryLocation, setHoveredHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
+  const [selectedHistoryLocation, setSelectedHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const prevAlertsSignature = useRef<string>("");
 
   const {
@@ -201,6 +204,8 @@ function Dashboard() {
     console.log("[Dashboard] Going back, clearing selectedContactId");
     setSelectedContactId(null);
     setAddress("");
+    setSelectedRowIndex(null);
+    setSelectedHistoryLocation(null);
   };
 
   // Handle location markers for user and contacts
@@ -430,6 +435,12 @@ function Dashboard() {
               onBack={handleBack}
               geocode={address}
               history={history[selectedContact.phone] || []}
+              onHistoryHover={setHoveredHistoryLocation}
+              onHistoryClick={(location, index) => {
+                setSelectedHistoryLocation(selectedRowIndex === index ? null : location);
+                setSelectedRowIndex(selectedRowIndex === index ? null : index);
+              }}
+              selectedRowIndex={selectedRowIndex}
             />
           )}
         </div>
@@ -440,6 +451,8 @@ function Dashboard() {
             center={getMapCenter()}
             onSelectContact={handleSelectContact}
             contacts={contactCards}
+            hoveredLocation={hoveredHistoryLocation}
+            selectedLocation={selectedHistoryLocation}
           />
         </div>
       </section>
