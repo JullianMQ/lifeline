@@ -70,6 +70,13 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
     const [roomUsers, setRoomUsers] = useState<Record<string, any[]>>({});
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+    // FIX (coderabbit): avoid stale activeRoomIdState in message handlers
+    const activeRoomIdRef = useRef<string | null>(activeRoomIdState);
+    const setActiveRoomIdStateSafe = (next: string | null) => {
+        activeRoomIdRef.current = next;
+        setActiveRoomIdState(next);
+    };
+
     const hasHandshakeRef = useRef(false);
     const userRef = useRef<any>(null);
     const clientIdRef = useRef<string | null>(null);
@@ -79,6 +86,10 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
     const ownedRoomReadyRef = useRef(false);
 
     const ownerRecoveryRef = useRef<{ userId: string; roomId: string | null; mode: "join" | "create" } | null>(null);
+
+    // FIX (coderabbit): safety timeout so ensureInFlight never sticks forever
+    const ensureTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const ENSURE_TIMEOUT_MS = 10_000;
 
     // suppress WS onError logging during logout / auth-switch teardown
     const suppressErrorLogsRef = useRef(false);
@@ -91,16 +102,52 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         return (userRef.current?.id ?? clientIdRef.current ?? null) as string | null;
     };
 
+    const clearEnsureTimeout = () => {
+        if (ensureTimeoutIdRef.current) {
+            clearTimeout(ensureTimeoutIdRef.current);
+            ensureTimeoutIdRef.current = null;
+        }
+    };
+
+    const clearEnsureInFlight = (opts?: { clearRecovery?: boolean; setError?: string | null }) => {
+        clearEnsureTimeout();
+        ensureInFlightRef.current = false;
+
+        if (opts?.clearRecovery) {
+            ownerRecoveryRef.current = null;
+        }
+        if (opts?.setError !== undefined) {
+            setLastError(opts.setError);
+        }
+    };
+
+    const beginEnsureAttempt = (opts?: { onTimeoutError?: string; clearRecoveryOnTimeout?: boolean }) => {
+        clearEnsureTimeout();
+        ensureInFlightRef.current = true;
+
+        ensureTimeoutIdRef.current = setTimeout(() => {
+            // If server never responds, unblock future attempts
+            ensureInFlightRef.current = false;
+
+            if (opts?.clearRecoveryOnTimeout) {
+                ownerRecoveryRef.current = null;
+            }
+
+            setLastError(opts?.onTimeoutError ?? "Room recovery timed out. Please try again.");
+            ensureTimeoutIdRef.current = null;
+        }, ENSURE_TIMEOUT_MS);
+    };
+
     const syncRooms = () => {
         const joined = getJoinedRooms();
         setRooms(joined);
 
         const active = getActiveRoom();
         if (active && joined.includes(active)) {
-            setActiveRoomIdState(active);
-        } else if (!activeRoomIdState && joined.length) {
+            setActiveRoomIdStateSafe(active);
+        } else if (!activeRoomIdRef.current && joined.length) {
             setActiveRoom(joined[0]);
-            setActiveRoomIdState(joined[0]);
+            setActiveRoomIdStateSafe(joined[0]);
         }
     };
 
@@ -114,28 +161,43 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         const userId = getCurrentUserId();
         if (!userId) return;
 
-        ensureInFlightRef.current = true;
-
         const saved = await getOwnerRoomId(userId).catch(() => null);
 
         // Spec: room IDs are cryptographically random (server-generated). Avoid deterministic IDs.
         // If we have a saved owner roomId, try to re-join it. Otherwise, create a new room.
         if (saved && isValidRoomId(saved)) {
             ownerRecoveryRef.current = { userId, roomId: saved, mode: "join" };
+
+            // Start ensure attempt timeout; will be cleared on join-approved/join-denied/close
+            beginEnsureAttempt({
+                onTimeoutError: "Could not rejoin your room (timeout). Please try again.",
+                clearRecoveryOnTimeout: true,
+            });
+
             try {
+                // joinRoom only sends; server response is handled in handleMessage
                 await joinRoom(saved);
             } catch {
-                // join result handled via messages
+                // If sending fails immediately, clear and allow retry
+                clearEnsureInFlight({ clearRecovery: true, setError: "Failed to send join request." });
             }
             return;
         }
 
         ownerRecoveryRef.current = { userId, roomId: null, mode: "create" };
+
+        beginEnsureAttempt({
+            onTimeoutError: "Could not create your room (timeout). Please try again.",
+            clearRecoveryOnTimeout: true,
+        });
+
         try {
             await createRoom();
         } catch (err: any) {
-            ensureInFlightRef.current = false;
-            setLastError(err?.message ?? "Failed to create room");
+            clearEnsureInFlight({
+                clearRecovery: true,
+                setError: err?.message ?? "Failed to create room",
+            });
         }
     };
 
@@ -153,23 +215,23 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
                 hasHandshakeRef.current = true;
                 ownedRoomReadyRef.current = false;
-                ensureInFlightRef.current = false;
-                ownerRecoveryRef.current = null;
 
-                setLastError(null);
+                // terminal reset for any in-flight recovery attempt
+                clearEnsureInFlight({ clearRecovery: true, setError: null });
 
                 // Server truth: connected.roomIds
                 const serverRoomIds = (msg as any).roomIds;
                 if (Array.isArray(serverRoomIds)) {
                     setRooms(serverRoomIds);
+
                     const active = getActiveRoom();
                     if (active && serverRoomIds.includes(active)) {
-                        setActiveRoomIdState(active);
+                        setActiveRoomIdStateSafe(active);
                     } else if (serverRoomIds.length) {
                         setActiveRoom(serverRoomIds[0]);
-                        setActiveRoomIdState(serverRoomIds[0]);
+                        setActiveRoomIdStateSafe(serverRoomIds[0]);
                     } else {
-                        setActiveRoomIdState(null);
+                        setActiveRoomIdStateSafe(null);
                     }
                 } else {
                     syncRooms();
@@ -198,13 +260,14 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                     ownedRoomReadyRef.current = true;
 
                     setActiveRoom(roomId);
-                    setActiveRoomIdState(roomId);
+                    setActiveRoomIdStateSafe(roomId);
 
                     setRooms((prev) => Array.from(new Set<string>([...prev, roomId])));
                 }
 
-                ensureInFlightRef.current = false;
-                ownerRecoveryRef.current = null;
+                // terminal success: clear ensure + recovery
+                clearEnsureInFlight({ clearRecovery: true });
+
                 syncRooms();
                 break;
             }
@@ -217,14 +280,16 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
                 const rec = ownerRecoveryRef.current;
 
+                // If this approval corresponds to our owner-room recovery, mark ready and clear in-flight
                 if (rec && userId && rec.userId === userId && rec.mode === "join" && roomId && rec.roomId && roomId === rec.roomId) {
-                    setOwnerRoomId(userId, roomId!).catch(() => { });
+                    setOwnerRoomId(userId, roomId).catch(() => { });
                     ownedRoomReadyRef.current = true;
-                    ensureInFlightRef.current = false;
-                    ownerRecoveryRef.current = null;
 
-                    setActiveRoom(roomId!);
-                    setActiveRoomIdState(roomId!);
+                    setActiveRoom(roomId);
+                    setActiveRoomIdStateSafe(roomId);
+
+                    // terminal success: clear ensure + recovery
+                    clearEnsureInFlight({ clearRecovery: true, setError: null });
                 }
 
                 syncRooms();
@@ -233,7 +298,6 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
             case "join-denied": {
                 const message = ((msg as any).message ?? "Join denied") as string;
-
                 setLastError(message);
 
                 const userId = getCurrentUserId();
@@ -250,17 +314,27 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
                 if (shouldRecreateOwnerRoom) {
                     clearOwnerRoomId(userId).catch(() => { });
+
                     ownerRecoveryRef.current = { userId, roomId: null, mode: "create" };
 
-                    createRoom()
-                        .catch((err: any) => setLastError(err?.message ?? "Failed to create owner room"))
-                        .finally(() => {
-                            ensureInFlightRef.current = false;
+                    // Keep ensure in-flight but restart timeout for the create attempt
+                    beginEnsureAttempt({
+                        onTimeoutError: "Could not create a new room (timeout). Please try again.",
+                        clearRecoveryOnTimeout: true,
+                    });
+
+                    createRoom().catch((err: any) => {
+                        clearEnsureInFlight({
+                            clearRecovery: true,
+                            setError: err?.message ?? "Failed to create owner room",
                         });
+                    });
+
                     return;
                 }
 
-                ensureInFlightRef.current = false;
+                // terminal failure: clear ensure + recovery (allow future attempts)
+                clearEnsureInFlight({ clearRecovery: true });
                 break;
             }
 
@@ -330,18 +404,22 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         }
     };
 
+    const handleClose = () => {
+        setIsConnected(false);
+        hasHandshakeRef.current = false;
+        ownedRoomReadyRef.current = false;
+
+        // FIX (coderabbit): explicitly clear ensureInFlight and recovery on close
+        clearEnsureInFlight({ clearRecovery: true });
+    };
+
     const connectOnce = (token: string) => {
         connectWS({
             authToken: token,
             headers,
             onOpen: () => setIsConnected(true),
             onMessage: handleMessage,
-            onClose: () => {
-                setIsConnected(false);
-                hasHandshakeRef.current = false;
-                ensureInFlightRef.current = false;
-                ownedRoomReadyRef.current = false;
-            },
+            onClose: handleClose,
 
             onError: (e) => {
                 if (suppressErrorLogsRef.current) return;
@@ -393,16 +471,18 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
         setIsConnected(false);
         setRooms([]);
-        setActiveRoomIdState(null);
+        setActiveRoomIdStateSafe(null);
         setServerTimestamp(null);
         setLastError(null);
         setRoomUsers({});
         setNotifications([]);
 
         hasHandshakeRef.current = false;
-        ensureInFlightRef.current = false;
         ownedRoomReadyRef.current = false;
         ownerRecoveryRef.current = null;
+
+        // ensure flags should always be cleared on auth changes
+        clearEnsureInFlight({ clearRecovery: true });
 
         userRef.current = null;
         clientIdRef.current = null;
@@ -428,13 +508,15 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                 // disconnectWS({ wipeKnownRooms: false, wipePending: false });
                 // setIsConnected(false);
                 hasHandshakeRef.current = false;
-                ensureInFlightRef.current = false;
                 ownedRoomReadyRef.current = false;
+
+                // clear in-flight ensure so it doesn't get stuck while backgrounded
+                clearEnsureInFlight({ clearRecovery: true });
+
                 return;
             }
 
             if (state !== "active") {
-                // ignore "inactive" and other transient states
                 return;
             }
 
@@ -463,13 +545,17 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
     useEffect(() => {
         return () => {
             suppressErrorLogsRef.current = true;
+
+            // clear ensure timers/refs to avoid setState after unmount
+            clearEnsureInFlight({ clearRecovery: true });
+
             disconnectWS({ wipeKnownRooms: true, wipePending: true });
         };
     }, []);
 
     const setActiveRoomId = (roomId: string) => {
         setActiveRoom(roomId);
-        setActiveRoomIdState(roomId);
+        setActiveRoomIdStateSafe(roomId);
         syncRooms();
     };
 
