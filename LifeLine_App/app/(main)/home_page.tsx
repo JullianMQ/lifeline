@@ -53,7 +53,16 @@ export default function HomePage() {
     useEffect(() => {
         if (!isMonitoring) return;
         if (activeRoomId) return;
-        ensureMyRoom();
+
+        ensureMyRoom().catch((err) => {
+            console.error("ensureMyRoom failed:", err);
+            Alert.alert(
+                "Room setup failed",
+                "We couldn’t create or join your room. Please check your connection and try again.",
+                [{ text: "OK" }]
+            );
+        });
+
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isMonitoring, activeRoomId]);
 

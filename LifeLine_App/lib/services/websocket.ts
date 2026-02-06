@@ -257,12 +257,19 @@ export async function connectWS(args: ConnectWSArgs) {
     onCloseRef = args.onClose ?? null;
     onErrorRef = args.onError ?? null;
 
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) && existingKey === desiredAuthKey) {
-        return;
+
+    if (socket && existingKey === desiredAuthKey) {
+        if (socket.readyState === WebSocket.OPEN) {
+            return Promise.resolve();
+        }
+        if (socket.readyState === WebSocket.CONNECTING) {
+            // Return the in-flight promise instead of undefined
+            if (openPromise) return openPromise;
+        }
     }
 
-    if (socket && existingKey !== desiredAuthKey) {
 
+    if (socket && existingKey !== desiredAuthKey) {
         resetWSForAuthSwitch();
     }
 
