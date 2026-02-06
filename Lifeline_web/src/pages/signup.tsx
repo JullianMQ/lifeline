@@ -158,7 +158,7 @@ function Signup() {
                   </button>
                   <label htmlFor="terms-checkbox" className="termsConditions">
                     <input type="checkbox" id="terms-checkbox" checked={tcAccepted} onChange={(e) => setTCAccepted(e.target.checked)}/>
-                      <p>I agree to the{" "} <a onClick={openTCModal}> Terms and Conditions</a></p>
+                      <p>I agree to the{" "} <a href="#" onClick={openTCModal}> Terms and Conditions</a></p>
                   </label>
                 </>
               )}

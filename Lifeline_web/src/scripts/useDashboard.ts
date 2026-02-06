@@ -227,7 +227,7 @@ export function useDashboard(): UseDashboardReturn {
       });
 
       return {
-        id: contactUserId || contactPhone || "",
+        id: contactUserId || contactPhone || `unknown-${contact.name}-${Math.random()}`,
         name: contact.name,
         phone: contact.phone_no,
         email: contact.email,

@@ -16,7 +16,9 @@ export default function TermsCondition({
         <article className="TCcontent">
             <section className="head">
                 <h1>TERMS AND CONDITIONS</h1>
-                <img src="/images/close.svg" alt="Back" onClick={onClose} className=""/>
+                <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', padding: 0, width: 'auto'}}> 
+                    <img src="/images/close.svg" alt="Back"/>
+                </button>
             </section>
 
             <section className="body">
@@ -148,7 +150,7 @@ export default function TermsCondition({
 
             <footer>
             <label htmlFor="terms-checkbox" className="termsConditions">
-                <input type="checkbox" checked={status} onChange={(e) => setStatus(e.target.checked)}/>
+                <input type="checkbox" checked={status} onChange={(e) => setStatus(e.target.checked)} id="terms-checkbox"/>
                 <p>I have read and agree to the Terms and Conditions.</p>
             </label>
 

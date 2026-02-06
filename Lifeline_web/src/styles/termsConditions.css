@@ -46,7 +46,6 @@
     align-items: center;
     justify-content: space-between;
     position: sticky;
-    top: 0;
     background-color: var(--soft-white);
 }
 
@@ -56,8 +55,8 @@
 
 .TCcontent footer { 
     gap: var(--space-xs); 
-    bottom: 0; padding-top: 
-    var(--space-xxs); 
+    bottom: 0; 
+    padding-top: var(--space-xxs); 
 }
 .TCcontent button {
     color: var(--soft-white);

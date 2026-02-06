@@ -17,7 +17,6 @@ const DEFAULT_CENTER = { lat: 15.1330832, lng: 120.5874361 };
 export { DEFAULT_CENTER as DEFAULT_MAP_CENTER };
 
 type Props = {
-  loading: boolean;
   center?: LatLng;
   onSelectContact: (contact: ContactCard) => void;
   contacts: ContactCard[];
@@ -95,7 +94,7 @@ function DashboardMap({ center, onSelectContact, contacts, hoveredLocation, sele
       
       const avatar = document.createElement("img");
       avatar.className = "map-pin-avatar";
-      avatar.src = displayLocation.image;
+      avatar.src = displayLocation.image || "/images/user-example.svg";
       avatar.alt = "Location preview";
       head.appendChild(avatar);
 
@@ -112,7 +111,6 @@ function DashboardMap({ center, onSelectContact, contacts, hoveredLocation, sele
       });
 
       created.push(previewMarker);
-      console.log("[DashboardMap] Created preview marker at:", displayLocation);
     }
 
     return () => {
