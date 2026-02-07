@@ -480,6 +480,7 @@ Upload user location data via HonoJS endpoint, which is then broadcast to all ro
   "longitude": 120.9842,
   "timestamp": "2026-01-18T10:00:00.000Z",
   "accuracy": 12,
+  "formattedLocation": "Manila, Metro Manila, Philippines",
   "roomId": "abc123def456"
 }
 ```
@@ -489,6 +490,7 @@ Upload user location data via HonoJS endpoint, which is then broadcast to all ro
 - `longitude`: number between -180 and 180
 - `timestamp`: string (ISO 8601) or number (Unix timestamp)
 - `accuracy`: optional number
+- `formattedLocation`: optional string
 - `roomId`: optional string - **Required when WebSocket is disconnected**
 
 **Behavior:**
@@ -532,6 +534,54 @@ When user is not authorized for the specified room:
 
 **Location Update Broadcast:**
 After successful upload, all room members receive a `location-update` message via WebSocket.
+
+### GET /api/locations
+
+Fetch recent locations for the authenticated user within the retention window.
+
+**Response:**
+```json
+{
+  "locations": [
+    {
+      "id": 123,
+      "user_id": "user_id",
+      "latitude": 14.5995,
+      "longitude": 120.9842,
+      "formatted_location": "Manila, Metro Manila, Philippines",
+      "timestamp": "2026-01-18T10:00:00.000Z",
+      "created_at": "2026-01-18T10:00:01.000Z"
+    }
+  ]
+}
+```
+
+### GET /api/locations/contacts
+
+Fetch recent locations for emergency contacts, grouped by user.
+
+**Response:**
+```json
+{
+  "locations_by_user": [
+    {
+      "user_id": "contact_user_id",
+      "user_name": "John Doe",
+      "user_phone": "09123456789",
+      "locations": [
+        {
+          "id": 456,
+          "latitude": 14.5995,
+          "longitude": 120.9842,
+          "formatted_location": "Manila, Metro Manila, Philippines",
+          "timestamp": "2026-01-18T10:00:00.000Z",
+          "created_at": "2026-01-18T10:00:01.000Z"
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## Rooms Info API
 
