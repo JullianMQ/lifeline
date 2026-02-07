@@ -202,15 +202,26 @@ export default function HomePage() {
 
                 <TouchableOpacity
                     className="mt-6 mb-8 px-6 py-3 rounded-full border-2 flex-row items-center h-20 w-48 justify-center"
-                    onPress={() => {
-                        if (isMonitoring) stopMonitoring();
-                        else startMonitoring();
+                    onPress={async () => {
+                        try {
+                            if (isMonitoring) {
+                                await stopMonitoring();
+                            } else {
+                                await startMonitoring();
+                            }
+                        } catch (err) {
+                            console.error(`${isMonitoring ? "stopMonitoring" : "startMonitoring"} failed:`, err);
+                            Alert.alert(
+                                "Monitoring failed",
+                                "We couldn’t update monitoring right now. Please try again.",
+                                [{ text: "OK" }]
+                            );
+                        }
                     }}
                 >
-                    <Text className="font-bold ml-2 text-2xl">
-                        {isMonitoring ? "STOP" : "START"}
-                    </Text>
+                    <Text className="font-bold ml-2 text-2xl">{isMonitoring ? "STOP" : "START"}</Text>
                 </TouchableOpacity>
+
             </View>
         </ScreenWrapper>
     );
