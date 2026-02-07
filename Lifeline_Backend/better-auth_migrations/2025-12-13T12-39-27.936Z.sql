@@ -2,6 +2,7 @@ CREATE TYPE role_enum AS ENUM ('mutual', 'dependent');
 
 CREATE TABLE "user" (
     "id" TEXT PRIMARY KEY NOT NULL,
+    "name" TEXT NOT NULL,
     "email" TEXT NOT NULL UNIQUE,
     "emailVerified" BOOLEAN NOT NULL,
     "image" TEXT,
