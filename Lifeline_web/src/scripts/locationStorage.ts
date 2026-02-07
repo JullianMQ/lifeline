@@ -10,6 +10,7 @@ export interface StoredLocation {
     longitude: number;
     accuracy?: number;
     timestamp: string;
+    visiblePhone: string;
     receivedAt: string; // When we received this update
 }
 export interface LocationStore {

@@ -23,6 +23,7 @@ export default function HomePage() {
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
+    const [incident, setIncident] = useState(incidentManager.getActive());
 
     const [isSOSSending, setIsSOSSending] = useState(false);
 
@@ -113,6 +114,22 @@ export default function HomePage() {
 
     return (
         <ScreenWrapper>
+
+            <SosAlertCallScreen
+                visible={!!incident}
+                callerName="Chister"
+                onAnswer={async () => {
+                    // "Answer" = silently trigger SOS
+                    await incidentManager.clearIncident();
+                    handleSOS();
+                }}
+                onDecline={async () => {
+                    // "Decline" = snooze safely (doesn't permanently disable)
+                    await incidentManager.snoozeActive();
+                    await incidentManager.clearIncident();
+                }}
+            />
+
             {/* MAP BOX */}
             <View className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden border" style={{ height: 384 }}>
                 {locationLoading ? (

@@ -51,6 +51,7 @@ export default {
     },
     plugins: [
       "expo-router",
+      ["expo-camera", { "recordAudioAndroid": false }],
       [
         "expo-splash-screen",
         {

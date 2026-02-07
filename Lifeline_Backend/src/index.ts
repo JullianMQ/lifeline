@@ -5,6 +5,7 @@ import auth from './routes/auth'
 import contacts from './routes/contacts'
 import webSocket from './routes/websocket'
 import locationRouter from './routes/location'
+import mediaRouter from './routes/media'
 import { cors } from 'hono/cors'
 
 const app = new Hono<{ Variables: AuthType }>({
@@ -15,14 +16,14 @@ app.use(
     cors({
         origin: process.env.ALLOWED_ORIGINS!.split(','),
         allowHeaders: ['Content-Type', 'X-Custom-Header', 'Upgrade-Insecure-Request'],
-        allowMethods: ['POST', 'GET', 'OPTIONS','DELETE'],
+        allowMethods: ['POST', 'GET', 'OPTIONS', 'DELETE', 'PUT'],
         exposeHeaders: ['Content-length', 'X-Kuma-Revision'],
         maxAge: 600,
         credentials: true,
     })
 )
 
-const routes = [auth, contacts, webSocket, locationRouter] as const;
+const routes = [auth, contacts, webSocket, locationRouter, mediaRouter] as const;
 
 routes.forEach((route) => {
     app.basePath("/api").route("/", route);

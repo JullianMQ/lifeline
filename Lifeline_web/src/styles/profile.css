@@ -1,10 +1,10 @@
 .dashboard{
     position: relative;
 }
-.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-radio, .info-options, .btn-row, .profile-card-name, .profile-card, .add-btn, .profile-contacts, .modal, .modal-content, .avatar-choice{
+.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-radio, .info-options, .btn-row, .profile-card-name, .profile-card, .add-btn, .profile-contacts, .modal, .modal-content, .avatar-choice, .profile-card-content{
     display: flex;
 }
-.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-options, .modal-content, .avatar-choice, .profile-contacts, .profile-card{
+.profile-body, .profile-user, .profile-user-content, .profile-id, .profile-info, .info-options, .modal-content, .avatar-choice, .profile-contacts, .profile-card, .profile-card-content{
     flex-direction: column;
 }
 .relative{
@@ -71,9 +71,7 @@ form.profile-user{
     width: fit-content;
 }
 
-.profile-id img{
-    aspect-ratio: 1/1;
-    border-radius: 100%;
+.profile-img{
     border: 1px solid var(--text-black);
 }
 
@@ -149,7 +147,7 @@ form.profile-user{
     background-color: rgba(0, 0, 0, 0.5);
 }
 
-.modal-content{
+.profile-user-content .modal-content{
     width: 60%;
     max-width: 800px;
     gap: var(--space-md);
@@ -171,9 +169,7 @@ form.profile-user{
 }
 
 .avatar-img{
-    aspect-ratio: 1/1;
     width: 100%;
-    border-radius: 100%;
     border: 1px solid var(--text-black);
 }
 
@@ -203,16 +199,15 @@ form.profile-user{
 }
 
 .profile-card{
-    gap: var(--space-xxs);
     min-width: 300px;
-    text-wrap: break-text;
+    max-width: 350px;
+    justify-content: space-between;
 }
-
-.profile-card p{
+.profile-card-content{
+    gap: var(--space-xxs);
     overflow-wrap: break-word;
     word-break: break-word;
-    text-wrap: pretty;
-    max-inline-size: 85%;
+    overflow-wrap: anywhere;
 }
 
 .profile-card-name{
@@ -221,10 +216,8 @@ form.profile-user{
 }
 
 .profile-card-name img{
-    aspect-ratio: 1/1;
     width: 32px;
     height: auto;
-    border-radius: 100%;
     border: 1px solid var(--text-black);
 }
 
@@ -251,11 +244,11 @@ form.profile-user{
     .profile-info, .profile-card-name{
         gap: var(--space-xxs);
     }
-    .profile-id img{
+    .profile-img{
         height: 64px;
     }
     .profile-card{
-        min-width: 200px;
+        min-width: 250px;
     }
     .profile-card, .profile-user{
         padding: var(--space-xs);
