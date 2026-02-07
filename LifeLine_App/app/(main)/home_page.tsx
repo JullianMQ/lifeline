@@ -23,7 +23,6 @@ export default function HomePage() {
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
-    const [incident, setIncident] = useState(incidentManager.getActive());
 
     const [isSOSSending, setIsSOSSending] = useState(false);
 
