@@ -70,7 +70,10 @@ export default function HomePage() {
     // When we have an active room, cache it for REST fallback (background task)
     useEffect(() => {
         if (!activeRoomId) return;
-        setRoomIdForBackgroundUploads(activeRoomId);
+
+        setRoomIdForBackgroundUploads(activeRoomId).catch((err) => {
+            console.error("setRoomIdForBackgroundUploads failed:", err);
+        });
     }, [activeRoomId]);
 
     // Start/stop location sharing based on monitoring.
@@ -78,18 +81,30 @@ export default function HomePage() {
     // Background: HTTP fallback every ~60s (Expo task)
     useEffect(() => {
         if (!isMonitoring) {
-            stopForegroundLocationSharing();
-            stopBackgroundLocationUploads();
+            stopForegroundLocationSharing().catch((err) => {
+                console.error("stopForegroundLocationSharing failed:", err);
+            });
+            stopBackgroundLocationUploads().catch((err) => {
+                console.error("stopBackgroundLocationUploads failed:", err);
+            });
             return;
         }
 
         // Start both; background task will only succeed once roomId is cached.
-        startForegroundLocationSharing();
-        startBackgroundLocationUploads();
+        startForegroundLocationSharing().catch((err) => {
+            console.error("startForegroundLocationSharing failed:", err);
+        });
+        startBackgroundLocationUploads().catch((err) => {
+            console.error("startBackgroundLocationUploads failed:", err);
+        });
 
         return () => {
-            stopForegroundLocationSharing();
-            stopBackgroundLocationUploads();
+            stopForegroundLocationSharing().catch((err) => {
+                console.error("stopForegroundLocationSharing cleanup failed:", err);
+            });
+            stopBackgroundLocationUploads().catch((err) => {
+                console.error("stopBackgroundLocationUploads cleanup failed:", err);
+            });
         };
     }, [isMonitoring]);
 
@@ -193,7 +208,9 @@ export default function HomePage() {
                         else startMonitoring();
                     }}
                 >
-                    <Text className="font-bold ml-2 text-2xl">{isMonitoring ? "STOP" : "START"}</Text>
+                    <Text className="font-bold ml-2 text-2xl">
+                        {isMonitoring ? "STOP" : "START"}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </ScreenWrapper>
