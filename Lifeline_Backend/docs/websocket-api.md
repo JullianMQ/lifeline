@@ -234,9 +234,22 @@ Trigger emergency mode across all rooms owned by the user.
 **Send:**
 ```json
 {
-  "type": "emergency-sos"
+  "type": "emergency-sos",
+  "latitude": 14.5995,
+  "longitude": 120.9842,
+  "timestamp": "2026-01-18T10:00:00.000Z",
+  "accuracy": 12,
+  "formattedLocation": "Manila, Metro Manila, Philippines",
+  "roomId": "abc123def456"
 }
 ```
+
+**Optional Location Fields:**
+- `latitude` and `longitude`: if provided, the server will process a location update and persist it to the database before broadcasting.
+- `timestamp`: optional string/number (defaults to current time if omitted).
+- `accuracy`: optional number.
+- `formattedLocation`: optional string.
+- `roomId`: optional string to target a specific room for the location update.
 
 **Response:**
 ```json
