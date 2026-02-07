@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { API_BASE_URL } from "../config/api";
 
 export type MediaType = "picture" | "video" | "voice_recording";
 
@@ -58,8 +59,6 @@ function getMediaTypeLabel(mediaType: MediaType): string {
       return "Media";
   }
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 export default function MediaModal({
   open,
