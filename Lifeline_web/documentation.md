@@ -120,3 +120,22 @@ npm install
 - Added user and contact icon as Google Map pin
 - Implemented pin onclick function to view details
 - Fixed user location pin 
+
+### 2026-02-03
+
+- Added Terms and Conditions
+- Implement disable signup button
+- Terms and conditions modal passes value to signup
+
+### 2026-02-04
+
+- Removed unused markers prop from DashboardMap
+- Implemented alert mode
+- Responsive adjustments for contact alert state
+- Alert mode and regular state for contacts
+
+### 2026-02-06
+
+- Added map location preview
+- Implemented onclick and onhover for location preview
+- Implemented online, offline, and preview state for map markers

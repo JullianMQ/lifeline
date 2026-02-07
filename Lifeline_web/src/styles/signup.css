@@ -43,3 +43,28 @@
 .role-options h3{
     font-weight: 700;
 }
+
+.termsConditions{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.termsConditions p, .termsConditions input{
+    width: auto;
+}
+
+.termsConditions input{
+    accent-color: var(--lifeline-red);
+}
+
+.signup .modal-content{
+    width: 500px;
+    height: 600px;
+    gap: var(--space-md);
+}
+
+

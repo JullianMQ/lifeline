@@ -1,0 +1,63 @@
+.TCcontent { 
+    overflow-y: scroll; 
+    position: relative; 
+    padding-right: 5px;
+}
+.TCcontent > * > * { 
+    color: var(--text-black); 
+    line-height: 1.2; 
+}
+
+.TCcontent .body, .TCcontent .body div, .TCcontent ul, .TCcontent footer {
+    display: flex;
+    flex-direction: column;
+}
+
+.TCcontent .body { 
+    gap: var(--space-xs); 
+}
+
+.TCcontent .body div {  
+    gap: var(--space-xxs); 
+}   
+.TCcontent ul { 
+    list-style: disc; 
+    margin-left: var(--space-sm); 
+    gap: var(--space-xxs); 
+}
+
+.TCcontent h1 { 
+    font-size: 18px; 
+}
+
+.TCcontent h2, .TCcontent p, .TCcontent li, .TCcontent button { 
+    font-size: 14px; 
+}
+.TCcontent strong { 
+    color: var(--text-black); 
+}
+
+.TCcontent .head img{ 
+    height: 16px; width: 16px; 
+}
+
+.TCcontent .head, .TCcontent footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    background-color: var(--soft-white);
+}
+
+.TCcontent .head { 
+    top: 0; padding-bottom: var(--space-xxs); 
+}
+
+.TCcontent footer { 
+    gap: var(--space-xs); 
+    bottom: 0; 
+    padding-top: var(--space-xxs); 
+}
+.TCcontent button {
+    color: var(--soft-white);
+}

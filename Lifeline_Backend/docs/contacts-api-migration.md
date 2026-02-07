@@ -49,6 +49,7 @@ interface ContactResponse {
 }
 
 interface ContactUser {
+    user_id: string | null;
     phone_no: string;
     name: string | null;
     email: string | null;
@@ -227,6 +228,7 @@ curl -X GET http://localhost:3000/contacts/users \
   "user_id": "user1",
   "emergency_contacts": [
     {
+      "user_id": "contact_user_id_123",
       "phone_no": "+639123456789",
       "name": "John Doe",
       "email": "john@example.com",

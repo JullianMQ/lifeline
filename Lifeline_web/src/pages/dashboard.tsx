@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import "../styles/dashboard.css";
+import "../styles/alertMode.css";
 import { useDashboard } from "../scripts/useDashboard";
 import { useNavigate } from "react-router-dom";
 import DashboardMap, { DEFAULT_MAP_CENTER } from "../components/DashboardMap";
@@ -136,16 +137,16 @@ function Dashboard() {
   >({});
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
+  const [hoveredHistoryLocation, setHoveredHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
+  const [selectedHistoryLocation, setSelectedHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const prevAlertsSignature = useRef<string>("");
 
   const {
-    markers,
-    loading,
     handleLocation,
     getGeocode,
     setAddress,
     address,
-    updateMarker,
   } = useMap();
   const {
     user,
@@ -188,7 +189,7 @@ function Dashboard() {
     });
     return contact || null;
   }, [selectedContactId, contactCards]);
-
+  
   // Handle selecting a contact - store the ID, not the object
   const handleSelectContact = (contact: ContactCard) => {
     console.log("[Dashboard] Selecting contact:", contact.id, contact.name);
@@ -202,6 +203,8 @@ function Dashboard() {
     console.log("[Dashboard] Going back, clearing selectedContactId");
     setSelectedContactId(null);
     setAddress("");
+    setSelectedRowIndex(null);
+    setSelectedHistoryLocation(null);
   };
 
   // Handle location markers for user and contacts
@@ -232,6 +235,7 @@ function Dashboard() {
           name: c.name,
           phone: c.phone,
           location: { lat: c.location.coords.lat, lng: c.location.coords.lng },
+          image: c.image,
         });
       }
     });
@@ -240,6 +244,7 @@ function Dashboard() {
     if (user?.location) {
       handleLocation(user);
     }
+    
   }, [contactCards, user]);
 
   // Update address and history when selected contact's location changes
@@ -351,7 +356,7 @@ function Dashboard() {
   };
 
   return (
-    <main className="dashboard">
+    <main className={`dashboard ${selectedContact?.hasActiveAlert ? "alert" : ""}`}>
       {/* Emergency Alert Modal */}
       {showAlertModal && activeAlerts.length > 0 && (
         <AlertModal
@@ -429,17 +434,23 @@ function Dashboard() {
               onBack={handleBack}
               geocode={address}
               history={history[selectedContact.phone] || []}
-              onAcknowledgeAlert={acknowledgeAlert}
+              onHistoryHover={setHoveredHistoryLocation}
+              onHistoryClick={(location, index) => {
+                setSelectedHistoryLocation(selectedRowIndex === index ? null : location);
+                setSelectedRowIndex(selectedRowIndex === index ? null : index);
+              }}
+              selectedRowIndex={selectedRowIndex}
             />
           )}
         </div>
 
         <div className="map">
           <DashboardMap
-            markers={markers}
-            loading={loading}
             center={getMapCenter()}
             onSelectContact={handleSelectContact}
+            contacts={contactCards}
+            hoveredLocation={hoveredHistoryLocation}
+            selectedLocation={selectedHistoryLocation}
           />
         </div>
       </section>

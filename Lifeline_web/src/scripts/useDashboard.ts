@@ -9,7 +9,7 @@ import {
   type StoredLocation,
   type LocationStore 
 } from "./locationStorage";
-import type { User, Contact } from "../types";
+import type { User } from "../types";
 import type { UseDashboardReturn, ContactCard, EmergencyAlert, LocationData } from "../types/realtime";
 
 /** Raw contact data from REST API */
@@ -29,7 +29,6 @@ export function useDashboard(): UseDashboardReturn {
 
   // REST API state
   const [user, setUser] = useState<User | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [rawContacts, setRawContacts] = useState<RawContact[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,9 +133,6 @@ export function useDashboard(): UseDashboardReturn {
         ...(data.dependent_contacts || []),
       ];
       setRawContacts(userContacts);
-
-      // Also format for backward compatibility
-
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load contacts";
       setError(errorMessage);
@@ -184,9 +180,8 @@ export function useDashboard(): UseDashboardReturn {
     return rawContacts.map((contact) => {
       // Use phone number as the primary key for matching
       const contactPhone = contact.phone_no;
-      const contactUserId = contact.user_id || contact.id || "";
+      const contactUserId = contact.user_id;
       const roomId = contact.room_id || null;
-
       // Get real-time location - match by phone number
       let locationData: LocationData | null = null;
       
@@ -232,7 +227,7 @@ export function useDashboard(): UseDashboardReturn {
       });
 
       return {
-        id: contactPhone || contactUserId || `contact_${contact.phone_no}`,
+        id: contactUserId || contactPhone || `unknown-${contact.name}-${Math.random()}`,
         name: contact.name,
         phone: contact.phone_no,
         email: contact.email,

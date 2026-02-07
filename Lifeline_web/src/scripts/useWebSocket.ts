@@ -22,7 +22,6 @@ import type {
   ConnectedMessage,
   LocationData,
   EmergencyAlert,
-  PresenceInfo,
   RoomInfo,
 } from "../types/realtime";
 

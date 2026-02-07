@@ -8,7 +8,9 @@ type Props = {
   onBack: () => void;
   geocode: string;
   history: { time: string; lat: number; lng: number }[];
-  onAcknowledgeAlert?: (alertId: string) => void;
+  onHistoryHover?: (location: { lat: number; lng: number; image: string } | null) => void;
+  onHistoryClick?: (location: { lat: number; lng: number; image: string } | null, index: number) => void;
+  selectedRowIndex?: number | null;
 };
 
 function formatLastSeen(timestamp: string): string {
@@ -37,12 +39,13 @@ export default function DashboardContact({
   onBack,
   geocode,
   history,
-  onAcknowledgeAlert,
+  onHistoryHover,
+  onHistoryClick,
+  selectedRowIndex,
 }: Props) {
   const location = contact.location?.coords ?? null;
   const isOnline = contact.presence?.status === "online";
-  const lastSeen = contact.presence?.lastSeen;
-  const lastUpdate = contact.location?.timestamp;
+  const lastUpdate = contact.activeAlert?.timestamp || contact.location?.timestamp;
 
   // Media modal state
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -117,62 +120,59 @@ export default function DashboardContact({
   };
 
   return (
-    <div className={`dashboard-contact-wrapper ${contact.hasActiveAlert ? 'dashboard-contact-alert' : ''}`}>
-      {/* Emergency Alert Banner */}
-      {contact.hasActiveAlert && contact.activeAlert && (
-        <div className="alert-banner-inline">
-          <div className="alert-banner-content">
-            <span className="alert-banner-icon">!</span>
-            <span className="alert-banner-message">
-              <strong>SOS ACTIVE</strong> - {contact.activeAlert.message || "Emergency alert active"}
-            </span>
-          </div>
-          {onAcknowledgeAlert && (
-            <button
-              className="alert-acknowledge-btn-white"
-              onClick={() => onAcknowledgeAlert(contact.activeAlert!.id)}
-            >
-              Acknowledge
-            </button>
-          )}
-        </div>
-      )}
+    <div className={`dashboard-contact-wrapper ${contact.hasActiveAlert ? 'alert-mode' : ''}`}>
 
       <button className="back-btn" onClick={onBack}>
         <img src="/images/close.svg" alt="Back" />
       </button>
 
       <section className="dashboard-user">
-        <img
-          src={contact?.image || "/images/user-example.svg"}
-          alt={`${contact?.name}`}
-          className="dashboard-user-img avatar"
-        />
+        <div className="relative">
+          <img
+            src={contact?.image || "/images/user-example.svg"}
+            alt={`${contact?.name}`}
+            className="dashboard-user-img avatar"
+          />
+          {!contact.hasActiveAlert && (
+            <span
+            className={`presence-indicator ${isOnline ? "presence-online" : "presence-offline"}`}
+            title={isOnline ? "Online" : "Offline"}
+            />
+          )}
+        </div>
         <div className="dashboard-cont-info">
           <div className="dashboard-name-row">
-            <h1 className={contact.hasActiveAlert ? 'alert-text' : ''}>{contact?.name?.split(" ")[0] || "User"}</h1>
-            <span
-              className={`presence-indicator ${isOnline ? "presence-online" : "presence-offline"}`}
-              title={isOnline ? "Online" : "Offline"}
-            />
+            <h1>
+              {contact.hasActiveAlert ? contact?.name : contact?.name?.split(" ")[0]}
+            </h1>
+            
           </div>
           <p className={contact.hasActiveAlert ? 'alert-text' : ''}>{contact?.phone}</p>
-          {!isOnline && lastSeen && (
-            <p className={`last-seen ${contact.hasActiveAlert ? 'alert-text-muted' : ''}`}>Last seen: {formatLastSeen(lastSeen)}</p>
+          {!isOnline && !contact.hasActiveAlert && lastUpdate &&(
+            <p className={`last-seen`}>Last seen: {formatLastSeen(lastUpdate)}</p>
           )}
+          
         </div>
       </section>
 
+      {contact.hasActiveAlert && lastUpdate && (
+        <section className="dashboard-cont-ws">
+          <p>Time:</p>
+          <h2 className="alert-text">{formatTimestamp(lastUpdate)}</h2>
+        </section>
+      )}
+
       <section className="dashboard-cont-ws">
+        {contact.hasActiveAlert && (<p>Origin:</p>)}
         <h2 className={`geo-loc ${contact.hasActiveAlert ? 'alert-text' : ''}`}>
           {geocode === "" ? "Loading..." : geocode}
         </h2>
         <p className={contact.hasActiveAlert ? 'alert-text' : ''}>
           {location ? `${location.lng}, ${location.lat}` : "Loading..."}
         </p>
-        {lastUpdate && (
+        {lastUpdate && !contact.hasActiveAlert && (
           <p className={`location-timestamp ${contact.hasActiveAlert ? 'alert-text-muted' : ''}`}>
-            Updated: {formatTimestamp(lastUpdate)}
+            Last Updated: {formatTimestamp(lastUpdate)}
           </p>
         )}
       </section>
@@ -192,7 +192,7 @@ export default function DashboardContact({
         </button>
       </section>
 
-      <section className="dashboard-history">
+      <section  className={`dashboard-history ${contact.hasActiveAlert ? 'hidden' : ''}`}>
         <p className={contact.hasActiveAlert ? 'alert-text' : ''}>History:</p>
         <div className="table-card">
           <article className="table-scroll">
@@ -202,16 +202,26 @@ export default function DashboardContact({
                   <td>Time Stamp</td>
                   <td>Location</td>
                 </tr>
-                {history.map((row, i) => (
-                  <tr key={i}>
-                    <td>{row.time}</td>
-                    <td>
-                      {row.lng}
-                      <br />
-                      {row.lat}
-                    </td>
-                  </tr>
-                ))}
+                {history.map((row, i) => {
+                  const isSelected = selectedRowIndex === i;
+                  return (
+                    <tr
+                      key={i}
+                      onMouseEnter={() => onHistoryHover?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' })}
+                      onMouseLeave={() => onHistoryHover?.(null)}
+                      onClick={() => onHistoryClick?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' }, i)}
+                      className={`history-row-hoverable ${isSelected ? 'selected' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>{row.time}</td>
+                      <td>
+                        {row.lng}
+                        <br />
+                        {row.lat}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </article>
