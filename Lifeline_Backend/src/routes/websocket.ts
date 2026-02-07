@@ -491,10 +491,14 @@ function handleRoomMessage(clientId: string, clientInfo: ClientInfo, data: any, 
     });
 }
 
-async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, ws: any): Promise<void> {
+async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, data: any, ws: any): Promise<void> {
     try {
         const user = clientInfo.user;
         const ownedRooms: string[] = [];
+
+        if (data && typeof data === "object" && ("latitude" in data || "longitude" in data)) {
+            handleLocationUpdate(clientId, clientInfo, data, ws);
+        }
 
         rooms.forEach((room) => {
             if (room.owner === clientId) {
@@ -962,7 +966,7 @@ ws.get('/ws', upgradeWebSocket((c) => {
                         break;
 
                     case 'emergency-sos':
-                        await handleEmergencySOS(clientId, clientInfo, ws);
+                        await handleEmergencySOS(clientId, clientInfo, data, ws);
                         break;
 
                     case 'ping':
