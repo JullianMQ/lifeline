@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import type { ContactCard } from "../types/realtime";
 import MediaModal, { type MediaFile, type MediaType } from "./MediaModal";
+import { API_BASE_URL } from "../config/api";
 import { debugMedia } from "../scripts/debug";
 
 type Props = {
@@ -31,8 +32,6 @@ function formatTimestamp(timestamp: string): string {
   const date = new Date(timestamp);
   return date.toLocaleString();
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 export default function DashboardContact({
   contact,
