@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import "./globals.css";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { SensorProvider } from "@/lib/context/sensor_context";
+import { SosMediaProvider } from "@/lib/services/sos_media_provider";
 import { useEffect } from "react";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
@@ -23,7 +24,6 @@ export default function RootLayout() {
       const { path, queryParams } = Linking.parse(url);
 
       if (path === "landing") {
-
         if (queryParams?.error) {
           console.warn("Magic link error:", queryParams.error);
           Alert.alert(
@@ -33,6 +33,7 @@ export default function RootLayout() {
           router.replace("/(auth)/login");
           return;
         }
+
         const token = queryParams?.token;
         if (token) {
           try {
@@ -55,7 +56,6 @@ export default function RootLayout() {
       }
     };
 
-
     const subscription = Linking.addEventListener("url", handleDeepLink);
 
     Linking.getInitialURL().then((url) => {
@@ -67,10 +67,13 @@ export default function RootLayout() {
 
   return (
     <SensorProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(main)" />
-      </Stack>
+      {/* ✅ MUST be inside SensorProvider because SosMediaProvider uses SensorContext */}
+      <SosMediaProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(main)" />
+        </Stack>
+      </SosMediaProvider>
     </SensorProvider>
   );
 }
