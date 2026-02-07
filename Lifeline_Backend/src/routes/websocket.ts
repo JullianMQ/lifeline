@@ -27,6 +27,40 @@ interface Room {
 const rooms = new Map<string, Room>();
 const clients = new Map<string, ClientInfo>();
 
+const LOCATION_TIMEZONE = process.env.LOCATION_TIMEZONE || "Asia/Singapore";
+const DEFAULT_RETENTION_DAYS = Number(process.env.LOCATION_RETENTION_DAYS ?? 3);
+
+function getRetentionDays(_user: User): number {
+    if (Number.isNaN(DEFAULT_RETENTION_DAYS) || DEFAULT_RETENTION_DAYS <= 0) {
+        return 3;
+    }
+    return DEFAULT_RETENTION_DAYS;
+}
+
+function parseTimestamp(value?: string | number): Date | null {
+    if (value === undefined || value === null || value === "") {
+        return new Date();
+    }
+    const parsed = typeof value === "number" ? new Date(value) : new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+    return parsed;
+}
+
+function metersBetween(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const earthRadiusMeters = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusMeters * c;
+}
+
 function generateRoomId(): string {
     return randomBytes(16).toString('hex');
 }
@@ -550,7 +584,7 @@ function handlePing(ws: any): void {
 }
 
 function handleLocationUpdate(clientId: string, clientInfo: ClientInfo, data: any, ws: any): void {
-    const { roomId, latitude, longitude, timestamp, accuracy } = data;
+    const { roomId, latitude, longitude, timestamp, accuracy, formattedLocation } = data;
 
     // Validate required fields
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
@@ -633,9 +667,93 @@ function handleLocationUpdate(clientId: string, clientInfo: ClientInfo, data: an
         }
     }
 
-    const timestampStr = timestamp 
-        ? (typeof timestamp === 'number' ? new Date(timestamp).toISOString() : timestamp)
-        : new Date().toISOString();
+    const recordedAt = parseTimestamp(timestamp);
+    if (!recordedAt) {
+        ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Invalid timestamp',
+            timestamp: new Date().toISOString()
+        }));
+        return;
+    }
+
+    const timestampStr = recordedAt.toISOString();
+    const formattedLocationValue = typeof formattedLocation === "string" && formattedLocation.trim()
+        ? formattedLocation.trim()
+        : null;
+
+    (async () => {
+        try {
+            const lastResult = await dbPool.query(
+                `SELECT latitude, longitude, recorded_at
+                 FROM user_locations
+                 WHERE user_id = $1
+                 ORDER BY recorded_at DESC
+                 LIMIT 1`,
+                [clientInfo.user.id]
+            );
+
+            if (lastResult.rows.length > 0) {
+                const last = lastResult.rows[0];
+                const lastLat = Number.parseFloat(last.latitude);
+                const lastLng = Number.parseFloat(last.longitude);
+                const lastRecorded = new Date(last.recorded_at);
+                const isSameLocation = Number.isFinite(lastLat) && Number.isFinite(lastLng)
+                    && metersBetween(lastLat, lastLng, latitude, longitude) <= 2;
+                const diffMs = Math.abs(recordedAt.getTime() - lastRecorded.getTime());
+
+                if (isSameLocation && diffMs < 5 * 60 * 1000) {
+                    return;
+                }
+            }
+
+            const retentionDays = getRetentionDays(clientInfo.user);
+            const client = await dbPool.connect();
+
+            try {
+                await client.query("BEGIN");
+
+                await client.query(
+                    `INSERT INTO user_locations (
+                        user_id, latitude, longitude, formatted_location, recorded_at
+                    ) VALUES ($1, $2, $3, $4, $5)`,
+                    [clientInfo.user.id, latitude, longitude, formattedLocationValue, recordedAt]
+                );
+
+                await client.query(
+                    `WITH day_list AS (
+                        SELECT DISTINCT (recorded_at AT TIME ZONE $2)::date AS day
+                        FROM user_locations
+                        WHERE user_id = $1
+                    ),
+                    ordered_days AS (
+                        SELECT day
+                        FROM day_list
+                        ORDER BY day DESC
+                    ),
+                    days_to_delete AS (
+                        SELECT day
+                        FROM ordered_days
+                        OFFSET $3
+                    )
+                    DELETE FROM user_locations ul
+                    USING days_to_delete d
+                    WHERE ul.user_id = $1
+                      AND (ul.recorded_at AT TIME ZONE $2)::date = d.day`,
+                    [clientInfo.user.id, LOCATION_TIMEZONE, retentionDays]
+                );
+
+                await client.query("COMMIT");
+            } catch (error) {
+                await client.query("ROLLBACK");
+                console.error("Failed to save websocket location:", error);
+            } finally {
+                client.release();
+            }
+        } catch (error) {
+            console.error("Failed to process websocket location:", error);
+        }
+    })();
 
     const locationMessage = {
         type: 'location-update',
@@ -758,7 +876,16 @@ ws.use("*", async (c, next) => {
  * */
 ws.get('/ws', upgradeWebSocket((c) => {
         const user = c.get("user");
-        if (!user) return c.json({ error: "User not found" }, 401);
+        if (!user) {
+            return {
+                onOpen(_event, ws) {
+                    ws.close();
+                },
+                onMessage(_event, _ws) {},
+                onClose(_event, _ws) {},
+                onError(_error) {}
+            };
+        }
         const clientId = user.id; // Use user ID as client ID
 
     return {

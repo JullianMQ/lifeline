@@ -42,12 +42,20 @@ This is the backend for the Lifeline application, built with Bun, Hono, Better A
 - `DELETE /api/contacts` - Clear all contacts
 - `DELETE /api/contacts/:type/:index` - Remove contact by type and index (emergency/0, dependent/1)
 
+### Locations
+
+- `POST /api/location` - Add a location sample for the authenticated user
+- `GET /api/locations` - Get recent location samples for the authenticated user
+- `GET /api/locations/contacts` - Get recent locations for emergency contacts (grouped by user)
+
 ## Features
 
 - Email/password authentication with Better Auth
 - Google OAuth integration
 - User roles: "mutual" or "dependent"
 - Emergency and dependent contacts management (unlimited per user, stored in arrays)
+- Location history storage with day-based FIFO retention window
+- Emergency contacts can view a user's recent location history
 - Phone number validation for Philippine formats
 - Automatic contacts creation on user signup
 
@@ -57,6 +65,35 @@ This is the backend for the Lifeline application, built with Bun, Hono, Better A
 - `BETTER_AUTH_URL` - Base URL for Better Auth (e.g., <http://localhost:3000>)
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `LOCATION_RETENTION_DAYS` - default retention window in days (default: 3)
+- `LOCATION_TIMEZONE` - timezone used for day boundaries (default: Asia/Singapore)
+
+## Data Model
+
+### user_locations
+
+- `id` (bigserial, primary key)
+- `user_id` (uuid, foreign key -> auth.user.id)
+- `latitude` (decimal)
+- `longitude` (decimal)
+- `formatted_location` (text, optional) - from Google Maps formatted_address
+- `formattedLocation` is accepted in REST/WebSocket inputs and stored as `formatted_location`
+- `recorded_at` (timestamptz) - source timestamp from device
+- `created_at` (timestamptz) - server insert timestamp
+
+Indexes:
+- (`user_id`, `created_at` desc)
+- (`user_id`, `recorded_at` desc)
+
+## Location Retention
+
+- Soft limit: 10,000 entries per day per user (no hard enforcement yet, intended for future rate limiting).
+- Retention window: 3 days by default; configurable per user (e.g., 7-15 days for premium users).
+- Timezone for day boundaries: Asia/Singapore.
+- Data is retained beyond the retention window until new data is added for a new day.
+- FIFO behavior is day-based: on insert, if the user has more than the retention window days, delete the oldest day.
+- Cleanup is only triggered on new insert; no manual delete endpoint.
+- Emergency contacts can view their contacts' recent location history.
 
 ## CHANGELOG
 
