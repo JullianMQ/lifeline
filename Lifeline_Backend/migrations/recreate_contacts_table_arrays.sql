@@ -1,6 +1,4 @@
 -- Drop and recreate contacts table with array-based structure
-DROP TABLE IF EXISTS "contacts";
-
 CREATE TABLE "contacts" (
     "id" SERIAL PRIMARY KEY,
     "user_id" TEXT NOT NULL REFERENCES "user" (id) ON DELETE CASCADE,
