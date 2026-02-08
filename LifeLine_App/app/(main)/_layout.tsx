@@ -4,6 +4,7 @@ import { View, ActivityIndicator } from "react-native";
 import { checkSession } from "../../lib/api/auth";
 import { getToken } from "@/lib/api/storage/user";
 import { WSProvider } from "@/lib/context/ws_context";
+import { SosMediaProvider } from "@/lib/services/sos_media_provider"; // <-- adjust path if needed
 
 export default function MainLayout() {
     const router = useRouter();
@@ -52,8 +53,10 @@ export default function MainLayout() {
     if (!isAuthed) return null;
 
     return (
-        <WSProvider authToken={token}>
-            <Slot />
-        </WSProvider>
+        <SosMediaProvider>
+            <WSProvider authToken={token}>
+                <Slot />
+            </WSProvider>
+        </SosMediaProvider>
     );
 }

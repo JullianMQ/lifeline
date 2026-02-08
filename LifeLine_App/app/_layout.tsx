@@ -2,7 +2,6 @@ import { Stack } from "expo-router";
 import "./globals.css";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { SensorProvider } from "@/lib/context/sensor_context";
-import { SosMediaProvider } from "@/lib/services/sos_media_provider";
 import { useEffect } from "react";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
@@ -67,13 +66,10 @@ export default function RootLayout() {
 
   return (
     <SensorProvider>
-      {/* ✅ MUST be inside SensorProvider because SosMediaProvider uses SensorContext */}
-      <SosMediaProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(main)" />
-        </Stack>
-      </SosMediaProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(main)" />
+      </Stack>
     </SensorProvider>
   );
 }

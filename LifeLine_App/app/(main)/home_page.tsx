@@ -1,5 +1,5 @@
-import React, { useContext, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Pressable } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
 import MapView from "react-native-maps";
 import * as Location from "expo-location";
@@ -16,14 +16,24 @@ import {
     setRoomIdForBackgroundUploads,
 } from "@/lib/services/background_location";
 
+// ✅ restored SOS alert flow
+import SosAlertCallScreen from "@/components/sos_alert";
+import { incidentManager, ActiveIncident } from "@/lib/services/incident_manager";
+import { useSosMedia } from "@/lib/services/sos_media_provider";
+
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
-    const { isConnected, activeRoomId, lastError, ensureMyRoom, sos } = useWS();
+    const { isConnected, activeRoomId, ensureMyRoom, sos } = useWS();
+
+    const { triggerSOSCapture } = useSosMedia();
 
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
     const [isSOSSending, setIsSOSSending] = useState(false);
+
+    // ✅ incident state for SosAlertCallScreen
+    const [incident, setIncident] = useState<ActiveIncident | null>(incidentManager.getActive());
 
     // Fetch user location (for the map UI only)
     useEffect(() => {
@@ -35,17 +45,38 @@ export default function HomePage() {
                     return;
                 }
 
-                const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+                const loc = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.High,
+                });
+
                 setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
 
-                const googleAddress = await reverseGeocodeWithGoogle(loc.coords.latitude, loc.coords.longitude);
-                setAddress(googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
+                const googleAddress = await reverseGeocodeWithGoogle(
+                    loc.coords.latitude,
+                    loc.coords.longitude
+                );
+
+                setAddress(
+                    googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`
+                );
             } catch (err) {
                 console.log("Error fetching location:", err);
             } finally {
                 setLocationLoading(false);
             }
         })();
+    }, []);
+
+    // ✅ keep incident manager in sync (restored)
+    useEffect(() => {
+        // hydrate in case app restarted
+        incidentManager.hydrateFromStorage?.();
+
+        const unsub = incidentManager.subscribe((inc) => {
+            setIncident(inc);
+        });
+
+        return () => unsub();
     }, []);
 
     /**
@@ -104,7 +135,7 @@ export default function HomePage() {
         };
     }, []);
 
-    const handleSOS = async () => {
+    const handleSOS = useCallback(async () => {
         if (isSOSSending) return;
 
         setIsSOSSending(true);
@@ -112,16 +143,48 @@ export default function HomePage() {
             await sos();
         } catch (err) {
             console.error("SOS failed:", err);
-            Alert.alert("SOS failed", "We couldn’t send your SOS right now. Please check your connection and try again.", [
-                { text: "OK" },
-            ]);
+            Alert.alert(
+                "SOS failed",
+                "We couldn’t send your SOS right now. Please check your connection and try again.",
+                [{ text: "OK" }]
+            );
         } finally {
             setIsSOSSending(false);
         }
-    };
+    }, [isSOSSending, sos]);
 
     return (
         <ScreenWrapper>
+            {/* ✅ RESTORED: SOS Alert / Incoming Call UI */}
+            <SosAlertCallScreen
+                visible={!!incident}
+                callerName="SOS Alert"
+                onAnswer={async () => {
+                    try {
+                        // Clear incident (so it doesn't re-trigger UI)
+                        await incidentManager.clearIncident();
+
+                        // Capture media (your provider now also queues + uploads)
+                        await triggerSOSCapture();
+
+                        // Send SOS message via WS/REST (whatever useWS.sos does)
+                        await handleSOS();
+                    } catch (e) {
+                        console.error("onAnswer flow failed:", e);
+                        Alert.alert(
+                            "SOS flow failed",
+                            "We couldn't complete the SOS flow. Please try again.",
+                            [{ text: "OK" }]
+                        );
+                    }
+                }}
+                onDecline={async () => {
+                    // Snooze safely (doesn't permanently disable)
+                    await incidentManager.snoozeActive?.();
+                    await incidentManager.clearIncident();
+                }}
+            />
+
             {/* MAP BOX */}
             <View className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden border" style={{ height: 384 }}>
                 {locationLoading ? (
@@ -199,9 +262,11 @@ export default function HomePage() {
                             else await startMonitoring();
                         } catch (err) {
                             console.error(`${isMonitoring ? "stopMonitoring" : "startMonitoring"} failed:`, err);
-                            Alert.alert("Monitoring failed", "We couldn’t update monitoring right now. Please try again.", [
-                                { text: "OK" },
-                            ]);
+                            Alert.alert(
+                                "Monitoring failed",
+                                "We couldn’t update monitoring right now. Please try again.",
+                                [{ text: "OK" }]
+                            );
                         }
                     }}
                 >
