@@ -8,7 +8,7 @@ type Props = {
   contact: ContactCard;
   onBack: () => void;
   geocode: string;
-  history: { time: string; lat: number; lng: number }[];
+  history: { time: string; timestamp: string; lat: number; lng: number }[];
   onHistoryHover?: (location: { lat: number; lng: number; image: string } | null) => void;
   onHistoryClick?: (location: { lat: number; lng: number; image: string } | null, index: number) => void;
   selectedRowIndex?: number | null;
@@ -52,6 +52,36 @@ export default function DashboardContact({
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+
+  // History filter state
+  const [historyFilter, setHistoryFilter] = useState<"all" | "1h" | "6h" | "today" | "yesterday">("all");
+
+  // Filter history based on selected time range
+  const getFilteredHistory = useCallback(() => {
+    if (historyFilter === "all") return history;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    return history.filter((item) => {
+      const itemDate = new Date(item.timestamp);
+      
+      switch (historyFilter) {
+        case "1h":
+          return (now.getTime() - itemDate.getTime()) <= 1 * 60 * 60 * 1000;
+        case "6h":
+          return (now.getTime() - itemDate.getTime()) <= 6 * 60 * 60 * 1000;
+        case "today":
+          return itemDate >= today && itemDate < new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        case "yesterday":
+          return itemDate >= yesterday && itemDate < today;
+        default:
+          return true;
+      }
+    });
+  }, [history, historyFilter]);
 
   const fetchMediaFiles = useCallback(async (mediaType: MediaType) => {
     // Use contact.id which is the user ID from the ContactCard
@@ -192,7 +222,20 @@ export default function DashboardContact({
       </section>
 
       <section  className={`dashboard-history ${contact.hasActiveAlert ? 'hidden' : ''}`}>
-        <p className={contact.hasActiveAlert ? 'alert-text' : ''}>History:</p>
+        <div className="history-header">
+          <p className={contact.hasActiveAlert ? 'alert-text' : ''}>History:</p>
+          <select 
+            value={historyFilter} 
+            onChange={(e) => setHistoryFilter(e.target.value as typeof historyFilter)}
+            className="history-filter"
+          >
+            <option value="all">All</option>
+            <option value="1h">Past 1 hr</option>
+            <option value="6h">Past 6 hrs</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+          </select>
+        </div>
         <div className="table-card">
           <article className="table-scroll">
             <table>
@@ -201,7 +244,7 @@ export default function DashboardContact({
                   <td>Time Stamp</td>
                   <td>Location</td>
                 </tr>
-                {history.map((row, i) => {
+                {getFilteredHistory().map((row, i) => {
                   const isSelected = selectedRowIndex === i;
                   return (
                     <tr

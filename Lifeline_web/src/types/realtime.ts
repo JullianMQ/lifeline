@@ -345,6 +345,12 @@ export interface UseDashboardReturn {
     loading: boolean;
     error: string | null;
 
+    // Location history from API - mapped by phone number with full history
+    locationHistory: Record<string, {
+        current: LocationData;
+        history: LocationData[];
+    }>;
+
     // Alerts
     activeAlerts: EmergencyAlert[];
 
@@ -364,4 +370,5 @@ export interface UseDashboardReturn {
     acknowledgeAlert: (alertId: string) => void;
     manualReconnect: () => void;
     refreshContacts: () => Promise<void>;
+    refreshLocations: () => Promise<void>;
 }
