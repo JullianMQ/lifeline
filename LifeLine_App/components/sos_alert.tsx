@@ -10,6 +10,7 @@ import {
     View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 
 type Props = {
     visible: boolean;
@@ -18,8 +19,6 @@ type Props = {
     onAnswer: () => void;
     onDecline: () => void;
     useModal?: boolean;
-
-
     autoAnswerAfterMs?: number;
 };
 
@@ -34,6 +33,10 @@ export default function SosAlertCallScreen({
 }: Props) {
     const pulse = useRef(new Animated.Value(0)).current;
 
+    // Ringtone source 
+    const ringtoneSource = require("../assets/sounds/lifeline-ringtone.mp3");
+    const player = useAudioPlayer(ringtoneSource, { downloadFirst: true });
+
     // prevent double actions (tap + auto, or multiple timers)
     const actedRef = useRef(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,19 +48,32 @@ export default function SosAlertCallScreen({
         }
     }, []);
 
-    const safeAnswer = useCallback(() => {
-        if (actedRef.current) return;
-        actedRef.current = true;
-        clearAutoTimer();
-        onAnswer();
-    }, [onAnswer, clearAutoTimer]);
+    const stopRingtone = useCallback(async () => {
+        try {
+            player.pause();
+            await player.seekTo(0);
+        } catch {
+            // ignore
+        }
+    }, [player]);
 
-    const safeDecline = useCallback(() => {
+    const safeAnswer = useCallback(async () => {
         if (actedRef.current) return;
         actedRef.current = true;
         clearAutoTimer();
+
+        await stopRingtone();
+        onAnswer();
+    }, [onAnswer, clearAutoTimer, stopRingtone]);
+
+    const safeDecline = useCallback(async () => {
+        if (actedRef.current) return;
+        actedRef.current = true;
+        clearAutoTimer();
+
+        await stopRingtone();
         onDecline();
-    }, [onDecline, clearAutoTimer]);
+    }, [onDecline, clearAutoTimer, stopRingtone]);
 
     // pulse animation
     useEffect(() => {
@@ -74,9 +90,52 @@ export default function SosAlertCallScreen({
         return () => loop.stop();
     }, [visible, pulse]);
 
-    // auto-answer fallback
+    // ringtone: play while visible, stop + rewind when hidden
     useEffect(() => {
+        let cancelled = false;
 
+        const run = async () => {
+            if (!visible) {
+                await stopRingtone();
+                return;
+            }
+
+            try {
+                await setAudioModeAsync({
+                    interruptionMode: "doNotMix", // or "duckOthers" if you prefer
+                    shouldPlayInBackground: true,
+                });
+
+                if (cancelled) return;
+
+                player.loop = true;
+                player.volume = 1.0;
+
+                // start from beginning
+                try {
+                    await player.seekTo(0);
+                } catch { }
+
+                player.play();
+            } catch {
+                // ignore
+            }
+        };
+
+        run();
+
+        return () => {
+            cancelled = true;
+            // best-effort cleanup
+            try {
+                player.pause();
+                player.seekTo(0);
+            } catch { }
+        };
+    }, [visible, player, stopRingtone]);
+
+    // auto-answer fallback (uses safeAnswer so ringtone stops too)
+    useEffect(() => {
         if (!visible) {
             actedRef.current = false;
             clearAutoTimer();
@@ -88,19 +147,15 @@ export default function SosAlertCallScreen({
 
         if (typeof autoAnswerAfterMs === "number" && autoAnswerAfterMs > 0) {
             timerRef.current = setTimeout(() => {
-
-                if (!actedRef.current) {
-                    actedRef.current = true;
-                    timerRef.current = null;
-                    onAnswer();
-                }
+                // important: call safeAnswer (stops ringtone + prevents double actions)
+                void safeAnswer();
             }, autoAnswerAfterMs);
         }
 
         return () => {
             clearAutoTimer();
         };
-    }, [visible, autoAnswerAfterMs, onAnswer, clearAutoTimer]);
+    }, [visible, autoAnswerAfterMs, safeAnswer, clearAutoTimer]);
 
     const pulseStyle = useMemo(() => {
         const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
@@ -147,13 +202,13 @@ export default function SosAlertCallScreen({
                 </View>
 
                 <View className="w-full flex-row justify-center px-6 gap-44">
-                    <CallAction label="Answer" bg="#2ecc71" icon="call" onPress={safeAnswer} />
+                    <CallAction label="Answer" bg="#2ecc71" icon="call" onPress={() => void safeAnswer()} />
                     <CallAction
                         label="Decline"
                         bg="#e74c3c"
                         icon="call"
                         rotateHangup
-                        onPress={safeDecline}
+                        onPress={() => void safeDecline()}
                     />
                 </View>
             </View>
@@ -168,7 +223,7 @@ export default function SosAlertCallScreen({
             animationType="fade"
             presentationStyle="fullScreen"
             statusBarTranslucent
-            onRequestClose={safeDecline}
+            onRequestClose={() => void safeDecline()}
         >
             {content}
         </Modal>
