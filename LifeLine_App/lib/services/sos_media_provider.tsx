@@ -22,6 +22,24 @@ import { SensorContext } from "@/lib/context/sensor_context";
 import * as Linking from "expo-linking";
 import * as Sharing from "expo-sharing";
 
+//uploader
+import { uploadMediaFile } from "@/lib/services/media_upload";
+import type { MediaType as UploadMediaType } from "@/lib/services/media_upload";
+
+type UploadedMap = {
+    backPhoto?: boolean;
+    backVideo?: boolean;
+    frontPhoto?: boolean;
+    frontVideo?: boolean;
+    audio?: boolean;
+
+    backPhotoFileId?: number;
+    backVideoFileId?: number;
+    frontPhotoFileId?: number;
+    frontVideoFileId?: number;
+    audioFileId?: number;
+};
+
 type SosMediaResult = {
     id: string;
     createdAt: number;
@@ -33,10 +51,14 @@ type SosMediaResult = {
     frontVideoPath?: string;
 
     audioPath?: string;
+
+    //upload tracking for outbox retries
+    uploaded?: UploadedMap;
 };
 
 type Ctx = {
     triggerSOSCapture: () => Promise<SosMediaResult | null>;
+    processOutbox: () => Promise<void>;
     isCapturing: boolean;
 };
 
@@ -50,11 +72,32 @@ export function useSosMedia() {
 
 const OUTBOX_KEY = "SOS_OUTBOX_V1";
 
-async function addToOutbox(item: SosMediaResult) {
+async function getOutbox(): Promise<SosMediaResult[]> {
     const raw = await AsyncStorage.getItem(OUTBOX_KEY);
-    const list: SosMediaResult[] = raw ? JSON.parse(raw) : [];
-    list.unshift(item);
+    return raw ? (JSON.parse(raw) as SosMediaResult[]) : [];
+}
+
+async function saveOutbox(list: SosMediaResult[]) {
     await AsyncStorage.setItem(OUTBOX_KEY, JSON.stringify(list));
+}
+
+function withDefaultUploaded(item: SosMediaResult): SosMediaResult {
+    return {
+        ...item,
+        uploaded: item.uploaded ?? {
+            backPhoto: false,
+            backVideo: false,
+            frontPhoto: false,
+            frontVideo: false,
+            audio: false,
+        },
+    };
+}
+
+async function addToOutbox(item: SosMediaResult) {
+    const list = await getOutbox();
+    list.unshift(withDefaultUploaded(item));
+    await saveOutbox(list);
 }
 
 function makeId() {
@@ -385,6 +428,105 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         [recordVideoOnce, bumpCameraInstance, setFacingAndWait, setModeAndWait, waitForCameraReady]
     );
 
+    // Outbox processing (uploads)
+    const isProcessingOutboxRef = useRef(false);
+
+    const processOutbox = useCallback(async () => {
+        sosLog("processOutbox: start");
+        const list = await getOutbox();
+        sosLog("processOutbox: loaded", { count: list.length, ids: list.map(x => x.id) });
+
+        if (Platform.OS !== "android") return;
+        if (isProcessingOutboxRef.current) return;
+
+        isProcessingOutboxRef.current = true;
+
+        try {
+            const list = await getOutbox();
+            if (!list.length) return;
+
+            const remaining: SosMediaResult[] = [];
+
+            const uploadOne = async (
+                item: SosMediaResult,
+                key: "backPhoto" | "frontPhoto" | "backVideo" | "frontVideo" | "audio",
+                path: string | undefined,
+                mediaType: UploadMediaType
+            ) => {
+                const up = item.uploaded!;
+                if (up[key] === true) return;
+                if (!path) {
+                    up[key] = true; // nothing to upload
+                    return;
+                }
+
+                // If file is missing, mark done so it doesn't block the queue forever
+                try {
+                    const info = await FileSystem.getInfoAsync(path);
+                    if (!info.exists) {
+                        sosLog("processOutbox: file missing, marking done", { key, path });
+                        up[key] = true;
+                        return;
+                    }
+                } catch {
+                    // ignore; still try upload
+                }
+
+                const res = await uploadMediaFile({
+                    fileUri: path,
+                    mediaType,
+                    description: `SOS ${item.id} ${key}`,
+                    // attachCookieFromStoredToken default true in uploader (recommended)
+                });
+
+                if (!res.success) {
+                    // throw to keep item in outbox for retry
+                    throw new Error(res.error);
+                }
+
+                up[key] = true;
+
+                // store server file id (optional)
+                if (key === "backPhoto") up.backPhotoFileId = res.file.id;
+                if (key === "frontPhoto") up.frontPhotoFileId = res.file.id;
+                if (key === "backVideo") up.backVideoFileId = res.file.id;
+                if (key === "frontVideo") up.frontVideoFileId = res.file.id;
+                if (key === "audio") up.audioFileId = res.file.id;
+            };
+
+            for (const raw of list) {
+                const item = withDefaultUploaded(raw);
+
+                try {
+                    await uploadOne(item, "backPhoto", item.backPhotoPath, "picture");
+                    await uploadOne(item, "frontPhoto", item.frontPhotoPath, "picture");
+                    await uploadOne(item, "backVideo", item.backVideoPath, "video");
+                    await uploadOne(item, "frontVideo", item.frontVideoPath, "video");
+                    await uploadOne(item, "audio", item.audioPath, "voice_recording");
+                } catch (e) {
+                    sosLog("outbox upload failed; will retry", fmtErr(e));
+                    remaining.push(item);
+                    continue;
+                }
+
+                // If all keys are done, drop item from outbox
+                const up = item.uploaded!;
+                const done =
+                    up.backPhoto === true &&
+                    up.frontPhoto === true &&
+                    up.backVideo === true &&
+                    up.frontVideo === true &&
+                    up.audio === true;
+
+                if (!done) remaining.push(item);
+            }
+
+            await saveOutbox(remaining);
+        } finally {
+            isProcessingOutboxRef.current = false;
+        }
+    }, []);
+
     const triggerSOSCapture = useCallback(async (): Promise<SosMediaResult | null> => {
         if (Platform.OS !== "android") return null;
         if (isCapturing) return null;
@@ -496,7 +638,7 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 audioPath = finalAudio;
             }
 
-            const result: SosMediaResult = {
+            const result: SosMediaResult = withDefaultUploaded({
                 id,
                 createdAt,
                 backPhotoPath,
@@ -504,12 +646,16 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 frontPhotoPath,
                 frontVideoPath,
                 audioPath,
-            };
+            });
 
             sosLog("triggerSOSCapture: result", result);
 
             await addToOutbox(result);
 
+            // kick upload worker immediately (best-effort)
+            processOutbox().catch(() => { });
+
+            // Your debug sharing stays
             await shareIfPossible(result.backPhotoPath, "Back photo");
             await shareIfPossible(result.backVideoPath, "Back video");
             await shareIfPossible(result.frontPhotoPath, "Front photo");
@@ -540,6 +686,7 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         takePhoto,
         setFacingAndWait,
         setModeAndWait,
+        processOutbox,
     ]);
 
     const triggerRef = useRef(triggerSOSCapture);
@@ -575,11 +722,20 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         return () => unsub();
     }, []);
 
+    // run outbox once at startup
+    useEffect(() => {
+        processOutbox().catch(() => { });
+    }, [processOutbox]);
+
     useEffect(() => {
         const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
             if (state === "active" || state === "unknown") {
+                // Try capture if incident exists
                 const inc = incidentManager.getActive();
                 if (inc) tryCaptureForIncidentRef.current?.(inc);
+
+                //also retry uploads when app becomes active
+                processOutbox().catch(() => { });
             } else {
                 try {
                     cameraRef.current?.stopRecording();
@@ -591,9 +747,12 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => sub.remove();
-    }, [recorder]);
+    }, [recorder, processOutbox]);
 
-    const value = useMemo(() => ({ triggerSOSCapture, isCapturing }), [triggerSOSCapture, isCapturing]);
+    const value = useMemo(
+        () => ({ triggerSOSCapture, processOutbox, isCapturing }),
+        [triggerSOSCapture, processOutbox, isCapturing]
+    );
 
     return (
         <SosMediaContext.Provider value={value}>
