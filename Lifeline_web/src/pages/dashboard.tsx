@@ -133,7 +133,7 @@ function Dashboard() {
     null,
   );
   const [history, setHistory] = useState<
-    Record<string, { time: string; lat: number; lng: number }[]>
+    Record<string, { time: string; timestamp: string; lat: number; lng: number }[]>
   >({});
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
@@ -157,6 +157,7 @@ function Dashboard() {
     activeAlerts,
     acknowledgeAlert,
     manualReconnect,
+    locationHistory,
   } = useDashboard();
 
   // Show modal automatically when new alerts come in
@@ -272,6 +273,42 @@ function Dashboard() {
       isOnline,
     });
 
+    // Load history from API if available
+    if (locationHistory[selectedContact.phone] && locationHistory[selectedContact.phone].history) {
+      const apiHistory = locationHistory[selectedContact.phone].history;
+      console.log("[Dashboard] Loading history from API for", selectedContact.phone, ":", apiHistory.length, "locations");
+      
+      setHistory((prev) => ({
+        ...prev,
+        [selectedContact.phone]: apiHistory.map((loc) => ({
+          time: new Date(loc.timestamp).toLocaleTimeString(),
+          timestamp: loc.timestamp,
+          lat: loc.coords.lat,
+          lng: loc.coords.lng,
+        })),
+      }));
+    } else {
+      // Fallback: manually populate history like before
+      setHistory((prev) => {
+        const existingHistory = prev[selectedContact.phone] || [];
+        const locationExists = existingHistory.some(
+          (h) => h.lat === lat && h.lng === lng
+        );
+        if (!locationExists && existingHistory.length === 0) {
+          const timestamp = new Date().toLocaleTimeString();
+          const fullTimestamp = new Date().toISOString();
+          return {
+            ...prev,
+            [selectedContact.phone]: [
+              { time: timestamp, timestamp: fullTimestamp, lat, lng },
+              ...existingHistory,
+            ],
+          };
+        }
+        return prev;
+      });
+    }
+
     const updateAddress = async () => {
       console.log("[Dashboard] Fetching geocode for", lat, lng);
       const res = await getGeocode(lat, lng);
@@ -280,33 +317,16 @@ function Dashboard() {
       setAddress(res);
       
       if (isOnline) {
+        const fullTimestamp = new Date().toISOString();
         setHistory((prev) => ({
           ...prev,
           [selectedContact.phone]: [
-            { time: timestamp, lat, lng },
+            { time: timestamp, timestamp: fullTimestamp, lat, lng },
             ...(prev[selectedContact.phone] || []).slice(0, 49), // Keep last 50 entries
           ],
         }));
       }
     };
-
-    setHistory((prev) => {
-      const existingHistory = prev[selectedContact.phone] || [];
-      const locationExists = existingHistory.some(
-        (h) => h.lat === lat && h.lng === lng
-      );
-      if (!locationExists && existingHistory.length === 0) {
-        const timestamp = new Date().toLocaleTimeString();
-        return {
-          ...prev,
-          [selectedContact.phone]: [
-            { time: timestamp, lat, lng },
-            ...existingHistory,
-          ],
-        };
-      }
-      return prev;
-    });
 
     updateAddress();
 
@@ -328,6 +348,7 @@ function Dashboard() {
     selectedContact?.location?.coords?.lat,
     selectedContact?.location?.coords?.lng,
     selectedContact?.presence?.status,
+    locationHistory,
   ]);
 
   const handleViewAlertContact = (contact: ContactCard) => {
@@ -362,12 +383,23 @@ function Dashboard() {
   const connectionIndicator = getConnectionIndicator();
 
   const getMapCenter = () => {
+    // First priority: selected location preview (from history)
+    if (selectedHistoryLocation) {
+      return {
+        lat: selectedHistoryLocation.lat,
+        lng: selectedHistoryLocation.lng,
+      };
+    }
+    
+    // Second priority: selected contact's current location
     if (selectedContact?.location?.coords) {
       return {
         lat: selectedContact.location.coords.lat,
         lng: selectedContact.location.coords.lng,
       };
     }
+    
+    // Third priority: any contact with location
     const contactWithLocation = contactCards.find((c) => c.location?.coords);
     if (contactWithLocation?.location?.coords) {
       return {
@@ -375,6 +407,8 @@ function Dashboard() {
         lng: contactWithLocation.location.coords.lng,
       };
     }
+    
+    // Final fallback: user location or default
     return user?.location || DEFAULT_MAP_CENTER;
   };
 
