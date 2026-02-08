@@ -16,24 +16,19 @@ import {
     setRoomIdForBackgroundUploads,
 } from "@/lib/services/background_location";
 
-// ✅ restored SOS alert flow
-import SosAlertCallScreen from "@/components/sos_alert";
-import { incidentManager, ActiveIncident } from "@/lib/services/incident_manager";
-import { useSosMedia } from "@/lib/services/sos_media_provider";
 
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
     const { isConnected, activeRoomId, ensureMyRoom, sos } = useWS();
 
-    const { triggerSOSCapture } = useSosMedia();
+
 
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
     const [isSOSSending, setIsSOSSending] = useState(false);
 
-    // ✅ incident state for SosAlertCallScreen
-    const [incident, setIncident] = useState<ActiveIncident | null>(incidentManager.getActive());
+
 
     // Fetch user location (for the map UI only)
     useEffect(() => {
@@ -67,17 +62,6 @@ export default function HomePage() {
         })();
     }, []);
 
-    // ✅ keep incident manager in sync (restored)
-    useEffect(() => {
-        // hydrate in case app restarted
-        incidentManager.hydrateFromStorage?.();
-
-        const unsub = incidentManager.subscribe((inc) => {
-            setIncident(inc);
-        });
-
-        return () => unsub();
-    }, []);
 
     /**
      * Monitoring orchestration (SEQUENCED):
@@ -155,35 +139,6 @@ export default function HomePage() {
 
     return (
         <ScreenWrapper>
-            {/* ✅ RESTORED: SOS Alert / Incoming Call UI */}
-            <SosAlertCallScreen
-                visible={!!incident}
-                callerName="SOS Alert"
-                onAnswer={async () => {
-                    try {
-                        // Clear incident (so it doesn't re-trigger UI)
-                        await incidentManager.clearIncident();
-
-                        // Capture media (your provider now also queues + uploads)
-                        await triggerSOSCapture();
-
-                        // Send SOS message via WS/REST (whatever useWS.sos does)
-                        await handleSOS();
-                    } catch (e) {
-                        console.error("onAnswer flow failed:", e);
-                        Alert.alert(
-                            "SOS flow failed",
-                            "We couldn't complete the SOS flow. Please try again.",
-                            [{ text: "OK" }]
-                        );
-                    }
-                }}
-                onDecline={async () => {
-                    // Snooze safely (doesn't permanently disable)
-                    await incidentManager.snoozeActive?.();
-                    await incidentManager.clearIncident();
-                }}
-            />
 
             {/* MAP BOX */}
             <View className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden border" style={{ height: 384 }}>
