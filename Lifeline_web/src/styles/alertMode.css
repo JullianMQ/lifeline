@@ -27,12 +27,7 @@
 
 /* Fonts */
 .alert-mode h1{
-    font-size: clamp(2.25rem, 1.4308rem + 3.4951vw, 5.625rem) !important;
     color: var(--lifeline-red);
-}
-
-.alert-mode p{
-    font-size: clamp(1.25rem, 1.068rem + 0.7767vw, 2rem) !important;
 }
 
 .alert .dashboard-content{
@@ -70,27 +65,25 @@
 }
 
 .map-pin.alert-mode {
-    animation: pulse-pin 1.5s infinite;
+    animation: pulse-pin 1s infinite;
 }
 
 @keyframes pulse-pin {
-    0% { 
-        
-        transform: translateY(0);
+    0% {         
+        transform: translateY(0) scale(1.2);
         box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
-
     }
     25% { 
-        transform: translateY(5px);
-        box-shadow: 0 0 6px 8px rgba(223, 55, 33, 0);
+        transform: translateY(10px);
+        box-shadow: 0 0 10px 12px rgba(223, 55, 33, 0);
     }
     75% { 
-        transform: translateY(5px);
+        transform: translateY(10px);
         box-shadow: 0 0 0 0 rgba(223, 55, 33, 0);
     }
     100% { 
-        transform: translateY(0);
-        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
+        transform: translateY(0) scale(1.2);
+        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.7);
     }
 }
 

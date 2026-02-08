@@ -436,7 +436,7 @@ function Dashboard() {
           <img
             src={user?.image || "/images/user-example.svg"}
             alt="user-img"
-            className="dashboard-img"
+            className="dashboard-img avatar"
             onClick={() => navigate("/profile")}
           />
         </div>
