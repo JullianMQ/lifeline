@@ -576,9 +576,8 @@ Fetch recent locations for emergency contacts, grouped by user.
 **Response:**
 ```json
 {
-  "locations_by_user": [
-    {
-      "user_id": "contact_user_id",
+  "locations_by_user": {
+    "contact_user_id": {
       "user_name": "John Doe",
       "user_phone": "09123456789",
       "locations": [
@@ -592,7 +591,7 @@ Fetch recent locations for emergency contacts, grouped by user.
         }
       ]
     }
-  ]
+  }
 }
 ```
 

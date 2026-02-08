@@ -233,8 +233,7 @@ router.get("/locations/contacts", async (c) => {
             [userPhone, LOCATION_TIMEZONE, retentionDays]
         );
 
-        const grouped = new Map<string, {
-            user_id: string;
+        const locationsByUser: Record<string, {
             user_name: string | null;
             user_phone: string | null;
             locations: Array<{
@@ -245,19 +244,18 @@ router.get("/locations/contacts", async (c) => {
                 timestamp: string;
                 created_at: string;
             }>;
-        }>();
+        }> = {};
 
         result.rows.forEach(row => {
-            if (!grouped.has(row.user_id)) {
-                grouped.set(row.user_id, {
-                    user_id: row.user_id,
+            if (!locationsByUser[row.user_id]) {
+                locationsByUser[row.user_id] = {
                     user_name: row.user_name,
                     user_phone: row.user_phone,
                     locations: []
-                });
+                };
             }
 
-            grouped.get(row.user_id)?.locations.push({
+            locationsByUser[row.user_id].locations.push({
                 id: row.id,
                 latitude: row.latitude,
                 longitude: row.longitude,
@@ -268,7 +266,7 @@ router.get("/locations/contacts", async (c) => {
         });
 
         return c.json({
-            locations_by_user: Array.from(grouped.values())
+            locations_by_user: locationsByUser
         });
     } catch (error) {
         console.error("Failed to fetch contact locations:", error);
