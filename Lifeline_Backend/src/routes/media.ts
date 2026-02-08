@@ -183,6 +183,48 @@ async function getAccessibleUserIds(requestingUserId: string, requestingUserPhon
     return Array.from(accessibleIds);
 }
 
+async function cleanupOldMediaFiles(
+    userId: string,
+    mediaType: MediaType,
+    currentCreatedAt: Date,
+    driveService: ReturnType<typeof getGoogleDriveService>
+): Promise<void> {
+    const filesToDeleteResult = await dbPool.query(
+        `SELECT id, drive_file_id
+         FROM media_files
+         WHERE user_id = $1
+           AND media_type = $2
+           AND date_trunc('day', "createdAt") <> date_trunc('day', $3::timestamptz)`,
+        [userId, mediaType, currentCreatedAt]
+    );
+
+    for (const row of filesToDeleteResult.rows as Array<{ id: number; drive_file_id: string }>) {
+        try {
+            await dbPool.query(`UPDATE media_files SET deleting = TRUE WHERE id = $1`, [row.id]);
+            let deleted = false;
+            let attempts = 0;
+            while (!deleted && attempts < 3) {
+                attempts += 1;
+                deleted = await driveService.deleteFile(row.drive_file_id);
+                if (!deleted && attempts < 3) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
+            if (!deleted) {
+                throw new Error("Failed to delete file from storage after retries");
+            }
+            await dbPool.query(`DELETE FROM media_files WHERE id = $1`, [row.id]);
+        } catch (error) {
+            try {
+                await dbPool.query(`UPDATE media_files SET deleting = FALSE WHERE id = $1`, [row.id]);
+            } catch (rollbackError) {
+                console.error('Failed to rollback deleting flag:', rollbackError);
+            }
+            console.error('Error deleting previous media file:', error);
+        }
+    }
+}
+
 // POST /media/upload - Upload a file
 router.post("/media/upload", async (c) => {
     const user = c.get("user");
@@ -277,6 +319,8 @@ router.post("/media/upload", async (c) => {
         }
 
         const savedFile = dbResult.rows[0] as MediaFile;
+
+        await cleanupOldMediaFiles(user.id, mediaType, savedFile.createdAt, driveService);
 
         return c.json({
             success: true,
@@ -513,7 +557,7 @@ router.get("/media/files/:id/download", async (c) => {
             .substring(0, 255);
         const encodedName = encodeURIComponent(file.original_name);
 
-        return new Response(Readable.toWeb(fileStream), {
+        return new Response(Readable.toWeb(fileStream) as unknown as ReadableStream, {
             headers: {
                 'Content-Type': file.mime_type,
                 'Content-Disposition': `attachment; filename="${sanitizedName}"; filename*=UTF-8''${encodedName}`,

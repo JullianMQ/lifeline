@@ -43,6 +43,23 @@ The backend uses OAuth2 with a refresh token from the app owner's Google account
 2. The backend manages folder organization per user
 3. Access control is handled at the application level, not Google Drive level
 
+### Media File Longevity (Plan)
+
+- Files are intended to last indefinitely unless replaced by a new-day upload.
+- Day boundary is based on the timezone embedded in each file's `createdAt` timestamp.
+- If a user uploads a file of a given `media_type` on a new calendar day, all of that user's previously stored files of the same `media_type` not on that same day are deleted.
+- Same-day uploads are additive; only a day change triggers deletion of prior files.
+- Deletion happens immediately after a successful upload + DB insert.
+- Cleanup is triggered on upload; there is no scheduled cleanup job.
+- Cleanup is best-effort with retries; it can be switched to atomic behavior later if needed.
+
+Checklist
+
+- [x] Determine day boundary using `createdAt` timezone.
+- [x] Enforce per-`media_type` deletion on new-day upload.
+- [x] Run cleanup immediately after successful upload + DB insert.
+- [x] Document behavior here and in `documentation.md`.
+
 ---
 
 ## 3. Media Types & Constraints
