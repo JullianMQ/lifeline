@@ -46,7 +46,7 @@ This is the backend for the Lifeline application, built with Bun, Hono, Better A
 
 - `POST /api/location` - Add a location sample for the authenticated user
 - `GET /api/locations` - Get recent location samples for the authenticated user
-- `GET /api/locations/contacts` - Get recent locations for emergency contacts (grouped by user)
+- `GET /api/locations/contacts` - Get recent locations for emergency contacts (grouped by user_id)
 
 ## Features
 
