@@ -8,12 +8,12 @@ type Props = {
   contact: ContactCard;
   onBack: () => void;
   geocode: string;
-  history: { time: string; timestamp: string; lat: number; lng: number }[];
-  onHistoryHover?: (location: { lat: number; lng: number; image: string } | null) => void;
-  onHistoryClick?: (location: { lat: number; lng: number; image: string } | null, index: number) => void;
+  history: { time: string; timestamp: string; lat: number; lng: number, formatted_location: string }[];
+  onHistoryHover?: (location: { lat: number; lng: number; image: string, formatted_location: string } | null) => void;
+  onHistoryClick?: (location: { lat: number; lng: number; image: string, formatted_location: string } | null, index: number) => void;
   selectedRowIndex?: number | null;
-  hoveredLocation?: { lat: number; lng: number; image: string } | null;
-  selectedLocation?: { lat: number; lng: number; image: string } | null;
+  hoveredLocation?: { lat: number; lng: number; image: string, formatted_location: string } | null;
+  selectedLocation?: { lat: number; lng: number; image: string, formatted_location: string } | null;
 };
 
 function formatLastSeen(timestamp: string): string {
@@ -68,7 +68,6 @@ export default function DashboardContact({
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-
     return history.filter((item) => {
       const itemDate = new Date(item.timestamp);
       
@@ -253,9 +252,9 @@ export default function DashboardContact({
                   return (
                     <tr
                       key={i}
-                      onMouseEnter={() => onHistoryHover?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' })}
+                      onMouseEnter={() => onHistoryHover?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg', formatted_location: row.formatted_location })}
                       onMouseLeave={() => onHistoryHover?.(null)}
-                      onClick={() => onHistoryClick?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' }, i)}
+                      onClick={() => onHistoryClick?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg', formatted_location: row.formatted_location }, i)}
                       className={`history-row-hoverable ${isSelected ? 'selected' : ''}`}
                       style={{ cursor: 'pointer' }}
                     >

@@ -154,3 +154,5 @@ npm install
 - Modified location display logic
 - Fixed map and history location display issues
 - Fixed alert mode display issues
+- Fixed geocode fetching on preview
+- Implemented geocode API on contact location fetch instead of preview  

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
 import { useWebSocket } from "./useWebSocket";
+import { useMap } from "../scripts/useMap";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { API_BASE_URL } from "../config/api";
 import type { User } from "../types";
@@ -46,7 +47,7 @@ interface LocationsByPhone {
 
 export function useDashboard(): UseDashboardReturn {
   const navigate = useNavigate();
-
+  const { getGeocode } = useMap();
   // REST API state
   const [user, setUser] = useState<User | null>(null);
   const [rawContacts, setRawContacts] = useState<RawContact[]>([]);
@@ -72,72 +73,108 @@ export function useDashboard(): UseDashboardReturn {
   // Fetch locations from API
   const fetchLocations = useCallback(async () => {
     try {
-      console.log("[useDashboard] Starting location fetch from:", `${API_BASE_URL}/api/locations/contacts`);
+      console.log(
+        "[useDashboard] Starting location fetch from:",
+        `${API_BASE_URL}/api/locations/contacts`
+      );
+
       const res = await fetch(`${API_BASE_URL}/api/locations/contacts`, {
         credentials: "include",
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to fetch locations: ${res.status} ${res.statusText}`);
+        throw new Error(
+          `Failed to fetch locations: ${res.status} ${res.statusText}`
+        );
       }
 
       const data: LocationApiResponse = await res.json();
       console.log("[useDashboard] Raw API response:", data);
-      console.log("[useDashboard] locations_by_user keys:", Object.keys(data.locations_by_user));
+      console.log(
+        "[useDashboard] locations_by_user keys:",
+        Object.keys(data.locations_by_user)
+      );
 
       // Transform API response into locations mapped by phone number
       const locationsByPhone: LocationsByPhone = {};
       let processedCount = 0;
 
-      Object.entries(data.locations_by_user).forEach(([_userId, userData]) => {
+      // IMPORTANT: use for...of so we can await geocoding in the mapping step
+      for (const [_userId, userData] of Object.entries(data.locations_by_user)) {
         const phoneNumber = userData.user_phone;
-        console.log(`[useDashboard] Processing user: ${userData.user_name} (${phoneNumber}), locations count: ${userData.locations.length}`);
-        
+        console.log(
+          `[useDashboard] Processing user: ${userData.user_name} (${phoneNumber}), locations count: ${userData.locations.length}`
+        );
+
         if (!phoneNumber) {
           console.warn("[useDashboard] Skipping user - no phone number");
-          return;
+          continue;
         }
-        
+
         if (!userData.locations || userData.locations.length === 0) {
-          console.warn(`[useDashboard] Skipping ${phoneNumber} - no locations array or empty`);
-          return;
+          console.warn(
+            `[useDashboard] Skipping ${phoneNumber} - no locations array or empty`
+          );
+          continue;
         }
 
         // Sort locations by timestamp (most recent first)
         const sortedLocations = [...userData.locations].sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
 
-        console.log(`[useDashboard] Sorted ${sortedLocations.length} locations for ${phoneNumber}:`, sortedLocations.map(l => ({ id: l.id, timestamp: l.timestamp })));
+        console.log(
+          `[useDashboard] Sorted ${sortedLocations.length} locations for ${phoneNumber}:`,
+          sortedLocations.map((l) => ({ id: l.id, timestamp: l.timestamp }))
+        );
 
-        // Convert to LocationData format
-        const locationDataArray: LocationData[] = sortedLocations.map((loc) => ({
-          userId: phoneNumber,
-          userName: userData.user_name,
-          roomId: "",
-          coords: {
-            lat: parseFloat(loc.latitude),
-            lng: parseFloat(loc.longitude),
-          },
-          timestamp: loc.timestamp,
-        }));
+        // Convert to LocationData format + PREFILL formatted_location if null
+        const locationDataArray: LocationData[] = await Promise.all(
+          sortedLocations.map(async (loc) => {
+            const lat = parseFloat(loc.latitude);
+            const lng = parseFloat(loc.longitude);
+
+            let formatted = loc.formatted_location; // string | null
+
+            if (formatted === null) {
+              formatted = await getGeocode(lat, lng);
+            }
+
+            return {
+              userId: phoneNumber,
+              userName: userData.user_name,
+              roomId: "",
+              coords: { lat, lng },
+              timestamp: loc.timestamp,
+              formatted_location: formatted,
+            };
+          })
+        );
 
         // Store most recent as current and all as history
         locationsByPhone[phoneNumber] = {
           current: locationDataArray[0],
           history: locationDataArray,
         };
-        
-        console.log(`[useDashboard] Stored location for ${phoneNumber}:`, locationsByPhone[phoneNumber].current);
-        processedCount++;
-      });
 
-      console.log(`[useDashboard] Processed ${processedCount} users, final locationsByPhone:`, locationsByPhone);
+        console.log(
+          `[useDashboard] Stored location for ${phoneNumber}:`,
+          locationsByPhone[phoneNumber].current
+        );
+        processedCount++;
+      }
+
+      console.log(
+        `[useDashboard] Processed ${processedCount} users, final locationsByPhone:`,
+        locationsByPhone
+      );
       setApiLocations(locationsByPhone);
     } catch (err) {
       console.error("[useDashboard] Failed to fetch locations:", err);
     }
-  }, [])
+  }, []);
+
 
   // Fetch locations on mount and periodically
   useEffect(() => {
