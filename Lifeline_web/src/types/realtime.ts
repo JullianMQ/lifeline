@@ -223,7 +223,7 @@ export interface LocationData {
         lat: number;
         lng: number;
     };
-    formatted_location: string | null;
+    formatted_location?: string | null;
     accuracy?: number;
     timestamp: string;
 }
