@@ -11,7 +11,6 @@ import { AppState, AppStateStatus, Platform, View, Alert } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { incidentManager, ActiveIncident } from "@/lib/services/incident_manager";
 import {
     useAudioRecorder,
     RecordingPresets,
@@ -21,6 +20,24 @@ import {
 import { SensorContext } from "@/lib/context/sensor_context";
 import * as Linking from "expo-linking";
 import * as Sharing from "expo-sharing";
+
+// uploader
+import { uploadMediaFile } from "@/lib/services/media_upload";
+import type { MediaType as UploadMediaType } from "@/lib/services/media_upload";
+
+type UploadedMap = {
+    backPhoto?: boolean;
+    backVideo?: boolean;
+    frontPhoto?: boolean;
+    frontVideo?: boolean;
+    audio?: boolean;
+
+    backPhotoFileId?: number;
+    backVideoFileId?: number;
+    frontPhotoFileId?: number;
+    frontVideoFileId?: number;
+    audioFileId?: number;
+};
 
 type SosMediaResult = {
     id: string;
@@ -33,10 +50,14 @@ type SosMediaResult = {
     frontVideoPath?: string;
 
     audioPath?: string;
+
+    // upload tracking for outbox retries
+    uploaded?: UploadedMap;
 };
 
 type Ctx = {
     triggerSOSCapture: () => Promise<SosMediaResult | null>;
+    processOutbox: () => Promise<void>;
     isCapturing: boolean;
 };
 
@@ -50,11 +71,32 @@ export function useSosMedia() {
 
 const OUTBOX_KEY = "SOS_OUTBOX_V1";
 
-async function addToOutbox(item: SosMediaResult) {
+async function getOutbox(): Promise<SosMediaResult[]> {
     const raw = await AsyncStorage.getItem(OUTBOX_KEY);
-    const list: SosMediaResult[] = raw ? JSON.parse(raw) : [];
-    list.unshift(item);
+    return raw ? (JSON.parse(raw) as SosMediaResult[]) : [];
+}
+
+async function saveOutbox(list: SosMediaResult[]) {
     await AsyncStorage.setItem(OUTBOX_KEY, JSON.stringify(list));
+}
+
+function withDefaultUploaded(item: SosMediaResult): SosMediaResult {
+    return {
+        ...item,
+        uploaded: item.uploaded ?? {
+            backPhoto: false,
+            backVideo: false,
+            frontPhoto: false,
+            frontVideo: false,
+            audio: false,
+        },
+    };
+}
+
+async function addToOutbox(item: SosMediaResult) {
+    const list = await getOutbox();
+    list.unshift(withDefaultUploaded(item));
+    await saveOutbox(list);
 }
 
 function makeId() {
@@ -65,19 +107,6 @@ function getBaseDirectory(): string {
     const base = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
     if (!base) throw new Error("No FileSystem base directory available.");
     return base;
-}
-
-function isConfirmedIncident(inc: ActiveIncident) {
-    return (
-        inc.reason === "FALL_CONFIRMED" ||
-        inc.reason === "CRASH_CONFIRMED" ||
-        inc.reason === "EMERGENCY_CONFIRMED"
-    );
-}
-
-function isForegroundish() {
-    const s = AppState.currentState;
-    return s === "active" || s === "unknown";
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -129,7 +158,6 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
     const { pauseMicMetering, resumeMicMetering } = useContext(SensorContext);
 
     const [isCapturing, setIsCapturing] = useState(false);
-    const lastCapturedIncidentIdRef = useRef<string | null>(null);
 
     // Force-remount key for CameraView (helps when front video gets stuck in a bad CameraX session)
     const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
@@ -176,7 +204,11 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
             promptOpenSettingsForCamera();
         }
 
-        sosLog("ensurePermissions", { camGranted, micGranted, canAskAgain: camStatus.canAskAgain });
+        sosLog("ensurePermissions", {
+            camGranted,
+            micGranted,
+            canAskAgain: camStatus.canAskAgain,
+        });
 
         return camGranted && micGranted;
     }, [camPerm, requestCamPerm, promptOpenSettingsForCamera]);
@@ -251,7 +283,10 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
 
         const okMode = await setModeAndWait("picture", 8000);
         if (!okMode || !cameraRef.current) {
-            sosLog("takePhoto: failed to set picture mode", { okMode, hasRef: !!cameraRef.current });
+            sosLog("takePhoto: failed to set picture mode", {
+                okMode,
+                hasRef: !!cameraRef.current,
+            });
             return undefined;
         }
 
@@ -276,7 +311,11 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
 
             try {
                 const info = await FileSystem.getInfoAsync(uri);
-                sosLog("takePhoto: file info", { uri, exists: info.exists, size: (info as any).size });
+                sosLog("takePhoto: file info", {
+                    uri,
+                    exists: info.exists,
+                    size: (info as any).size,
+                });
                 if (!info.exists) return undefined;
                 if (typeof (info as any).size === "number" && (info as any).size === 0) return undefined;
             } catch (e) {
@@ -302,11 +341,17 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
             if (!cameraRef.current) return undefined;
 
             const okMode = await setModeAndWait("video", 10000);
-            sosLog("recordVideoOnce: setMode video", { okMode, facing: cameraFacingRef.current });
+            sosLog("recordVideoOnce: setMode video", {
+                okMode,
+                facing: cameraFacingRef.current,
+            });
             if (!okMode || !cameraRef.current) return undefined;
 
             const okReady = await waitForCameraReady(10000);
-            sosLog("recordVideoOnce: waitForCameraReady", { okReady, facing: cameraFacingRef.current });
+            sosLog("recordVideoOnce: waitForCameraReady", {
+                okReady,
+                facing: cameraFacingRef.current,
+            });
             if (!okReady || !cameraRef.current) return undefined;
 
             try {
@@ -384,6 +429,108 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         },
         [recordVideoOnce, bumpCameraInstance, setFacingAndWait, setModeAndWait, waitForCameraReady]
     );
+
+    // Outbox processing (uploads)
+    const isProcessingOutboxRef = useRef(false);
+
+    const processOutbox = useCallback(async () => {
+        if (Platform.OS !== "android") return;
+        if (isProcessingOutboxRef.current) return;
+
+        isProcessingOutboxRef.current = true;
+
+        try {
+            sosLog("processOutbox: start");
+            const list = await getOutbox();
+            sosLog("processOutbox: loaded", { count: list.length, ids: list.map((x) => x.id) });
+
+            if (!list.length) return;
+
+            const remaining: SosMediaResult[] = [];
+
+            const uploadOne = async (
+                item: SosMediaResult,
+                key: "backPhoto" | "frontPhoto" | "backVideo" | "frontVideo" | "audio",
+                path: string | undefined,
+                mediaType: UploadMediaType
+            ) => {
+                const up = item.uploaded!;
+                if (up[key] === true) return;
+
+                if (!path) {
+                    up[key] = true; // nothing to upload
+                    return;
+                }
+
+                // If file is missing, mark done so it doesn't block the queue forever
+                try {
+                    const info = await FileSystem.getInfoAsync(path);
+                    if (!info.exists) {
+                        sosLog("processOutbox: file missing, marking done", { key, path });
+                        up[key] = true;
+                        return;
+                    }
+                } catch {
+                    // ignore; still try upload
+                }
+
+                sosLog("processOutbox: upload attempt", { key, path, mediaType });
+
+                const res = await uploadMediaFile({
+                    fileUri: path,
+                    mediaType,
+                    description: `SOS ${item.id} ${key}`,
+                });
+
+                if (!res.success) {
+                    // throw to keep item in outbox for retry
+                    throw new Error(res.error);
+                }
+
+                sosLog("processOutbox: upload result", { key, ok: true, fileId: res.file?.id });
+
+                up[key] = true;
+
+                // store server file id (optional)
+                if (key === "backPhoto") up.backPhotoFileId = res.file.id;
+                if (key === "frontPhoto") up.frontPhotoFileId = res.file.id;
+                if (key === "backVideo") up.backVideoFileId = res.file.id;
+                if (key === "frontVideo") up.frontVideoFileId = res.file.id;
+                if (key === "audio") up.audioFileId = res.file.id;
+            };
+
+            for (const raw of list) {
+                const item = withDefaultUploaded(raw);
+
+                try {
+                    await uploadOne(item, "backPhoto", item.backPhotoPath, "picture");
+                    await uploadOne(item, "frontPhoto", item.frontPhotoPath, "picture");
+                    await uploadOne(item, "backVideo", item.backVideoPath, "video");
+                    await uploadOne(item, "frontVideo", item.frontVideoPath, "video");
+                    await uploadOne(item, "audio", item.audioPath, "voice_recording");
+                } catch (e) {
+                    sosLog("outbox upload failed; will retry", fmtErr(e));
+                    remaining.push(item);
+                    continue;
+                }
+
+                const up = item.uploaded!;
+                const done =
+                    up.backPhoto === true &&
+                    up.frontPhoto === true &&
+                    up.backVideo === true &&
+                    up.frontVideo === true &&
+                    up.audio === true;
+
+                if (!done) remaining.push(item);
+            }
+
+            await saveOutbox(remaining);
+            sosLog("processOutbox: saved", { remaining: remaining.length });
+        } finally {
+            isProcessingOutboxRef.current = false;
+        }
+    }, []);
 
     const triggerSOSCapture = useCallback(async (): Promise<SosMediaResult | null> => {
         if (Platform.OS !== "android") return null;
@@ -496,7 +643,7 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 audioPath = finalAudio;
             }
 
-            const result: SosMediaResult = {
+            const result: SosMediaResult = withDefaultUploaded({
                 id,
                 createdAt,
                 backPhotoPath,
@@ -504,12 +651,16 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 frontPhotoPath,
                 frontVideoPath,
                 audioPath,
-            };
+            });
 
             sosLog("triggerSOSCapture: result", result);
 
             await addToOutbox(result);
 
+            // kick upload worker immediately (best-effort)
+            processOutbox().catch(() => { });
+
+            // Optional debug sharing
             await shareIfPossible(result.backPhotoPath, "Back photo");
             await shareIfPossible(result.backVideoPath, "Back video");
             await shareIfPossible(result.frontPhotoPath, "Front photo");
@@ -540,46 +691,19 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         takePhoto,
         setFacingAndWait,
         setModeAndWait,
+        processOutbox,
     ]);
 
-    const triggerRef = useRef(triggerSOSCapture);
+    // run outbox once at startup
     useEffect(() => {
-        triggerRef.current = triggerSOSCapture;
-    }, [triggerSOSCapture]);
+        processOutbox().catch(() => { });
+    }, [processOutbox]);
 
-    const tryCaptureForIncidentRef = useRef<((inc: ActiveIncident) => void) | null>(null);
-    useEffect(() => {
-        tryCaptureForIncidentRef.current = async (inc: ActiveIncident) => {
-            if (!isConfirmedIncident(inc)) return;
-            if (!isForegroundish()) return;
-
-            if (lastCapturedIncidentIdRef.current === inc.id) return;
-            lastCapturedIncidentIdRef.current = inc.id;
-
-            const res = await triggerRef.current();
-            if (!res) lastCapturedIncidentIdRef.current = null;
-        };
-    }, []);
-
-    useEffect(() => {
-        const unsub = incidentManager.subscribe((incident) => {
-            if (!incident) {
-                lastCapturedIncidentIdRef.current = null;
-                return;
-            }
-            if (!isForegroundish()) return;
-
-            tryCaptureForIncidentRef.current?.(incident);
-        });
-
-        return () => unsub();
-    }, []);
-
+    // retry uploads when app becomes active (NO auto-capture)
     useEffect(() => {
         const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
             if (state === "active" || state === "unknown") {
-                const inc = incidentManager.getActive();
-                if (inc) tryCaptureForIncidentRef.current?.(inc);
+                processOutbox().catch(() => { });
             } else {
                 try {
                     cameraRef.current?.stopRecording();
@@ -591,9 +715,12 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => sub.remove();
-    }, [recorder]);
+    }, [recorder, processOutbox]);
 
-    const value = useMemo(() => ({ triggerSOSCapture, isCapturing }), [triggerSOSCapture, isCapturing]);
+    const value = useMemo(
+        () => ({ triggerSOSCapture, processOutbox, isCapturing }),
+        [triggerSOSCapture, processOutbox, isCapturing]
+    );
 
     return (
         <SosMediaContext.Provider value={value}>

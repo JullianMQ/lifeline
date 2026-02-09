@@ -1,5 +1,5 @@
-import React, { useContext, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Pressable } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
 import MapView from "react-native-maps";
 import * as Location from "expo-location";
@@ -16,14 +16,19 @@ import {
     setRoomIdForBackgroundUploads,
 } from "@/lib/services/background_location";
 
+
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
-    const { isConnected, activeRoomId, lastError, ensureMyRoom, sos } = useWS();
+    const { isConnected, activeRoomId, ensureMyRoom, sos } = useWS();
+
+
 
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
     const [isSOSSending, setIsSOSSending] = useState(false);
+
+
 
     // Fetch user location (for the map UI only)
     useEffect(() => {
@@ -35,11 +40,20 @@ export default function HomePage() {
                     return;
                 }
 
-                const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+                const loc = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.High,
+                });
+
                 setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
 
-                const googleAddress = await reverseGeocodeWithGoogle(loc.coords.latitude, loc.coords.longitude);
-                setAddress(googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`);
+                const googleAddress = await reverseGeocodeWithGoogle(
+                    loc.coords.latitude,
+                    loc.coords.longitude
+                );
+
+                setAddress(
+                    googleAddress ?? `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`
+                );
             } catch (err) {
                 console.log("Error fetching location:", err);
             } finally {
@@ -47,6 +61,7 @@ export default function HomePage() {
             }
         })();
     }, []);
+
 
     /**
      * Monitoring orchestration (SEQUENCED):
@@ -104,7 +119,7 @@ export default function HomePage() {
         };
     }, []);
 
-    const handleSOS = async () => {
+    const handleSOS = useCallback(async () => {
         if (isSOSSending) return;
 
         setIsSOSSending(true);
@@ -112,16 +127,19 @@ export default function HomePage() {
             await sos();
         } catch (err) {
             console.error("SOS failed:", err);
-            Alert.alert("SOS failed", "We couldn’t send your SOS right now. Please check your connection and try again.", [
-                { text: "OK" },
-            ]);
+            Alert.alert(
+                "SOS failed",
+                "We couldn’t send your SOS right now. Please check your connection and try again.",
+                [{ text: "OK" }]
+            );
         } finally {
             setIsSOSSending(false);
         }
-    };
+    }, [isSOSSending, sos]);
 
     return (
         <ScreenWrapper>
+
             {/* MAP BOX */}
             <View className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden border" style={{ height: 384 }}>
                 {locationLoading ? (
@@ -199,9 +217,11 @@ export default function HomePage() {
                             else await startMonitoring();
                         } catch (err) {
                             console.error(`${isMonitoring ? "stopMonitoring" : "startMonitoring"} failed:`, err);
-                            Alert.alert("Monitoring failed", "We couldn’t update monitoring right now. Please try again.", [
-                                { text: "OK" },
-                            ]);
+                            Alert.alert(
+                                "Monitoring failed",
+                                "We couldn’t update monitoring right now. Please try again.",
+                                [{ text: "OK" }]
+                            );
                         }
                     }}
                 >

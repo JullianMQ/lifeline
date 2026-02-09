@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useCallback } from "react";
 import {
     Animated,
     Image,
@@ -8,8 +8,9 @@ import {
     StatusBar,
     Text,
     View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 
 type Props = {
     visible: boolean;
@@ -18,29 +19,143 @@ type Props = {
     onAnswer: () => void;
     onDecline: () => void;
     useModal?: boolean;
+    autoAnswerAfterMs?: number;
 };
 
 export default function SosAlertCallScreen({
     visible,
-    callerName = 'Unknown',
+    callerName = "Unknown",
     avatarUri,
     onAnswer,
     onDecline,
     useModal = true,
+    autoAnswerAfterMs,
 }: Props) {
     const pulse = useRef(new Animated.Value(0)).current;
 
+    // Ringtone source 
+    const ringtoneSource = require("../assets/sounds/lifeline-ringtone.mp3");
+    const player = useAudioPlayer(ringtoneSource, { downloadFirst: true });
+
+    // prevent double actions (tap + auto, or multiple timers)
+    const actedRef = useRef(false);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const clearAutoTimer = useCallback(() => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    }, []);
+
+    const stopRingtone = useCallback(async () => {
+        try {
+            player.pause();
+            await player.seekTo(0);
+        } catch {
+            // ignore
+        }
+    }, [player]);
+
+    const safeAnswer = useCallback(async () => {
+        if (actedRef.current) return;
+        actedRef.current = true;
+        clearAutoTimer();
+
+        await stopRingtone();
+        onAnswer();
+    }, [onAnswer, clearAutoTimer, stopRingtone]);
+
+    const safeDecline = useCallback(async () => {
+        if (actedRef.current) return;
+        actedRef.current = true;
+        clearAutoTimer();
+
+        await stopRingtone();
+        onDecline();
+    }, [onDecline, clearAutoTimer, stopRingtone]);
+
+    // pulse animation
     useEffect(() => {
         if (!visible) return;
+
         const loop = Animated.loop(
             Animated.sequence([
                 Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
                 Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: true }),
             ])
         );
+
         loop.start();
         return () => loop.stop();
     }, [visible, pulse]);
+
+    // ringtone: play while visible, stop + rewind when hidden
+    useEffect(() => {
+        let cancelled = false;
+
+        const run = async () => {
+            if (!visible) {
+                await stopRingtone();
+                return;
+            }
+
+            try {
+                await setAudioModeAsync({
+                    interruptionMode: "doNotMix", // or "duckOthers" if you prefer
+                    shouldPlayInBackground: true,
+                });
+
+                if (cancelled) return;
+
+                player.loop = true;
+                player.volume = 1.0;
+
+                // start from beginning
+                try {
+                    await player.seekTo(0);
+                } catch { }
+
+                player.play();
+            } catch {
+                // ignore
+            }
+        };
+
+        run();
+
+        return () => {
+            cancelled = true;
+            // best-effort cleanup
+            try {
+                player.pause();
+                player.seekTo(0);
+            } catch { }
+        };
+    }, [visible, player, stopRingtone]);
+
+    // auto-answer fallback (uses safeAnswer so ringtone stops too)
+    useEffect(() => {
+        if (!visible) {
+            actedRef.current = false;
+            clearAutoTimer();
+            return;
+        }
+
+        actedRef.current = false;
+        clearAutoTimer();
+
+        if (typeof autoAnswerAfterMs === "number" && autoAnswerAfterMs > 0) {
+            timerRef.current = setTimeout(() => {
+                // important: call safeAnswer (stops ringtone + prevents double actions)
+                void safeAnswer();
+            }, autoAnswerAfterMs);
+        }
+
+        return () => {
+            clearAutoTimer();
+        };
+    }, [visible, autoAnswerAfterMs, safeAnswer, clearAutoTimer]);
 
     const pulseStyle = useMemo(() => {
         const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
@@ -48,19 +163,16 @@ export default function SosAlertCallScreen({
         return { transform: [{ scale }], opacity };
     }, [pulse]);
 
-    const initial = (callerName?.trim()?.[0] || 'C').toUpperCase();
+    const initial = (callerName?.trim()?.[0] || "C").toUpperCase();
 
     const content = (
         <SafeAreaView className="flex-1 bg-[#2f2f2f]">
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
             <View className="flex-1 items-center justify-between px-6 pb-12">
-                {/* top spacing */}
                 <View className="h-10" />
 
-                {/* avatar + name (grouped) */}
                 <View className="items-center mt-0 mb-1">
-                    {/* avatar */}
                     <View className="items-center justify-center">
                         <Animated.View
                             style={pulseStyle}
@@ -77,30 +189,28 @@ export default function SosAlertCallScreen({
                         </View>
                     </View>
 
-                    {/* name (now truly right below avatar) */}
                     <View className="items-center mt-6">
                         <Text className="text-white text-[44px] font-semibold">{callerName}</Text>
                         <Text className="text-white/65 text-[13px] mt-1">Incoming call</Text>
+
+                        {typeof autoAnswerAfterMs === "number" && autoAnswerAfterMs > 0 ? (
+                            <Text className="text-white/45 text-[12px] mt-2">
+                                Auto-confirm in {Math.ceil(autoAnswerAfterMs / 1000)}s
+                            </Text>
+                        ) : null}
                     </View>
                 </View>
 
-                {/* buttons */}
                 <View className="w-full flex-row justify-center px-6 gap-44">
-                    <CallAction
-                        label="Answer"
-                        bg="#2ecc71"
-                        icon="call"
-                        onPress={onAnswer}
-                    />
+                    <CallAction label="Answer" bg="#2ecc71" icon="call" onPress={() => void safeAnswer()} />
                     <CallAction
                         label="Decline"
                         bg="#e74c3c"
                         icon="call"
                         rotateHangup
-                        onPress={onDecline}
+                        onPress={() => void safeDecline()}
                     />
                 </View>
-
             </View>
         </SafeAreaView>
     );
@@ -113,7 +223,7 @@ export default function SosAlertCallScreen({
             animationType="fade"
             presentationStyle="fullScreen"
             statusBarTranslucent
-            onRequestClose={onDecline}
+            onRequestClose={() => void safeDecline()}
         >
             {content}
         </Modal>
@@ -137,7 +247,7 @@ function CallAction({
         <View className="items-center">
             <Pressable
                 onPress={onPress}
-                android_ripple={{ color: 'rgba(255,255,255,0.18)', borderless: true }}
+                android_ripple={{ color: "rgba(255,255,255,0.18)", borderless: true }}
                 className="w-32 h-32 rounded-full items-center justify-center"
                 style={{ backgroundColor: bg }}
             >
@@ -145,10 +255,10 @@ function CallAction({
                     name={icon}
                     size={28}
                     color="#fff"
-                    style={rotateHangup ? { transform: [{ rotate: '135deg' }] } : undefined}
+                    style={rotateHangup ? { transform: [{ rotate: "135deg" }] } : undefined}
                 />
             </Pressable>
-
+            <Text className="text-white/80 mt-3">{label}</Text>
         </View>
     );
 }
