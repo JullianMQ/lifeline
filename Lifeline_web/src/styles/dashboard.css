@@ -289,6 +289,13 @@ ul{
     .table-card{
         height: 25vh;
     }
+    .alert-modal-overlay, .alert-modal-body, .alert-modal-footer, .alert-modal-header{
+        padding: var(--space-xs) var(--space-sm) !important;
+    }
+    .alert-modal-item{
+        padding: var(--space-xs) !important;
+        gap: var(--space-xs) !important;
+    }
     footer{
         display: none;
     }
@@ -315,6 +322,13 @@ ul{
     }
     .table-card{
         height: 25vh;
+    }
+    .alert-modal{
+        max-width: none !important;
+        width: 50vh !important;
+    }
+    .alert-modal-overlay, .alert-modal-body, .alert-modal-footer, .alert-modal-header{
+        padding: var(--space-sm) var(--space-md) !important;
     }
 }
 

@@ -239,7 +239,7 @@ input:-webkit-autofill:focus {
     padding: 12px 16px;
   }
   ::-webkit-scrollbar {
-    width: 8px; 
+    width: 6px; 
     height: 6px;
   }
 }
