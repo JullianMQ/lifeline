@@ -1,8 +1,10 @@
 /* Dashboard */
 .alert header > *, .alert footer, .alert .status-text{ color: var(--soft-white) !important; }
 .alert header, .alert footer{ background-color: var(--lifeline-red); }
-.alert .map, .alert .map > *{ border: 2px solid var(--lifeline-red) !important; }
-
+.alert .map, .alert .map > *{ border: 2px solid var(--lifeline-red) !important;}
+.alert .map{
+    height: 40vh;
+}
 .alert .alert-indicator-btn{
     background-color: var(--soft-white);
     color: var(--lifeline-red);
@@ -41,6 +43,10 @@
     gap: var(--space-xs);
 }
 
+.dashboard-contact-wrapper.alert-mode{
+    justify-content: start;
+    gap: var(--space-sm);
+}
 .alert-mode .dashboard-user-img{
     height: 180px;
 }
@@ -97,4 +103,10 @@
     .alert-mode .dashboard-user-img{
         height: 100px;
     }
+}
+@media screen and (min-width: 1025px) {
+     .alert .map{
+        height: 100%;    
+    }
+    
 }

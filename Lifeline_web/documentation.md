@@ -143,13 +143,14 @@ npm install
 
 ### 2026-02-08
 
-- Replaced localStorage cache with API endpoint GET /api/locations/contacts
 - Implemented location history loading from API for all contacts
-- Added location history state management in useDashboard hook
-- Integrated location history into dashboard contact selection
-- History data includes most recent location and full location history per contact
-- Added comprehensive debug logging for location fetching and matching
 - Added history filter dropdown with time-based filtering (past 1 hr, past 6 hrs, today, yesterday)
 - Updated history structure to include ISO timestamp for accurate filtering
 - Map center now uses selected location preview for better navigation
-- Moved all history filter styles to dashboard.css for cleaner component code
+
+### 2026-02-09
+
+- Implemented dynamic geocode and coordinate updates when hovering/clicking history locations
+- Modified location display logic
+- Fixed map and history location display issues
+- Fixed alert mode display issues
