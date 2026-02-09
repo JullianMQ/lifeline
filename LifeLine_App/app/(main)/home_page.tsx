@@ -117,7 +117,7 @@ export default function HomePage() {
                 console.error("stopBackgroundLocationUploads unmount failed:", err);
             });
         };
-    }, []);
+    }, [isMonitoring]);
 
     const handleSOS = useCallback(async () => {
         if (isSOSSending) return;
@@ -190,6 +190,7 @@ export default function HomePage() {
             </View>
 
             <View style={{ flex: 1 }} />
+
 
             {/* SOS and STOP BUTTON */}
             <View className="items-center mt-12">

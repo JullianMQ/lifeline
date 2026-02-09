@@ -139,3 +139,18 @@ npm install
 - Added map location preview
 - Implemented onclick and onhover for location preview
 - Implemented online, offline, and preview state for map markers
+- Fixed location history updating even when not online
+
+### 2026-02-08
+
+- Implemented location history loading from API for all contacts
+- Added history filter dropdown with time-based filtering (past 1 hr, past 6 hrs, today, yesterday)
+- Updated history structure to include ISO timestamp for accurate filtering
+- Map center now uses selected location preview for better navigation
+
+### 2026-02-09
+
+- Implemented dynamic geocode and coordinate updates when hovering/clicking history locations
+- Modified location display logic
+- Fixed map and history location display issues
+- Fixed alert mode display issues

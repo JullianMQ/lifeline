@@ -133,7 +133,7 @@ function Dashboard() {
     null,
   );
   const [history, setHistory] = useState<
-    Record<string, { time: string; lat: number; lng: number }[]>
+    Record<string, { time: string; timestamp: string; lat: number; lng: number }[]>
   >({});
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
@@ -157,6 +157,7 @@ function Dashboard() {
     activeAlerts,
     acknowledgeAlert,
     manualReconnect,
+    locationHistory,
   } = useDashboard();
 
   // Show modal automatically when new alerts come in
@@ -263,12 +264,50 @@ function Dashboard() {
 
     const lat = selectedContact.location.coords.lat;
     const lng = selectedContact.location.coords.lng;
+    const isOnline = selectedContact.presence?.status === "online";
 
     console.log("[Dashboard] Selected contact location changed:", {
       name: selectedContact.name,
       lat,
       lng,
+      isOnline,
     });
+
+    // Load history from API if available
+    if (locationHistory[selectedContact.phone] && locationHistory[selectedContact.phone].history) {
+      const apiHistory = locationHistory[selectedContact.phone].history;
+      console.log("[Dashboard] Loading history from API for", selectedContact.phone, ":", apiHistory.length, "locations");
+      
+      setHistory((prev) => ({
+        ...prev,
+        [selectedContact.phone]: apiHistory.map((loc) => ({
+          time: new Date(loc.timestamp).toLocaleTimeString(),
+          timestamp: loc.timestamp,
+          lat: loc.coords.lat,
+          lng: loc.coords.lng,
+        })),
+      }));
+    } else {
+      // Fallback: manually populate history like before
+      setHistory((prev) => {
+        const existingHistory = prev[selectedContact.phone] || [];
+        const locationExists = existingHistory.some(
+          (h) => h.lat === lat && h.lng === lng
+        );
+        if (!locationExists && existingHistory.length === 0) {
+          const timestamp = new Date().toLocaleTimeString();
+          const fullTimestamp = new Date().toISOString();
+          return {
+            ...prev,
+            [selectedContact.phone]: [
+              { time: timestamp, timestamp: fullTimestamp, lat, lng },
+              ...existingHistory,
+            ],
+          };
+        }
+        return prev;
+      });
+    }
 
     const updateAddress = async () => {
       console.log("[Dashboard] Fetching geocode for", lat, lng);
@@ -276,33 +315,66 @@ function Dashboard() {
       const timestamp = new Date().toLocaleTimeString();
       console.log("[Dashboard] Geocode result:", res);
       setAddress(res);
-      setHistory((prev) => ({
-        ...prev,
-        [selectedContact.phone]: [
-          { time: timestamp, lat, lng },
-          ...(prev[selectedContact.phone] || []).slice(0, 49), // Keep last 50 entries
-        ],
-      }));
+      
+      if (isOnline) {
+        const fullTimestamp = new Date().toISOString();
+        setHistory((prev) => ({
+          ...prev,
+          [selectedContact.phone]: [
+            { time: timestamp, timestamp: fullTimestamp, lat, lng },
+            ...(prev[selectedContact.phone] || []).slice(0, 49), // Keep last 50 entries
+          ],
+        }));
+      }
     };
 
     updateAddress();
 
-    // Only poll for address updates, not location updates (WebSocket handles that)
-    const interval = setInterval(() => {
-      // Re-fetch geocode in case the location has changed
-      if (selectedContact.location?.coords) {
-        updateAddress();
-      }
-    }, 30000); // Poll less frequently since WebSocket provides real-time updates
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isOnline) {
+      interval = setInterval(() => {
+        if (selectedContact.location?.coords) {
+          updateAddress();
+        }
+      }, 30000);
+    }
 
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [
     selectedContact?.id,
     selectedContact?.location?.coords?.lat,
     selectedContact?.location?.coords?.lng,
+    selectedContact?.presence?.status,
+    locationHistory,
   ]);
 
-  // Handle viewing a contact from alert modal
+  // Update geocode when hovering or selecting a history location
+  useEffect(() => {
+    const locationToGeocode = selectedHistoryLocation || hoveredHistoryLocation;
+
+    if (!locationToGeocode) {
+      return;
+    }
+
+    const updateHistoryAddress = async () => {
+      console.log("[Dashboard] Fetching geocode for history location:", locationToGeocode);
+      const res = await getGeocode(locationToGeocode.lat, locationToGeocode.lng);
+      console.log("[Dashboard] History location geocode result:", res);
+      setAddress(res);
+    };
+
+    updateHistoryAddress();
+  }, [
+    hoveredHistoryLocation?.lat,
+    hoveredHistoryLocation?.lng,
+    selectedHistoryLocation?.lat,
+    selectedHistoryLocation?.lng,
+    getGeocode,
+  ]);
+
   const handleViewAlertContact = (contact: ContactCard) => {
     console.log(
       "[Dashboard] handleViewAlertContact:",
@@ -315,7 +387,6 @@ function Dashboard() {
     }
   };
 
-  // Get connection status indicator
   const getConnectionIndicator = () => {
     switch (connectionStatus) {
       case "connected":
@@ -335,15 +406,24 @@ function Dashboard() {
 
   const connectionIndicator = getConnectionIndicator();
 
-  // Get map center based on selected contact or user location
   const getMapCenter = () => {
+    // First priority: selected location preview (from history)
+    if (selectedHistoryLocation) {
+      return {
+        lat: selectedHistoryLocation.lat,
+        lng: selectedHistoryLocation.lng,
+      };
+    }
+    
+    // Second priority: selected contact's current location
     if (selectedContact?.location?.coords) {
       return {
         lat: selectedContact.location.coords.lat,
         lng: selectedContact.location.coords.lng,
       };
     }
-    // Try to get first contact with location
+    
+    // Third priority: any contact with location
     const contactWithLocation = contactCards.find((c) => c.location?.coords);
     if (contactWithLocation?.location?.coords) {
       return {
@@ -351,7 +431,8 @@ function Dashboard() {
         lng: contactWithLocation.location.coords.lng,
       };
     }
-    // Fall back to user location or default
+    
+    // Final fallback: user location or default
     return user?.location || DEFAULT_MAP_CENTER;
   };
 
@@ -413,7 +494,7 @@ function Dashboard() {
           <img
             src={user?.image || "/images/user-example.svg"}
             alt="user-img"
-            className="dashboard-img"
+            className="dashboard-img avatar"
             onClick={() => navigate("/profile")}
           />
         </div>
@@ -440,6 +521,8 @@ function Dashboard() {
                 setSelectedRowIndex(selectedRowIndex === index ? null : index);
               }}
               selectedRowIndex={selectedRowIndex}
+              hoveredLocation={hoveredHistoryLocation}
+              selectedLocation={selectedHistoryLocation}
             />
           )}
         </div>

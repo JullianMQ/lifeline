@@ -1,8 +1,10 @@
 /* Dashboard */
 .alert header > *, .alert footer, .alert .status-text{ color: var(--soft-white) !important; }
 .alert header, .alert footer{ background-color: var(--lifeline-red); }
-.alert .map, .alert .map > *{ border: 2px solid var(--lifeline-red) !important; }
-
+.alert .map, .alert .map > *{ border: 2px solid var(--lifeline-red) !important;}
+.alert .map{
+    height: 40vh;
+}
 .alert .alert-indicator-btn{
     background-color: var(--soft-white);
     color: var(--lifeline-red);
@@ -27,12 +29,7 @@
 
 /* Fonts */
 .alert-mode h1{
-    font-size: clamp(2.25rem, 1.4308rem + 3.4951vw, 5.625rem) !important;
     color: var(--lifeline-red);
-}
-
-.alert-mode p{
-    font-size: clamp(1.25rem, 1.068rem + 0.7767vw, 2rem) !important;
 }
 
 .alert .dashboard-content{
@@ -46,6 +43,10 @@
     gap: var(--space-xs);
 }
 
+.dashboard-contact-wrapper.alert-mode{
+    justify-content: start;
+    gap: var(--space-sm);
+}
 .alert-mode .dashboard-user-img{
     height: 180px;
 }
@@ -70,27 +71,25 @@
 }
 
 .map-pin.alert-mode {
-    animation: pulse-pin 1.5s infinite;
+    animation: pulse-pin 1s infinite;
 }
 
 @keyframes pulse-pin {
-    0% { 
-        
-        transform: translateY(0);
+    0% {         
+        transform: translateY(0) scale(1.2);
         box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
-
     }
     25% { 
-        transform: translateY(5px);
-        box-shadow: 0 0 6px 8px rgba(223, 55, 33, 0);
+        transform: translateY(10px);
+        box-shadow: 0 0 10px 12px rgba(223, 55, 33, 0);
     }
     75% { 
-        transform: translateY(5px);
+        transform: translateY(10px);
         box-shadow: 0 0 0 0 rgba(223, 55, 33, 0);
     }
     100% { 
-        transform: translateY(0);
-        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.4);
+        transform: translateY(0) scale(1.2);
+        box-shadow: 0 0 0 0 rgba(223, 55, 33, 0.7);
     }
 }
 
@@ -104,4 +103,10 @@
     .alert-mode .dashboard-user-img{
         height: 100px;
     }
+}
+@media screen and (min-width: 1025px) {
+     .alert .map{
+        height: 100%;    
+    }
+    
 }
