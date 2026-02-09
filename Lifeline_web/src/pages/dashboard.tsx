@@ -133,18 +133,17 @@ function Dashboard() {
     null,
   );
   const [history, setHistory] = useState<
-    Record<string, { time: string; timestamp: string; lat: number; lng: number }[]>
+    Record<string, { time: string; timestamp: string; lat: number; lng: number; formatted_location: string }[]>
   >({});
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
-  const [hoveredHistoryLocation, setHoveredHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
-  const [selectedHistoryLocation, setSelectedHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
+  const [hoveredHistoryLocation, setHoveredHistoryLocation] = useState<{ lat: number; lng: number; image: string; formatted_location: string } | null>(null);
+  const [selectedHistoryLocation, setSelectedHistoryLocation] = useState<{ lat: number; lng: number; image: string; formatted_location: string } | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const prevAlertsSignature = useRef<string>("");
 
   const {
     handleLocation,
-    getGeocode,
     setAddress,
     address,
   } = useMap();
@@ -264,6 +263,7 @@ function Dashboard() {
 
     const lat = selectedContact.location.coords.lat;
     const lng = selectedContact.location.coords.lng;
+    const geocode = selectedContact.location.formatted_location ?? "";
     const isOnline = selectedContact.presence?.status === "online";
 
     console.log("[Dashboard] Selected contact location changed:", {
@@ -285,6 +285,7 @@ function Dashboard() {
           timestamp: loc.timestamp,
           lat: loc.coords.lat,
           lng: loc.coords.lng,
+          formatted_location: loc.formatted_location ?? "",
         })),
       }));
     } else {
@@ -300,7 +301,7 @@ function Dashboard() {
           return {
             ...prev,
             [selectedContact.phone]: [
-              { time: timestamp, timestamp: fullTimestamp, lat, lng },
+              { time: timestamp, timestamp: fullTimestamp, lat, lng, formatted_location: geocode },
               ...existingHistory,
             ],
           };
@@ -311,18 +312,16 @@ function Dashboard() {
 
     const updateAddress = async () => {
       console.log("[Dashboard] Fetching geocode for", lat, lng);
-      const res = await getGeocode(lat, lng);
       const timestamp = new Date().toLocaleTimeString();
-      console.log("[Dashboard] Geocode result:", res);
-      setAddress(res);
+      setAddress(geocode);
       
       if (isOnline) {
         const fullTimestamp = new Date().toISOString();
         setHistory((prev) => ({
           ...prev,
           [selectedContact.phone]: [
-            { time: timestamp, timestamp: fullTimestamp, lat, lng },
-            ...(prev[selectedContact.phone] || []).slice(0, 49), // Keep last 50 entries
+            { time: timestamp, timestamp: fullTimestamp, lat, lng, formatted_location: geocode },
+            ...(prev[selectedContact.phone] || [])
           ],
         }));
       }
@@ -353,27 +352,23 @@ function Dashboard() {
 
   // Update geocode when hovering or selecting a history location
   useEffect(() => {
-    const locationToGeocode = selectedHistoryLocation || hoveredHistoryLocation;
+    const locationToShow = selectedHistoryLocation || hoveredHistoryLocation;
 
-    if (!locationToGeocode) {
-      return;
-    }
+    if (!locationToShow) return;
 
-    const updateHistoryAddress = async () => {
-      console.log("[Dashboard] Fetching geocode for history location:", locationToGeocode);
-      const res = await getGeocode(locationToGeocode.lat, locationToGeocode.lng);
-      console.log("[Dashboard] History location geocode result:", res);
-      setAddress(res);
-    };
+    console.log("[Dashboard] Using stored formatted_location for history location:", locationToShow);
 
-    updateHistoryAddress();
+    setAddress(locationToShow.formatted_location);
   }, [
     hoveredHistoryLocation?.lat,
     hoveredHistoryLocation?.lng,
+    hoveredHistoryLocation?.formatted_location,
     selectedHistoryLocation?.lat,
     selectedHistoryLocation?.lng,
-    getGeocode,
+    selectedHistoryLocation?.formatted_location,
+    setAddress,
   ]);
+
 
   const handleViewAlertContact = (contact: ContactCard) => {
     console.log(
