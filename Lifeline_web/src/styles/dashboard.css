@@ -82,6 +82,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 .dashboard-content{
     grid-column: 1/3;
     position: relative;
+    flex: 1;
 }
 
 .dashboard-content, .dashboard-contacts, .dashboard-user, .table-card table, .map{
@@ -162,11 +163,6 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
     border: none;
 }
 
-.dashboard-history{
-    flex: 1;
-    min-height: 0;
-}
-
 .history-header {
     display: flex;
     align-items: center;
@@ -174,7 +170,7 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 }
 
 .history-filter {
-    padding: 6px 10px;
+    padding: 6px 20px 6px 10px;
     border-radius: 12px;
     border: none;
     font-size: 14px;
@@ -189,11 +185,9 @@ header, .dashboard, .dashboard-content, .dashboard-user, .dashboard-user-info, .
 }
 
 .table-card{
-    flex: 1 0 auto;
     padding: var(--space-xs);
     overflow-y: auto;
-    min-height: 0;
-    height: 35vh;
+    height: 20vh;
 }
 
 .table-card table{
@@ -264,7 +258,7 @@ ul{
     }
     .dashboard-body{
         padding: var(--space-sm);
-        gap: var(--space-sm);
+        gap: var(--space-xs);
     }
     .dashboard-card{
         padding: var(--space-xs);
@@ -289,6 +283,12 @@ ul{
     .dashboard-contacts > div{
         gap: var(--space-xs);
     }
+    .map{
+        height: 25vh;    
+    }
+    .table-card{
+        height: 25vh;
+    }
     footer{
         display: none;
     }
@@ -301,17 +301,20 @@ ul{
     .dashboard-body{
         padding: var(--space-md);
     }
-
     .dashboard-buttons img{
         width: 20%;
     }
-
     .dashboard-content{
         gap: var(--space-sm);
     }
-
     .dashboard-card{
         width: 120px;
+    }
+    .map{
+        height: 30vh;    
+    }
+    .table-card{
+        height: 25vh;
     }
 }
 
@@ -332,6 +335,9 @@ ul{
     .presence-indicator{
         width: 30px !important;
         height: 30px !important;
+    }
+    .table-card{
+        height: 40vh;
     }
 }
 
@@ -524,7 +530,6 @@ ul{
 .location-timestamp {
     font-size: 0.75rem;
     color: #6b7280;
-    margin-top: var(--space-xxs);
 }
 
 /* ============================================================================
@@ -847,12 +852,10 @@ ul{
 .dashboard-contact-wrapper {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    justify-content: space-between;
     width: 100%;
     height: 100%;
     position: relative;
-    padding: var(--space-sm);
-    border-radius: var(--space-sm);
     transition: background-color 0.3s ease;
 }
 
