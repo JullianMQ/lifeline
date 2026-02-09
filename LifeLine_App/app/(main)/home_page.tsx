@@ -18,16 +18,13 @@ import {
 
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
-    const { isConnected, activeRoomId, serverTimestamp, lastError, ensureMyRoom, sos } = useWS();
+    const { isConnected, activeRoomId, lastError, ensureMyRoom, sos } = useWS();
 
-    const [messageReply, setMessageReply] = useState("");
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
-
     const [isSOSSending, setIsSOSSending] = useState(false);
 
-    // Fetch user location (for the map UI only)
     // Fetch user location (for the map UI only)
     useEffect(() => {
         (async () => {
@@ -37,6 +34,7 @@ export default function HomePage() {
                     setLocationLoading(false);
                     return;
                 }
+
                 const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
                 setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
 
@@ -50,37 +48,59 @@ export default function HomePage() {
         })();
     }, []);
 
-    // Create/ensure a room ONLY when monitoring starts
-    useEffect(() => {
-        if (!isMonitoring) return;
-        if (activeRoomId) return;
-        ensureMyRoom();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isMonitoring, activeRoomId]);
-
-    // When we have an active room, cache it for REST fallback (background task)
-    useEffect(() => {
-        if (!activeRoomId) return;
-        setRoomIdForBackgroundUploads(activeRoomId);
-    }, [activeRoomId]);
-
-    // Start/stop location sharing based on monitoring.
-    // Foreground: WS-first every ~60s (HTTP fallback if WS is down)
-    // Background: HTTP fallback every ~60s (Expo task)
+    /**
+     * Monitoring orchestration (SEQUENCED):
+     * 1) if monitoring OFF -> stop sharing
+     * 2) if monitoring ON but no room yet -> ensureMyRoom, then wait for activeRoomId via re-render
+     * 3) once room exists -> cache roomId, then start foreground/background sharing
+     */
     useEffect(() => {
         if (!isMonitoring) {
-            stopForegroundLocationSharing();
-            stopBackgroundLocationUploads();
+            stopForegroundLocationSharing().catch((err) => {
+                console.error("stopForegroundLocationSharing failed:", err);
+            });
+            stopBackgroundLocationUploads().catch((err) => {
+                console.error("stopBackgroundLocationUploads failed:", err);
+            });
             return;
         }
 
-        // Start both; background task will only succeed once roomId is cached.
-        startForegroundLocationSharing();
-        startBackgroundLocationUploads();
+        // Monitoring ON, but room not ready yet -> create/ensure room first
+        if (!activeRoomId) {
+            ensureMyRoom().catch((err) => {
+                console.error("ensureMyRoom failed:", err);
+                Alert.alert(
+                    "Room setup failed",
+                    "We couldn’t create or join your room. Please check your connection and try again.",
+                    [{ text: "OK" }]
+                );
+            });
+            return;
+        }
 
+        // Room is ready -> cache for background REST uploads, then start sharing
+        setRoomIdForBackgroundUploads(activeRoomId).catch((err) => {
+            console.error("setRoomIdForBackgroundUploads failed:", err);
+        });
+
+        startForegroundLocationSharing().catch((err) => {
+            console.error("startForegroundLocationSharing failed:", err);
+        });
+
+        startBackgroundLocationUploads().catch((err) => {
+            console.error("startBackgroundLocationUploads failed:", err);
+        });
+    }, [isMonitoring, activeRoomId, ensureMyRoom]);
+
+    // Safety: stop on unmount too
+    useEffect(() => {
         return () => {
-            stopForegroundLocationSharing();
-            stopBackgroundLocationUploads();
+            stopForegroundLocationSharing().catch((err) => {
+                console.error("stopForegroundLocationSharing unmount failed:", err);
+            });
+            stopBackgroundLocationUploads().catch((err) => {
+                console.error("stopBackgroundLocationUploads unmount failed:", err);
+            });
         };
     }, [isMonitoring]);
 
@@ -92,12 +112,9 @@ export default function HomePage() {
             await sos();
         } catch (err) {
             console.error("SOS failed:", err);
-
-            Alert.alert(
-                "SOS failed",
-                "We couldn’t send your SOS right now. Please check your connection and try again.",
-                [{ text: "OK" }]
-            );
+            Alert.alert("SOS failed", "We couldn’t send your SOS right now. Please check your connection and try again.", [
+                { text: "OK" },
+            ]);
         } finally {
             setIsSOSSending(false);
         }
@@ -124,7 +141,7 @@ export default function HomePage() {
                         }}
                         showsUserLocation
                         provider="google"
-                    ></MapView>
+                    />
                 ) : (
                     <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#eee" }}>
                         <Text className="text-gray-600">Location not available</Text>
@@ -135,7 +152,6 @@ export default function HomePage() {
             {/* LOCATION TEXT */}
             <View className="mx-4 mt-3">
                 <Text className="text-s text-gray-500">You are at:</Text>
-
 
                 {address ? (
                     <Text className="text-xl font-semibold">{address}</Text>
@@ -154,8 +170,6 @@ export default function HomePage() {
                 <Text className="text-base font-semibold">
                     {isConnected ? `connected | ${activeRoomId ?? "no room"}` : "disconnected"}
                 </Text>
-
-                {lastError ? <Text className="text-red-600 mt-1">{lastError}</Text> : null}
             </View>
 
             <View style={{ flex: 1 }} />
@@ -177,32 +191,22 @@ export default function HomePage() {
                             <Text className="text-white font-bold mt-1 text-3xl">SOS</Text>
                         </>
                     )}
-                <TouchableOpacity
-                    className="w-52 h-52 rounded-full items-center justify-center bg-red-600 mb-6"
-                    onPress={handleSOS}
-                    disabled={isSOSSending}
-                    style={{ opacity: isSOSSending ? 0.7 : 1 }}
-                >
-                    {isSOSSending ? (
-                        <ActivityIndicator size="large" color="white" />
-                    ) : (
-                        <>
-                            <Ionicons name="call" size={50} color="white" />
-                            <Text className="text-white font-bold mt-1 text-3xl">SOS</Text>
-                        </>
-                    )}
                 </TouchableOpacity>
-
-                {messageReply ? <Text className="mt-4 text-center text-gray-700">Server: {messageReply}</Text> : null}
 
                 <TouchableOpacity
                     className="mt-6 mb-8 px-6 py-3 rounded-full border-2 flex-row items-center h-20 w-48 justify-center"
-                    onPress={() => {
-                        if (isMonitoring) stopMonitoring();
-                        else startMonitoring();
+                    onPress={async () => {
+                        try {
+                            if (isMonitoring) await stopMonitoring();
+                            else await startMonitoring();
+                        } catch (err) {
+                            console.error(`${isMonitoring ? "stopMonitoring" : "startMonitoring"} failed:`, err);
+                            Alert.alert("Monitoring failed", "We couldn’t update monitoring right now. Please try again.", [
+                                { text: "OK" },
+                            ]);
+                        }
                     }}
                 >
-                    <Text className="font-bold ml-2 text-2xl">{isMonitoring ? "STOP" : "START"}</Text>
                     <Text className="font-bold ml-2 text-2xl">{isMonitoring ? "STOP" : "START"}</Text>
                 </TouchableOpacity>
             </View>

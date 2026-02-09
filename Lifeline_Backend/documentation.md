@@ -95,16 +95,6 @@ Indexes:
 - Cleanup is only triggered on new insert; no manual delete endpoint.
 - Emergency contacts can view their contacts' recent location history.
 
-## Media File Longevity (Plan)
-
-- Goal: Media files stored in Google Drive are intended to last indefinitely unless replaced by a new-day upload.
-- Day boundary: Determined by the timezone embedded in each file's `createdAt` timestamp.
-- Retention rule: When a user uploads media of a given type on a new calendar day, all files of that same media type not on that same day are deleted.
-- Same-day uploads are additive; only a day change triggers deletion of prior files.
-- Deletion is performed immediately after a successful upload + DB insert.
-- Cleanup is triggered on upload; there is no scheduled cleanup job.
-- Cleanup is best-effort with retries; it can be switched to atomic behavior later if needed.
-
 ## CHANGELOG
 
 ### 2025-12-13
