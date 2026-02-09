@@ -351,6 +351,30 @@ function Dashboard() {
     locationHistory,
   ]);
 
+  // Update geocode when hovering or selecting a history location
+  useEffect(() => {
+    const locationToGeocode = selectedHistoryLocation || hoveredHistoryLocation;
+
+    if (!locationToGeocode) {
+      return;
+    }
+
+    const updateHistoryAddress = async () => {
+      console.log("[Dashboard] Fetching geocode for history location:", locationToGeocode);
+      const res = await getGeocode(locationToGeocode.lat, locationToGeocode.lng);
+      console.log("[Dashboard] History location geocode result:", res);
+      setAddress(res);
+    };
+
+    updateHistoryAddress();
+  }, [
+    hoveredHistoryLocation?.lat,
+    hoveredHistoryLocation?.lng,
+    selectedHistoryLocation?.lat,
+    selectedHistoryLocation?.lng,
+    getGeocode,
+  ]);
+
   const handleViewAlertContact = (contact: ContactCard) => {
     console.log(
       "[Dashboard] handleViewAlertContact:",
@@ -497,6 +521,8 @@ function Dashboard() {
                 setSelectedRowIndex(selectedRowIndex === index ? null : index);
               }}
               selectedRowIndex={selectedRowIndex}
+              hoveredLocation={hoveredHistoryLocation}
+              selectedLocation={selectedHistoryLocation}
             />
           )}
         </div>

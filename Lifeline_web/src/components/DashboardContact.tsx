@@ -12,6 +12,8 @@ type Props = {
   onHistoryHover?: (location: { lat: number; lng: number; image: string } | null) => void;
   onHistoryClick?: (location: { lat: number; lng: number; image: string } | null, index: number) => void;
   selectedRowIndex?: number | null;
+  hoveredLocation?: { lat: number; lng: number; image: string } | null;
+  selectedLocation?: { lat: number; lng: number; image: string } | null;
 };
 
 function formatLastSeen(timestamp: string): string {
@@ -41,8 +43,10 @@ export default function DashboardContact({
   onHistoryHover,
   onHistoryClick,
   selectedRowIndex,
+  hoveredLocation,
+  selectedLocation,
 }: Props) {
-  const location = contact.location?.coords ?? null;
+  const location = selectedLocation || hoveredLocation || contact.location?.coords;
   const isOnline = contact.presence?.status === "online";
   const lastUpdate = contact.activeAlert?.timestamp || contact.location?.timestamp;
 
