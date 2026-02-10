@@ -5,6 +5,7 @@ import type { AuthType } from "../lib/auth";
 import { randomBytes } from "crypto";
 import { dbPool } from "../lib/db";
 import { debugWs } from "../lib/debug";
+import { sendEmergencyAlertEmail } from "../lib/email";
 
 type User = NonNullable<typeof auth.$Infer.Session.user>;
 
@@ -59,6 +60,48 @@ function metersBetween(lat1: number, lon1: number, lat2: number, lon2: number): 
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return earthRadiusMeters * c;
+}
+
+function parseNumber(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+}
+
+function extractSosLocation(data: any): { formattedLocation: string | null; latitude: number | null; longitude: number | null } {
+    const formattedLocation =
+        (typeof data?.formattedLocation === "string" && data.formattedLocation.trim()) ||
+        (typeof data?.formatted_location === "string" && data.formatted_location.trim()) ||
+        (typeof data?.location?.formattedLocation === "string" && data.location.formattedLocation.trim()) ||
+        (typeof data?.location?.formatted_location === "string" && data.location.formatted_location.trim()) ||
+        (typeof data?.location?.address === "string" && data.location.address.trim()) ||
+        (typeof data?.address === "string" && data.address.trim()) ||
+        null;
+
+    const latitude =
+        parseNumber(data?.latitude) ??
+        parseNumber(data?.lat) ??
+        parseNumber(data?.location?.latitude) ??
+        parseNumber(data?.location?.lat) ??
+        null;
+    const longitude =
+        parseNumber(data?.longitude) ??
+        parseNumber(data?.long) ??
+        parseNumber(data?.lng) ??
+        parseNumber(data?.location?.longitude) ??
+        parseNumber(data?.location?.lng) ??
+        null;
+
+    return {
+        formattedLocation,
+        latitude,
+        longitude
+    };
 }
 
 function generateRoomId(): string {
@@ -211,6 +254,54 @@ async function getEmergencyContacts(userId: string): Promise<string[]> {
         return contactPhoneNumbers;
     } catch (error) {
         console.error(`[${new Date().toISOString()}] Error fetching emergency contacts for user ${userId}:`, error);
+        return [];
+    }
+}
+
+type EmergencyContactEmail = {
+    email: string;
+    name: string | null;
+};
+
+async function getEmergencyContactEmails(userId: string): Promise<EmergencyContactEmail[]> {
+    try {
+        const result = await dbPool.query(`
+            SELECT c.emergency_contacts
+            FROM contacts c
+            WHERE c.user_id = $1
+        `, [userId]);
+
+        if (result.rows.length === 0) {
+            return [];
+        }
+
+        const emergencyPhones: string[] = result.rows[0].emergency_contacts || [];
+        if (emergencyPhones.length === 0) {
+            return [];
+        }
+
+        const userResult = await dbPool.query(`
+            SELECT name, email, phone_no
+            FROM "user"
+            WHERE phone_no = ANY($1)
+        `, [emergencyPhones]);
+
+        const byPhone = new Map<string, { name: string | null; email: string | null }>();
+        for (const row of userResult.rows) {
+            byPhone.set(row.phone_no, { name: row.name, email: row.email });
+        }
+
+        const emails: EmergencyContactEmail[] = [];
+        for (const phone of emergencyPhones) {
+            const record = byPhone.get(phone);
+            if (record?.email) {
+                emails.push({ email: record.email, name: record.name });
+            }
+        }
+
+        return emails;
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error fetching emergency contact emails for user ${userId}:`, error);
         return [];
     }
 }
@@ -495,9 +586,18 @@ async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, data
     try {
         const user = clientInfo.user;
         const ownedRooms: string[] = [];
+        const emergencyEmails = await getEmergencyContactEmails(user.id);
 
-        if (data && typeof data === "object" && ("latitude" in data || "longitude" in data)) {
-            handleLocationUpdate(clientId, clientInfo, data, ws);
+        if (data && typeof data === "object") {
+            const { formattedLocation, latitude, longitude } = extractSosLocation(data);
+            if (typeof latitude === "number" && typeof longitude === "number") {
+                handleLocationUpdate(clientId, clientInfo, {
+                    ...data,
+                    latitude,
+                    longitude,
+                    formattedLocation: formattedLocation ?? data.formattedLocation ?? null,
+                }, ws);
+            }
         }
 
         rooms.forEach((room) => {
@@ -518,6 +618,30 @@ async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, data
         }
 
         console.log(`[${new Date().toISOString()}] EMERGENCY SOS triggered by ${user?.name || "Unknown"} (${clientId}) for rooms: ${ownedRooms.join(', ')}`);
+
+        if (emergencyEmails.length > 0) {
+            const triggeredAt = new Date();
+            const { formattedLocation, latitude, longitude } = extractSosLocation(data);
+
+            await Promise.allSettled(
+                emergencyEmails.map(contact =>
+                    sendEmergencyAlertEmail({
+                        toEmail: contact.email,
+                        toName: contact.name,
+                        emergencyUserName: user?.name || null,
+                        emergencyUserPhone: user?.phone_no || null,
+                        formattedLocation,
+                        latitude,
+                        longitude,
+                        triggeredAt
+                    })
+                )
+            );
+
+            console.log(`[${new Date().toISOString()}] Emergency alert emails sent to ${emergencyEmails.length} contacts for user ${user?.name || "Unknown"}`);
+        } else {
+            console.log(`[${new Date().toISOString()}] No emergency contact emails found for ${user?.name || "Unknown"} (${clientId})`);
+        }
 
         for (const roomId of ownedRooms) {
             const room = rooms.get(roomId);

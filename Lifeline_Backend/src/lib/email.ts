@@ -5,6 +5,8 @@ const inquiryEmail = "inquiry@lifeline-help.me";
 const inquiryName = "Lifeline Inquiry";
 const registrationEmail = "register@lifeline-help.me";
 const registrationName = "Lifeline Registration";
+const alertEmail = inquiryEmail;
+const alertName = "Lifeline Emergency Alert";
 
 const mailjet = Client.apiConnect(process.env.MJ_APIKEY_PUBLIC as string, process.env.MJ_APIKEY_PRIVATE as string)
 export async function sendVerifyEmail(email: string, url: string) {
@@ -135,6 +137,95 @@ export async function sendMagicLinkEmail(email: string, url: string, token: stri
     } catch (error) {
         console.error('Error sending magic link email:', error)
         return false
+    }
+}
+
+type EmergencyAlertEmailInput = {
+    toEmail: string;
+    toName?: string | null;
+    emergencyUserName?: string | null;
+    emergencyUserPhone?: string | null;
+    formattedLocation?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    triggeredAt?: Date;
+};
+
+export async function sendEmergencyAlertEmail(input: EmergencyAlertEmailInput) {
+    await ensureContact(input.toEmail);
+
+    const triggeredAt = input.triggeredAt ?? new Date();
+    const locationText = input.formattedLocation
+        ? input.formattedLocation
+        : (typeof input.latitude === "number" && typeof input.longitude === "number")
+            ? `${input.latitude}, ${input.longitude}`
+            : "Location unavailable";
+    const mapUrl = (typeof input.latitude === "number" && typeof input.longitude === "number")
+        ? `https://maps.google.com/?q=${input.latitude},${input.longitude}`
+        : null;
+
+    const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <img
+                    alt="Lifeline logo"
+                    height="164"
+                    src="https://i.imgur.com/ZCrqLpj.png"
+                    style="display:block;outline:none;border:none;text-decoration:none;margin:0 auto"
+                    width="164" />
+            </div>
+            <div style="background-color: #fff4f4; padding: 24px; border-radius: 10px;">
+                <h1 style="color: #b91c1c; margin-bottom: 12px;">Emergency SOS Activated</h1>
+                <p style="color: #333; font-size: 16px; margin: 0 0 12px;">
+                    ${input.emergencyUserName || "A Lifeline user"} has triggered an emergency SOS.
+                </p>
+                <p style="color: #333; font-size: 16px; margin: 0 0 12px;">
+                    Phone: ${input.emergencyUserPhone || "Unavailable"}
+                </p>
+                <p style="color: #333; font-size: 16px; margin: 0 0 12px;">
+                    Location: ${locationText}
+                </p>
+                ${mapUrl ? `
+                <p style="margin: 0 0 12px;">
+                    <a href="${mapUrl}" style="color: #2563eb;">View on map</a>
+                </p>
+                ` : ""}
+                <p style="color: #666; font-size: 14px; margin-top: 16px;">
+                    Triggered at: ${triggeredAt.toISOString()}
+                </p>
+            </div>
+        </div>
+    `;
+
+    const data: SendEmailV3_1.Body = {
+        Messages: [
+            {
+                From: {
+                    Email: alertEmail,
+                    Name: alertName
+                },
+                To: [
+                    {
+                        Email: input.toEmail,
+                        Name: input.toName || undefined
+                    }
+                ],
+                Subject: "Lifeline Emergency Alert",
+                HTMLPart: htmlContent,
+                TemplateLanguage: false,
+            }
+        ],
+    };
+
+    try {
+        const res: LibraryResponse<SendEmailV3_1.Response> = await mailjet
+            .post("send", { 'version': 'v3.1' })
+            .request(data);
+
+        return res;
+    } catch (error) {
+        console.error('Error sending emergency alert email:', error);
+        return false;
     }
 }
 
