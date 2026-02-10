@@ -588,16 +588,14 @@ async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, data
         const ownedRooms: string[] = [];
         const emergencyEmails = await getEmergencyContactEmails(user.id);
 
-        if (data && typeof data === "object") {
-            const { formattedLocation, latitude, longitude } = extractSosLocation(data);
-            if (typeof latitude === "number" && typeof longitude === "number") {
-                handleLocationUpdate(clientId, clientInfo, {
-                    ...data,
-                    latitude,
-                    longitude,
-                    formattedLocation: formattedLocation ?? data.formattedLocation ?? null,
-                }, ws);
-            }
+        const { formattedLocation, latitude, longitude } = extractSosLocation(data);
+        if (typeof latitude === "number" && typeof longitude === "number") {
+            handleLocationUpdate(clientId, clientInfo, {
+                ...data,
+                latitude,
+                longitude,
+                formattedLocation: formattedLocation ?? data?.formattedLocation ?? null,
+            }, ws);
         }
 
         rooms.forEach((room) => {

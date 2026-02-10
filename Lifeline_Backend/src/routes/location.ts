@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { auth } from "../lib/auth";
 import { z } from "zod";
 import { rooms, broadcastToRoom, clients } from "./websocket";
+import { sendEmergencyAlertEmail } from "../lib/email";
 import { dbPool } from "../lib/db";
 
 type User = NonNullable<typeof auth.$Infer.Session.user>;
@@ -12,6 +13,14 @@ const locationSchema = z.object({
     timestamp: z.string().or(z.number()),
     accuracy: z.number().optional(),
     formattedLocation: z.string().trim().optional(),
+    roomId: z.string().optional()
+});
+
+const sosSchema = z.object({
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    formattedLocation: z.string().trim().optional(),
+    timestamp: z.string().or(z.number()).optional(),
     roomId: z.string().optional()
 });
 
@@ -31,6 +40,96 @@ function parseTimestamp(value: string | number): Date | null {
         return null;
     }
     return parsed;
+}
+
+function parseNumber(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+}
+
+function extractSosLocation(data: any): { formattedLocation: string | null; latitude: number | null; longitude: number | null } {
+    const formattedLocation =
+        (typeof data?.formattedLocation === "string" && data.formattedLocation.trim()) ||
+        (typeof data?.formatted_location === "string" && data.formatted_location.trim()) ||
+        (typeof data?.location?.formattedLocation === "string" && data.location.formattedLocation.trim()) ||
+        (typeof data?.location?.formatted_location === "string" && data.location.formatted_location.trim()) ||
+        (typeof data?.location?.address === "string" && data.location.address.trim()) ||
+        (typeof data?.address === "string" && data.address.trim()) ||
+        null;
+
+    const latitude =
+        parseNumber(data?.latitude) ??
+        parseNumber(data?.lat) ??
+        parseNumber(data?.location?.latitude) ??
+        parseNumber(data?.location?.lat) ??
+        null;
+    const longitude =
+        parseNumber(data?.longitude) ??
+        parseNumber(data?.long) ??
+        parseNumber(data?.lng) ??
+        parseNumber(data?.location?.longitude) ??
+        parseNumber(data?.location?.lng) ??
+        null;
+
+    return {
+        formattedLocation,
+        latitude,
+        longitude
+    };
+}
+
+type EmergencyContactEmail = {
+    email: string;
+    name: string | null;
+};
+
+async function getEmergencyContactEmails(userId: string): Promise<EmergencyContactEmail[]> {
+    try {
+        const result = await dbPool.query(`
+            SELECT c.emergency_contacts
+            FROM contacts c
+            WHERE c.user_id = $1
+        `, [userId]);
+
+        if (result.rows.length === 0) {
+            return [];
+        }
+
+        const emergencyPhones: string[] = result.rows[0].emergency_contacts || [];
+        if (emergencyPhones.length === 0) {
+            return [];
+        }
+
+        const userResult = await dbPool.query(`
+            SELECT name, email, phone_no
+            FROM "user"
+            WHERE phone_no = ANY($1)
+        `, [emergencyPhones]);
+
+        const byPhone = new Map<string, { name: string | null; email: string | null }>();
+        for (const row of userResult.rows) {
+            byPhone.set(row.phone_no, { name: row.name, email: row.email });
+        }
+
+        const emails: EmergencyContactEmail[] = [];
+        for (const phone of emergencyPhones) {
+            const record = byPhone.get(phone);
+            if (record?.email) {
+                emails.push({ email: record.email, name: record.name });
+            }
+        }
+
+        return emails;
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error fetching emergency contact emails for user ${userId}:`, error);
+        return [];
+    }
 }
 
 const router = new Hono<{ Variables: { user: User } }>({
@@ -166,6 +265,154 @@ router.post("/location", async (c) => {
     userRoomIds.forEach(roomId => {
         broadcastToRoom(roomId, locationMessage);
     });
+
+    return c.json({
+        success: true,
+        timestamp: timestampStr,
+        rooms: userRoomIds
+    });
+}).basePath("/api");
+
+router.post("/sos", async (c) => {
+    const user = c.get("user");
+    const body = await c.req.json();
+
+    const { formattedLocation, latitude, longitude } = extractSosLocation(body);
+    const parsed = sosSchema.safeParse({
+        latitude,
+        longitude,
+        formattedLocation: formattedLocation || undefined,
+        timestamp: body?.timestamp,
+        roomId: body?.roomId
+    });
+
+    if (!parsed.success) {
+        return c.json({ error: "Invalid SOS data", details: parsed.error.issues }, 400);
+    }
+
+    const userPhone = user.phone_no;
+    if (!userPhone) {
+        return c.json({ error: "User phone number not available" }, 400);
+    }
+
+    const recordedAt = parsed.data.timestamp ? parseTimestamp(parsed.data.timestamp) : new Date();
+    if (!recordedAt) {
+        return c.json({ error: "Invalid timestamp" }, 400);
+    }
+
+    const userRoomIds: string[] = [];
+    if (parsed.data.roomId) {
+        const room = rooms.get(parsed.data.roomId);
+        if (!room) {
+            return c.json({ error: "Room not found" }, 404);
+        }
+
+        const ownerClient = clients.get(room.owner);
+        const isOwner = ownerClient?.user?.phone_no === userPhone;
+        const isEmergencyContact = room.emergencyContacts.includes(userPhone);
+
+        if (!isOwner && !isEmergencyContact) {
+            return c.json({ error: "User is not authorized to broadcast to this room" }, 403);
+        }
+
+        userRoomIds.push(parsed.data.roomId);
+    } else {
+        rooms.forEach((room, rid) => {
+            const ownerClient = clients.get(room.owner);
+            const isOwner = ownerClient?.user?.phone_no === userPhone;
+            const isEmergencyContact = room.emergencyContacts.includes(userPhone);
+
+            if (isOwner || isEmergencyContact) {
+                userRoomIds.push(rid);
+            }
+        });
+
+        if (userRoomIds.length === 0) {
+            return c.json({ error: "User is not in any active room. Provide roomId for disconnected SOS." }, 400);
+        }
+    }
+
+    const retentionDays = getRetentionDays(user);
+    const client = await dbPool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        await client.query(
+            `INSERT INTO user_locations (
+                user_id, latitude, longitude, formatted_location, recorded_at
+            ) VALUES ($1, $2, $3, $4, $5)`,
+            [user.id, parsed.data.latitude, parsed.data.longitude, parsed.data.formattedLocation || null, recordedAt]
+        );
+
+        await client.query(
+            `WITH day_list AS (
+                SELECT DISTINCT (recorded_at AT TIME ZONE $2)::date AS day
+                FROM user_locations
+                WHERE user_id = $1
+            ),
+            ordered_days AS (
+                SELECT day
+                FROM day_list
+                ORDER BY day DESC
+            ),
+            days_to_delete AS (
+                SELECT day
+                FROM ordered_days
+                OFFSET $3
+            )
+            DELETE FROM user_locations ul
+            USING days_to_delete d
+            WHERE ul.user_id = $1
+              AND (ul.recorded_at AT TIME ZONE $2)::date = d.day`,
+            [user.id, LOCATION_TIMEZONE, retentionDays]
+        );
+
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Failed to save SOS location:", error);
+        return c.json({ error: "Failed to save SOS" }, 500);
+    } finally {
+        client.release();
+    }
+
+    const timestampStr = recordedAt.toISOString();
+    const locationMessage = {
+        type: "location-update",
+        data: {
+            visiblePhone: userPhone,
+            userName: user.name,
+            latitude: parsed.data.latitude,
+            longitude: parsed.data.longitude,
+            timestamp: timestampStr,
+            accuracy: null
+        },
+        timestamp: new Date().toISOString()
+    };
+
+    userRoomIds.forEach(roomId => {
+        broadcastToRoom(roomId, locationMessage);
+    });
+
+    const emergencyEmails = await getEmergencyContactEmails(user.id);
+    if (emergencyEmails.length > 0) {
+        const triggeredAt = new Date();
+        await Promise.allSettled(
+            emergencyEmails.map(contact =>
+                sendEmergencyAlertEmail({
+                    toEmail: contact.email,
+                    toName: contact.name,
+                    emergencyUserName: user?.name || null,
+                    emergencyUserPhone: user?.phone_no || null,
+                    formattedLocation: null,
+                    latitude: parsed.data.latitude,
+                    longitude: parsed.data.longitude,
+                    triggeredAt
+                })
+            )
+        );
+    }
 
     return c.json({
         success: true,
