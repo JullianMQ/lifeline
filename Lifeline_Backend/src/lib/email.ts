@@ -5,10 +5,18 @@ const inquiryEmail = "inquiry@lifeline-help.me";
 const inquiryName = "Lifeline Inquiry";
 const registrationEmail = "register@lifeline-help.me";
 const registrationName = "Lifeline Registration";
-const alertEmail = inquiryEmail;
+const alertEmail = "alert@lifeline-help.me";
 const alertName = "Lifeline Emergency Alert";
 
 const mailjet = Client.apiConnect(process.env.MJ_APIKEY_PUBLIC as string, process.env.MJ_APIKEY_PRIVATE as string)
+
+export function getFrontendLoginUrl(): string {
+    if (process.env.NODE_ENV === "production") {
+        return "https://lifeline-help.me/login";
+    }
+
+    return "http://localhost:5173/login";
+}
 export async function sendVerifyEmail(email: string, url: string) {
     await ensureContact(email)
 
@@ -227,14 +235,6 @@ export async function sendEmergencyAlertEmail(input: EmergencyAlertEmailInput) {
         console.error('Error sending emergency alert email:', error);
         return false;
     }
-}
-
-function setEmail(email: string) {
-
-}
-
-function getEmail() {
-
 }
 
 function htmlTemplate(url: string): string {

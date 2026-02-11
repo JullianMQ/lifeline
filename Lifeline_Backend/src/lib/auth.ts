@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { createAuthMiddleware, magicLink, openAPI } from "better-auth/plugins";
 import { z } from "zod";
-import { sendVerifyEmail, sendMagicLinkEmail } from "./email";
+import { sendVerifyEmail, sendMagicLinkEmail, getFrontendLoginUrl } from "./email";
 import { dbPool } from "./db";
 
 let magicLinkUrl: string;
@@ -26,7 +26,11 @@ export const auth = betterAuth({
         sendVerificationEmail: async ({ user, url, token }, request) => {
             // console.log("request", request)
             // console.log("token", token)
-            sendVerifyEmail(user.email, url)
+            const callbackURL = getFrontendLoginUrl();
+            const verificationUrl = new URL(url);
+            verificationUrl.searchParams.set("callbackURL", callbackURL);
+
+            sendVerifyEmail(user.email, verificationUrl.toString())
                 // .then(res => {
                 //     console.log(res)
                 // })

@@ -177,6 +177,11 @@ router.post("/contacts", async (c) => {
         return c.json({ error: "Dependent users cannot add dependent contacts." }, 400);
     }
 
+    const hasValidUserPhone = typeof user.phone_no === "string" && phoneValidation.safeParse(user.phone_no).success;
+    if (!hasValidUserPhone) {
+        return c.json({ error: "User phone number is missing or invalid." }, 400);
+    }
+
     // Get current contacts first
     const currentContactsResult = await dbPool.query('SELECT emergency_contacts, dependent_contacts FROM contacts WHERE user_id = $1', [user.id]);
     let currentEmergency: string[] = [];
@@ -361,6 +366,11 @@ router.put("/contacts", async (c) => {
     // Guard: Dependent users cannot add dependent contacts
     if (user.role === "dependent" && parsed.data.dependent_contacts && parsed.data.dependent_contacts.length > 0) {
         return c.json({ error: "Dependent users cannot add dependent contacts." }, 400);
+    }
+
+    const hasValidUserPhone = typeof user.phone_no === "string" && phoneValidation.safeParse(user.phone_no).success;
+    if (!hasValidUserPhone) {
+        return c.json({ error: "User phone number is missing or invalid." }, 400);
     }
 
     const updateFields: string[] = [];
