@@ -408,7 +408,7 @@ router.post("/sos", async (c) => {
                     toName: contact.name,
                     emergencyUserName: user?.name || null,
                     emergencyUserPhone: user?.phone_no || null,
-                    formattedLocation: null,
+                    formattedLocation: parsed.data.formattedLocation || null,
                     latitude: parsed.data.latitude,
                     longitude: parsed.data.longitude,
                     triggeredAt
