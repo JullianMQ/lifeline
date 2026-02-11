@@ -123,13 +123,21 @@ export function useSignup() {
 
     setLoading(true);
     try {
-      await authClient.signUp.email({
+      const res = await authClient.signUp.email({
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         password: formData.password,
         phone_no: formData.phoneNo,
         role: formData.role,
       }as any);
+      if (res.error) {
+        const raw = JSON.stringify(res.error).toLowerCase();
+        if (raw.includes("phone") || raw.includes("phone_no")) {
+          setInvalidFields(["phoneNo"]);
+          setError("Phone number already exists.");
+        }
+        return;
+      }
       navigate("/login");
       } catch (err: any) {
       if (err.code === "USER_ALREADY_EXISTS") {

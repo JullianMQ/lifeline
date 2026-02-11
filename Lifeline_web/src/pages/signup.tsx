@@ -18,6 +18,7 @@ function Signup() {
     loading,
     handleChange,
     handleSubmit,
+    checkEmail,
   } = useSignup();
   const { handleGoogleLogin } = googleAuth();
 
@@ -31,13 +32,13 @@ function Signup() {
 
   const closeTCModal = () => setTCModal(false);
 
-  const handleSubmitWithTC = (e: React.FormEvent<HTMLFormElement>) => {
-    if (step === 2 && !tcAccepted) {
-      e.preventDefault();
-      return;
-    }
-    handleSubmit(e);
-  };
+  // const handleSubmitWithTC = (e: React.FormEvent<HTMLFormElement>) => {
+  //   if (step === 2 && !tcAccepted) {
+  //     e.preventDefault();
+  //     return;
+  //   }
+  //   handleSubmit(e);
+  // };
 
   return (
     <main className="signup">
@@ -65,7 +66,7 @@ function Signup() {
             <h1 className="lifeline-text">SIGNUP</h1>
           </div>
 
-          <form className="form" onSubmit={handleSubmitWithTC}>
+          <form className="form" onSubmit={(e) => handleSubmit(e)}>
             {step === 1 && (
               <>
                 <input
