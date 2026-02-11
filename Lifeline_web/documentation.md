@@ -156,3 +156,12 @@ npm install
 - Fixed alert mode display issues
 - Fixed geocode fetching on preview
 - Implemented geocode API on contact location fetch instead of preview  
+
+### 2026-02-12
+
+- Implemented lazy loading for geocode API
+- Fixed error handling of phone number
+- Added sos and acknowledged to realtime location types (API + WebSocket)
+- Active alerts now derived from DB locations
+- Modified dismss to acknowledge SOS locations
+- Added sos styling to history rows with sos flag

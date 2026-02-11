@@ -55,6 +55,7 @@ export interface LocationUpdateMessage {
         longitude: number;
         timestamp: string;
         accuracy?: number;
+        sos?: boolean;
     };
 }
 
@@ -216,6 +217,7 @@ export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "di
 
 /** Location data stored in frontend state */
 export interface LocationData {
+    id?: string | number;
     userId: string;
     userName: string;
     roomId: string;
@@ -226,6 +228,8 @@ export interface LocationData {
     formatted_location?: string | null;
     accuracy?: number;
     timestamp: string;
+    sos: boolean;
+    acknowledged: boolean;
 }
 
 /** Emergency alert stored in frontend state */

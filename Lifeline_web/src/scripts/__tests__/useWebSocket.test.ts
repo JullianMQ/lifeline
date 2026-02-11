@@ -168,7 +168,7 @@ describe("webSocketReducer", () => {
         clientId: "client-123",
         user: mockUser,
         rooms: new Map([["room-1", { roomId: "room-1", joinedAt: mockTimestamp }]]),
-        locations: new Map([["user-1", { userId: "user-1", userName: "Test", roomId: "room-1", coords: { lat: 0, lng: 0 }, timestamp: mockTimestamp }]]),
+        locations: new Map([["user-1", { userId: "user-1", userName: "Test", roomId: "room-1", coords: { lat: 0, lng: 0 }, timestamp: mockTimestamp, sos: false, acknowledged: false }]]),
       };
 
       const action: WebSocketAction = { type: "DISCONNECTED" };
@@ -286,6 +286,8 @@ describe("webSocketReducer", () => {
             roomId: "room-1",
             coords: { lat: 40.0, lng: -74.0 },
             timestamp: "2026-01-25T11:00:00.000Z",
+            sos: false,
+            acknowledged: false,
           }],
         ]),
       };
