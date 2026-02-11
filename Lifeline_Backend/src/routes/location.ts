@@ -13,7 +13,8 @@ const locationSchema = z.object({
     timestamp: z.string().or(z.number()),
     accuracy: z.number().optional(),
     formattedLocation: z.string().trim().optional(),
-    roomId: z.string().optional()
+    roomId: z.string().optional(),
+    sos: z.boolean().optional()
 });
 
 const sosSchema = z.object({
@@ -154,7 +155,7 @@ router.post("/location", async (c) => {
         return c.json({ error: "Invalid location data", details: parsed.error.issues }, 400);
     }
 
-    const { latitude, longitude, timestamp, accuracy, formattedLocation, roomId } = parsed.data;
+    const { latitude, longitude, timestamp, accuracy, formattedLocation, roomId, sos } = parsed.data;
     const userPhone = user.phone_no;
 
     if (!userPhone) {
@@ -212,9 +213,9 @@ router.post("/location", async (c) => {
 
         await client.query(
             `INSERT INTO user_locations (
-                user_id, latitude, longitude, formatted_location, recorded_at
-            ) VALUES ($1, $2, $3, $4, $5)`,
-            [user.id, latitude, longitude, formattedLocation || null, recordedAt]
+                user_id, latitude, longitude, formatted_location, sos, acknowledged, recorded_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [user.id, latitude, longitude, formattedLocation || null, sos === true, false, recordedAt]
         );
 
         await client.query(
@@ -257,7 +258,8 @@ router.post("/location", async (c) => {
             latitude,
             longitude,
             timestamp: timestampStr,
-            accuracy
+            accuracy,
+            sos: sos === true
         },
         timestamp: new Date().toISOString()
     };
@@ -340,9 +342,9 @@ router.post("/sos", async (c) => {
 
         await client.query(
             `INSERT INTO user_locations (
-                user_id, latitude, longitude, formatted_location, recorded_at
-            ) VALUES ($1, $2, $3, $4, $5)`,
-            [user.id, parsed.data.latitude, parsed.data.longitude, parsed.data.formattedLocation || null, recordedAt]
+                user_id, latitude, longitude, formatted_location, sos, acknowledged, recorded_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [user.id, parsed.data.latitude, parsed.data.longitude, parsed.data.formattedLocation || null, true, false, recordedAt]
         );
 
         await client.query(
@@ -386,7 +388,8 @@ router.post("/sos", async (c) => {
             latitude: parsed.data.latitude,
             longitude: parsed.data.longitude,
             timestamp: timestampStr,
-            accuracy: null
+            accuracy: null,
+            sos: true
         },
         timestamp: new Date().toISOString()
     };
@@ -430,7 +433,7 @@ router.get("/locations", async (c) => {
             `WITH cutoff AS (
                 SELECT ((now() AT TIME ZONE $2)::date - ($3 - 1))::date AS day
             )
-            SELECT id, user_id, latitude, longitude, formatted_location, recorded_at, created_at
+            SELECT id, user_id, latitude, longitude, formatted_location, sos, acknowledged, recorded_at, created_at
             FROM user_locations
             WHERE user_id = $1
               AND (recorded_at AT TIME ZONE $2)::date >= (SELECT day FROM cutoff)
@@ -444,6 +447,8 @@ router.get("/locations", async (c) => {
             latitude: row.latitude,
             longitude: row.longitude,
             formatted_location: row.formatted_location,
+            sos: row.sos,
+            acknowledged: row.acknowledged,
             timestamp: row.recorded_at,
             created_at: row.created_at
         }));
@@ -470,7 +475,7 @@ router.get("/locations/contacts", async (c) => {
                 SELECT ((now() AT TIME ZONE $2)::date - ($3 - 1))::date AS day
             )
             SELECT ul.id, ul.user_id, ul.latitude, ul.longitude, ul.formatted_location,
-                   ul.recorded_at, ul.created_at, u.name as user_name, u.phone_no as user_phone
+                   ul.sos, ul.acknowledged, ul.recorded_at, ul.created_at, u.name as user_name, u.phone_no as user_phone
             FROM user_locations ul
             JOIN "user" u ON ul.user_id = u.id
             JOIN contacts c ON c.user_id = u.id
@@ -488,6 +493,8 @@ router.get("/locations/contacts", async (c) => {
                 latitude: number;
                 longitude: number;
                 formatted_location: string | null;
+                sos: boolean;
+                acknowledged: boolean;
                 timestamp: string;
                 created_at: string;
             }>;
@@ -507,6 +514,8 @@ router.get("/locations/contacts", async (c) => {
                 latitude: row.latitude,
                 longitude: row.longitude,
                 formatted_location: row.formatted_location,
+                sos: row.sos,
+                acknowledged: row.acknowledged,
                 timestamp: row.recorded_at,
                 created_at: row.created_at
             });
@@ -518,6 +527,40 @@ router.get("/locations/contacts", async (c) => {
     } catch (error) {
         console.error("Failed to fetch contact locations:", error);
         return c.json({ error: "Failed to fetch contact locations" }, 500);
+    }
+}).basePath("/api");
+
+router.patch("/locations/:id/acknowledge", async (c) => {
+    const user = c.get("user");
+    const id = c.req.param("id");
+    const locationId = Number.parseInt(id, 10);
+
+    if (!Number.isFinite(locationId)) {
+        return c.json({ error: "Invalid location id" }, 400);
+    }
+
+    try {
+        const result = await dbPool.query(
+            `UPDATE user_locations
+             SET acknowledged = true
+             WHERE id = $1
+               AND user_id = $2
+             RETURNING id, acknowledged`,
+            [locationId, user.id]
+        );
+
+        if (result.rows.length === 0) {
+            return c.json({ error: "Location not found" }, 404);
+        }
+
+        return c.json({
+            success: true,
+            id: result.rows[0].id,
+            acknowledged: result.rows[0].acknowledged
+        });
+    } catch (error) {
+        console.error("Failed to acknowledge location:", error);
+        return c.json({ error: "Failed to acknowledge location" }, 500);
     }
 }).basePath("/api");
 
