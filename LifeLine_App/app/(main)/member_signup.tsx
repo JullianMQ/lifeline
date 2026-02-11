@@ -2,7 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { signUp } from "@/lib/api/auth";
-import { generateMagicLinkQr } from "@/lib/api/contact";
+import { generateMagicLinkQr, saveContacts } from "@/lib/api/contact";
 
 interface SignupForm {
     firstName: string;
@@ -13,8 +13,11 @@ interface SignupForm {
     confirmPassword: string;
 }
 
+type Role = "mutual" | "dependent";
+
 export default function MemberSignup() {
     const { role } = useLocalSearchParams<{ role: string }>();
+
     const [form, setForm] = useState<SignupForm>({
         firstName: "",
         lastName: "",
@@ -52,39 +55,56 @@ export default function MemberSignup() {
             return;
         }
 
+        const normalizedRole = String(role || "").toLowerCase() as Role;
+        if (normalizedRole !== "mutual" && normalizedRole !== "dependent") {
+            Alert.alert("Error", "Invalid role. Please go back and select a role.");
+            return;
+        }
+
         try {
+            const fullName = `${firstName} ${lastName}`;
+
+            // 1) Create member user account
             await signUp({
-                name: `${firstName} ${lastName}`,
+                name: fullName,
                 email,
                 phone_no,
                 password,
-                role,
+                role: normalizedRole,
             } as any);
 
-            // Generate QR link
+            // 2) Add the created member as MY contact (same style as web)
+            // Web rule: dependent -> dependent_contacts, mutual -> emergency_contacts
+            const payload =
+                normalizedRole === "dependent"
+                    ? { dependent_contacts: [phone_no.trim()] }
+                    : { emergency_contacts: [phone_no.trim()] };
+
+            // This is the crucial part you were missing in signup flow
+            await saveContacts(payload);
+
+            // 3) Generate QR link for the new member
             const qrUrl = await generateMagicLinkQr({
                 email,
-                name: `${firstName} ${lastName}`,
+                name: fullName,
                 callbackURL: "lifeline://landing",
                 newUserCallbackURL: "lifeline://landing",
                 errorCallbackURL: "lifeline://landing",
             });
 
-
-
+            // 4) Navigate to QR page
             router.push({
-                pathname: "/(auth)/member_signup_qr",
+                pathname: "/member_signup_qr",
                 params: { qrUrl: encodeURIComponent(qrUrl) },
             });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Signup failed");
+            Alert.alert("Error", err?.message || "Signup failed");
         }
     };
 
     return (
         <View className="flex-1 bg-white items-center pt-32">
             <View className="w-3/4 flex-1 justify-between">
-
                 {/* TOP CONTENT */}
                 <View className="items-center mb-8">
                     <Text className="text-3xl font-extrabold mb-12">Fill up member details</Text>
@@ -138,22 +158,12 @@ export default function MemberSignup() {
 
                 {/* BOTTOM BUTTONS */}
                 <View className="mb-10">
-                    <TouchableOpacity
-                        onPress={handleSignup}
-                        className="bg-lifelineRed py-4 rounded-full mb-4"
-                    >
-                        <Text className="text-center text-white font-semibold text-lg">
-                            Confirm
-                        </Text>
+                    <TouchableOpacity onPress={handleSignup} className="bg-lifelineRed py-4 rounded-full mb-4">
+                        <Text className="text-center text-white font-semibold text-lg">Confirm</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                        className="border-2 border-black py-4 rounded-full"
-                    >
-                        <Text className="text-center text-black font-semibold text-lg">
-                            Back
-                        </Text>
+                    <TouchableOpacity onPress={() => router.back()} className="border-2 border-black py-4 rounded-full">
+                        <Text className="text-center text-black font-semibold text-lg">Back</Text>
                     </TouchableOpacity>
                 </View>
             </View>

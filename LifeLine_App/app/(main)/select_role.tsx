@@ -37,7 +37,7 @@ const SelectRole: React.FC = () => {
         }
 
         router.push({
-            pathname: "/(auth)/member_signup",
+            pathname: "/(main)/member_signup",
             params: { role: selectedRole },
         });
     };
