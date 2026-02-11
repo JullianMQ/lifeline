@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { createAuthMiddleware, magicLink, openAPI } from "better-auth/plugins";
 import { z } from "zod";
-import { sendVerifyEmail, sendMagicLinkEmail, getFrontendLoginUrl } from "./email";
+import { sendVerifyEmail, sendMagicLinkEmail, getFrontendLoginUrl, ensureContact } from "./email";
 import { dbPool } from "./db";
 
 let magicLinkUrl: string;
@@ -134,6 +134,11 @@ export const auth = betterAuth({
         user: {
             create: {
                 after: async (user) => {
+                    try {
+                        await ensureContact(user.email);
+                    } catch (error) {
+                        console.error("Error adding Mailjet contact for user:", error);
+                    }
                     const result = await dbPool.query('INSERT INTO contacts (user_id, emergency_contacts, dependent_contacts) VALUES ($1, $2, $3) RETURNING id', [user.id, [], []]);
                     const contactId = result.rows[0].id;
                     await dbPool.query('UPDATE "user" SET emergency_contact = $1 WHERE id = $2', [contactId, user.id]);

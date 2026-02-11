@@ -7,6 +7,7 @@ const registrationEmail = "register@lifeline-help.me";
 const registrationName = "Lifeline Registration";
 const alertEmail = "alert@lifeline-help.me";
 const alertName = "Lifeline Emergency Alert";
+const mailjetContactListId = Number(process.env.MJ_CONTACT_LIST_ID ?? "10527712");
 
 const mailjet = Client.apiConnect(process.env.MJ_APIKEY_PUBLIC as string, process.env.MJ_APIKEY_PRIVATE as string)
 
@@ -58,21 +59,23 @@ export async function isUser(email: string): Promise<boolean> {
 }
 
 export async function ensureContact(email: string): Promise<boolean> {
-    const exists = await isUser(email)
-
-    if (!exists) {
-        return await addContact(email)
-    }
-
-    return true
+    return await addContact(email)
 }
 
 export async function addContact(email: string): Promise<boolean> {
     try {
+        if (!mailjetContactListId || Number.isNaN(mailjetContactListId)) {
+            console.error("Mailjet contact list ID is not configured.");
+            return false;
+        }
+
         const res = await mailjet
-            .post('contact')
+            .post('contactslist')
+            .id(mailjetContactListId)
+            .action('managecontact')
             .request({
-                Email: email
+                Email: email,
+                Action: 'addforce'
             }) as LibraryResponse<unknown>
 
         // Check if response was successful (status 201 for created)
