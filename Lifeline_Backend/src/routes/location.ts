@@ -534,6 +534,7 @@ router.patch("/locations/:id/acknowledge", async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
     const locationId = Number.parseInt(id, 10);
+    const userPhone = user.phone_no;
 
     if (!Number.isFinite(locationId)) {
         return c.json({ error: "Invalid location id" }, 400);
@@ -541,12 +542,20 @@ router.patch("/locations/:id/acknowledge", async (c) => {
 
     try {
         const result = await dbPool.query(
-            `UPDATE user_locations
+            `UPDATE user_locations ul
              SET acknowledged = true
-             WHERE id = $1
-               AND user_id = $2
-             RETURNING id, acknowledged`,
-            [locationId, user.id]
+             FROM contacts c
+             WHERE ul.id = $1
+               AND (
+                 ul.user_id = $2
+                 OR (
+                   $3::text IS NOT NULL
+                   AND c.user_id = ul.user_id
+                   AND $3::text = ANY(c.emergency_contacts)
+                 )
+               )
+             RETURNING ul.id, ul.acknowledged`,
+            [locationId, user.id, userPhone || null]
         );
 
         if (result.rows.length === 0) {
