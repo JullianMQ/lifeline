@@ -135,8 +135,9 @@ export function useSignup() {
         if (raw.includes("phone") || raw.includes("phone_no")) {
           setInvalidFields(["phoneNo"]);
           setError("Phone number already exists.");
-        }
-        return;
+        } else {
+          setError(res.error.message || "Signup failed");
+        } return;
       }
       navigate("/login");
       } catch (err: any) {

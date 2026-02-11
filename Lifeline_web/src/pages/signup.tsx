@@ -18,7 +18,6 @@ function Signup() {
     loading,
     handleChange,
     handleSubmit,
-    checkEmail,
   } = useSignup();
   const { handleGoogleLogin } = googleAuth();
 
@@ -31,14 +30,6 @@ function Signup() {
   };
 
   const closeTCModal = () => setTCModal(false);
-
-  // const handleSubmitWithTC = (e: React.FormEvent<HTMLFormElement>) => {
-  //   if (step === 2 && !tcAccepted) {
-  //     e.preventDefault();
-  //     return;
-  //   }
-  //   handleSubmit(e);
-  // };
 
   return (
     <main className="signup">
