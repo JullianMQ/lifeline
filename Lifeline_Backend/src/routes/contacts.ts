@@ -19,6 +19,7 @@ interface ContactUser {
     email: string | null;
     role: string | null;
     image: string | null;
+    latest_location_id?: number | null;
 }
 
 const phoneValidation = z.string().refine(val => /^09\d{9}$/.test(val) || /^\+639\d{9}$/.test(val), "Invalid Philippine phone number");
@@ -60,9 +61,14 @@ router.get("/contacts/users", async (c) => {
     const emergencyDetails: ContactUser[] = [];
     if (contactRow.emergency_contacts && contactRow.emergency_contacts.length > 0) {
         const emergencyResult = await dbPool.query(`
-            SELECT id, name, email, phone_no, image, role
-            FROM "user" 
-            WHERE phone_no = ANY($1)
+            SELECT u.id, u.name, u.email, u.phone_no, u.image, u.role,
+                   (SELECT ul.id
+                    FROM user_locations ul
+                    WHERE ul.user_id = u.id
+                    ORDER BY ul.recorded_at DESC
+                    LIMIT 1) AS latest_location_id
+            FROM "user" u
+            WHERE u.phone_no = ANY($1)
         `, [contactRow.emergency_contacts]);
 
         // Create mapping for quick lookup
@@ -74,7 +80,8 @@ router.get("/contacts/users", async (c) => {
                 name: row.name,
                 email: row.email,
                 role: row.role,
-                image: row.image
+                image: row.image,
+                latest_location_id: row.latest_location_id
             };
         });
 
@@ -89,7 +96,8 @@ router.get("/contacts/users", async (c) => {
                     name: null,
                     email: null,
                     role: null,
-                    image: null
+                    image: null,
+                    latest_location_id: null
                 });
             }
         });
@@ -99,9 +107,14 @@ router.get("/contacts/users", async (c) => {
     const dependentDetails: ContactUser[] = [];
     if (contactRow.dependent_contacts && contactRow.dependent_contacts.length > 0) {
         const dependentResult = await dbPool.query(`
-            SELECT id, name, email, phone_no, image, role
-            FROM "user" 
-            WHERE phone_no = ANY($1)
+            SELECT u.id, u.name, u.email, u.phone_no, u.image, u.role,
+                   (SELECT ul.id
+                    FROM user_locations ul
+                    WHERE ul.user_id = u.id
+                    ORDER BY ul.recorded_at DESC
+                    LIMIT 1) AS latest_location_id
+            FROM "user" u
+            WHERE u.phone_no = ANY($1)
         `, [contactRow.dependent_contacts]);
 
         // Create mapping for quick lookup
@@ -113,7 +126,8 @@ router.get("/contacts/users", async (c) => {
                 name: row.name,
                 email: row.email,
                 role: row.role,
-                image: row.image
+                image: row.image,
+                latest_location_id: row.latest_location_id
             };
         });
 
@@ -128,7 +142,8 @@ router.get("/contacts/users", async (c) => {
                     name: null,
                     email: null,
                     role: null,
-                    image: null
+                    image: null,
+                    latest_location_id: null
                 });
             }
         });
