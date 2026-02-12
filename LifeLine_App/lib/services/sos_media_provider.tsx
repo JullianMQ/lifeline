@@ -283,10 +283,7 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
 
         const okMode = await setModeAndWait("picture", 8000);
         if (!okMode || !cameraRef.current) {
-            sosLog("takePhoto: failed to set picture mode", {
-                okMode,
-                hasRef: !!cameraRef.current,
-            });
+            sosLog("takePhoto: failed to set picture mode", { okMode, hasRef: !!cameraRef.current });
             return undefined;
         }
 
@@ -311,11 +308,7 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
 
             try {
                 const info = await FileSystem.getInfoAsync(uri);
-                sosLog("takePhoto: file info", {
-                    uri,
-                    exists: info.exists,
-                    size: (info as any).size,
-                });
+                sosLog("takePhoto: file info", { uri, exists: info.exists, size: (info as any).size });
                 if (!info.exists) return undefined;
                 if (typeof (info as any).size === "number" && (info as any).size === 0) return undefined;
             } catch (e) {
@@ -341,21 +334,14 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
             if (!cameraRef.current) return undefined;
 
             const okMode = await setModeAndWait("video", 10000);
-            sosLog("recordVideoOnce: setMode video", {
-                okMode,
-                facing: cameraFacingRef.current,
-            });
+            sosLog("recordVideoOnce: setMode video", { okMode, facing: cameraFacingRef.current });
             if (!okMode || !cameraRef.current) return undefined;
 
             const okReady = await waitForCameraReady(10000);
-            sosLog("recordVideoOnce: waitForCameraReady", {
-                okReady,
-                facing: cameraFacingRef.current,
-            });
+            sosLog("recordVideoOnce: waitForCameraReady", { okReady, facing: cameraFacingRef.current });
             if (!okReady || !cameraRef.current) return undefined;
 
             try {
-                // Give extra settle time for front camera before recording
                 await sleep(cameraFacingRef.current === "front" ? 900 : 300);
 
                 sosLog("recordVideoOnce: calling recordAsync", { facing: cameraFacingRef.current });
@@ -379,11 +365,7 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 if (!uri) return undefined;
 
                 const info = await FileSystem.getInfoAsync(uri);
-                sosLog("recordVideoOnce: file info", {
-                    uri,
-                    exists: info.exists,
-                    size: (info as any).size,
-                });
+                sosLog("recordVideoOnce: file info", { uri, exists: info.exists, size: (info as any).size });
 
                 if (!info.exists) return undefined;
                 if (typeof (info as any).size === "number" && (info as any).size === 0) return undefined;
@@ -417,7 +399,6 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 await sleep(1200);
                 await waitForCameraReady(12000);
 
-                // Ensure front + video before retry
                 await setFacingAndWait("front", 12000);
                 await setModeAndWait("video", 12000);
 
@@ -458,11 +439,10 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 if (up[key] === true) return;
 
                 if (!path) {
-                    up[key] = true; // nothing to upload
+                    up[key] = true;
                     return;
                 }
 
-                // If file is missing, mark done so it doesn't block the queue forever
                 try {
                     const info = await FileSystem.getInfoAsync(path);
                     if (!info.exists) {
@@ -483,7 +463,6 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 });
 
                 if (!res.success) {
-                    // throw to keep item in outbox for retry
                     throw new Error(res.error);
                 }
 
@@ -491,7 +470,6 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
 
                 up[key] = true;
 
-                // store server file id (optional)
                 if (key === "backPhoto") up.backPhotoFileId = res.file.id;
                 if (key === "frontPhoto") up.frontPhotoFileId = res.file.id;
                 if (key === "backVideo") up.backVideoFileId = res.file.id;
@@ -502,17 +480,27 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
             for (const raw of list) {
                 const item = withDefaultUploaded(raw);
 
-                try {
-                    await uploadOne(item, "backPhoto", item.backPhotoPath, "picture");
-                    await uploadOne(item, "frontPhoto", item.frontPhotoPath, "picture");
-                    await uploadOne(item, "backVideo", item.backVideoPath, "video");
-                    await uploadOne(item, "frontVideo", item.frontVideoPath, "video");
-                    await uploadOne(item, "audio", item.audioPath, "voice_recording");
-                } catch (e) {
-                    sosLog("outbox upload failed; will retry", fmtErr(e));
-                    remaining.push(item);
-                    continue;
-                }
+                let anyFailed = false;
+
+                const attempt = async (
+                    key: "backPhoto" | "frontPhoto" | "backVideo" | "frontVideo" | "audio",
+                    path: string | undefined,
+                    mediaType: UploadMediaType
+                ) => {
+                    try {
+                        await uploadOne(item, key, path, mediaType);
+                    } catch (e) {
+                        anyFailed = true;
+                        sosLog("outbox upload failed; will retry", fmtErr(e));
+                    }
+                };
+
+                // Attempt each independently (don’t abort the rest on failure)
+                await attempt("backPhoto", item.backPhotoPath, "picture");
+                await attempt("frontPhoto", item.frontPhotoPath, "picture");
+                await attempt("backVideo", item.backVideoPath, "video");
+                await attempt("frontVideo", item.frontVideoPath, "video");
+                await attempt("audio", item.audioPath, "voice_recording");
 
                 const up = item.uploaded!;
                 const done =
@@ -522,7 +510,10 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                     up.frontVideo === true &&
                     up.audio === true;
 
-                if (!done) remaining.push(item);
+                // Push only once per item if not fully done OR any piece failed (retry later)
+                if (!done || anyFailed) {
+                    remaining.push(item);
+                }
             }
 
             await saveOutbox(remaining);
@@ -569,7 +560,6 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
         try {
             await pauseMicMetering?.().catch(() => { });
 
-            // Photos first: back then front
             await setModeAndWait("picture", 12000);
 
             await setFacingAndWait("back", 12000);
@@ -580,7 +570,6 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
             frontPhotoTmp = await takePhoto();
             sosLog("frontPhotoTmp", { frontPhotoTmp });
 
-            // Audio recording (separate, not concurrent with video)
             try {
                 await recorder.prepareToRecordAsync();
                 await recorder.record();
@@ -594,7 +583,6 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
                 audioTmp = recorder.uri ?? undefined;
             }
 
-            // Videos after: back then front
             await setModeAndWait("video", 12000);
 
             await setFacingAndWait("back", 12000);
@@ -660,12 +648,14 @@ export function SosMediaProvider({ children }: { children: React.ReactNode }) {
             // kick upload worker immediately (best-effort)
             processOutbox().catch(() => { });
 
-            // Optional debug sharing
-            await shareIfPossible(result.backPhotoPath, "Back photo");
-            await shareIfPossible(result.backVideoPath, "Back video");
-            await shareIfPossible(result.frontPhotoPath, "Front photo");
-            await shareIfPossible(result.frontVideoPath, "Front video");
-            await shareIfPossible(result.audioPath, "Audio");
+            // DEV ONLY: don’t block triggerSOSCapture on share dialogs
+            if (__DEV__) {
+                void shareIfPossible(result.backPhotoPath, "Back photo");
+                void shareIfPossible(result.backVideoPath, "Back video");
+                void shareIfPossible(result.frontPhotoPath, "Front photo");
+                void shareIfPossible(result.frontVideoPath, "Front video");
+                void shareIfPossible(result.audioPath, "Audio");
+            }
 
             return result;
         } catch (e) {

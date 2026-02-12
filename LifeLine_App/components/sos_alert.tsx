@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import {
     Animated,
     Image,
@@ -33,13 +33,23 @@ export default function SosAlertCallScreen({
 }: Props) {
     const pulse = useRef(new Animated.Value(0)).current;
 
-    // Ringtone source 
-    const ringtoneSource = require("../assets/sounds/lifeline-ringtone.mp3");
-    const player = useAudioPlayer(ringtoneSource, { downloadFirst: true });
+    // ringtone
+    const ringtoneSource = useMemo(
+        () => require("../assets/sounds/lifeline-ringtone.mp3"),
+        []
+    );
+    const playerOptions = useMemo(() => ({ downloadFirst: true }), []);
+    const player = useAudioPlayer(ringtoneSource, playerOptions);
 
-    // prevent double actions (tap + auto, or multiple timers)
+    // prevent double actions (tap + auto)
     const actedRef = useRef(false);
+    const prevVisibleRef = useRef<boolean>(false);
+
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // live countdown
+    const [remainingMs, setRemainingMs] = useState<number>(0);
 
     const clearAutoTimer = useCallback(() => {
         if (timerRef.current) {
@@ -48,32 +58,44 @@ export default function SosAlertCallScreen({
         }
     }, []);
 
+    const clearCountdownInterval = useCallback(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    }, []);
+
     const stopRingtone = useCallback(async () => {
         try {
             player.pause();
-            await player.seekTo(0);
         } catch {
             // ignore
         }
+        // seekTo may reject; consume it
+        Promise.resolve(player.seekTo(0)).catch(() => { });
     }, [player]);
 
     const safeAnswer = useCallback(async () => {
         if (actedRef.current) return;
         actedRef.current = true;
+
         clearAutoTimer();
+        clearCountdownInterval();
 
         await stopRingtone();
         onAnswer();
-    }, [onAnswer, clearAutoTimer, stopRingtone]);
+    }, [onAnswer, clearAutoTimer, clearCountdownInterval, stopRingtone]);
 
     const safeDecline = useCallback(async () => {
         if (actedRef.current) return;
         actedRef.current = true;
+
         clearAutoTimer();
+        clearCountdownInterval();
 
         await stopRingtone();
         onDecline();
-    }, [onDecline, clearAutoTimer, stopRingtone]);
+    }, [onDecline, clearAutoTimer, clearCountdownInterval, stopRingtone]);
 
     // pulse animation
     useEffect(() => {
@@ -102,7 +124,7 @@ export default function SosAlertCallScreen({
 
             try {
                 await setAudioModeAsync({
-                    interruptionMode: "doNotMix", // or "duckOthers" if you prefer
+                    interruptionMode: "doNotMix",
                     shouldPlayInBackground: true,
                 });
 
@@ -111,11 +133,8 @@ export default function SosAlertCallScreen({
                 player.loop = true;
                 player.volume = 1.0;
 
-                // start from beginning
-                try {
-                    await player.seekTo(0);
-                } catch { }
-
+                // start from beginning; consume rejection
+                await Promise.resolve(player.seekTo(0)).catch(() => { });
                 player.play();
             } catch {
                 // ignore
@@ -126,36 +145,70 @@ export default function SosAlertCallScreen({
 
         return () => {
             cancelled = true;
-            // best-effort cleanup
             try {
                 player.pause();
-                player.seekTo(0);
             } catch { }
+            player.seekTo(0).catch(() => { });
         };
     }, [visible, player, stopRingtone]);
 
-    // auto-answer fallback (uses safeAnswer so ringtone stops too)
+    // auto-answer fallback + live countdown
     useEffect(() => {
+        const prevVisible = prevVisibleRef.current;
+
+        // when hidden: clear timers/intervals
         if (!visible) {
-            actedRef.current = false;
             clearAutoTimer();
+            clearCountdownInterval();
+            setRemainingMs(0);
+            prevVisibleRef.current = visible;
             return;
         }
 
-        actedRef.current = false;
+        // only reset actedRef when transitioning false -> true
+        if (!prevVisible && visible) {
+            actedRef.current = false;
+        }
+
         clearAutoTimer();
+        clearCountdownInterval();
 
         if (typeof autoAnswerAfterMs === "number" && autoAnswerAfterMs > 0) {
+            const deadline = Date.now() + autoAnswerAfterMs;
+
+            setRemainingMs(autoAnswerAfterMs);
+
+            // live countdown ticker
+            intervalRef.current = setInterval(() => {
+                const msLeft = Math.max(0, deadline - Date.now());
+                setRemainingMs(msLeft);
+
+                if (msLeft <= 0) {
+                    clearCountdownInterval();
+                }
+            }, 250);
+
+            // auto-answer timer
             timerRef.current = setTimeout(() => {
-                // important: call safeAnswer (stops ringtone + prevents double actions)
                 void safeAnswer();
             }, autoAnswerAfterMs);
+        } else {
+            setRemainingMs(0);
         }
+
+        prevVisibleRef.current = visible;
 
         return () => {
             clearAutoTimer();
+            clearCountdownInterval();
         };
-    }, [visible, autoAnswerAfterMs, safeAnswer, clearAutoTimer]);
+    }, [
+        visible,
+        autoAnswerAfterMs,
+        safeAnswer,
+        clearAutoTimer,
+        clearCountdownInterval,
+    ]);
 
     const pulseStyle = useMemo(() => {
         const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
@@ -195,7 +248,7 @@ export default function SosAlertCallScreen({
 
                         {typeof autoAnswerAfterMs === "number" && autoAnswerAfterMs > 0 ? (
                             <Text className="text-white/45 text-[12px] mt-2">
-                                Auto-confirm in {Math.ceil(autoAnswerAfterMs / 1000)}s
+                                Auto-confirm in {Math.ceil(remainingMs / 1000)}s
                             </Text>
                         ) : null}
                     </View>

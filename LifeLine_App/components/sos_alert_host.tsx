@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import SosAlertCallScreen from "@/components/sos_alert";
 import { incidentManager, ActiveIncident } from "@/lib/services/incident_manager";
 import { useSosMedia } from "@/lib/services/sos_media_provider";
@@ -9,33 +9,35 @@ export default function SosAlertHost() {
     const { triggerSOSCapture } = useSosMedia();
     const { sos } = useWS();
 
-    useEffect(() => {
+    // prevent double-trigger (tap + auto-answer, or rapid taps)
+    const isSendingRef = useRef(false);
 
+    useEffect(() => {
         incidentManager.hydrateFromStorage().catch(() => { });
         const unsub = incidentManager.subscribe((inc) => setIncident(inc));
         return unsub;
     }, []);
 
     const onAnswer = useCallback(async () => {
-        try {
-            console.log("[SOS_ALERT_HOST] Answer pressed / auto-answer fired");
-            // close UI immediately
-            await incidentManager.clearIncident();
+        if (isSendingRef.current) return;
+        isSendingRef.current = true;
 
-            // capture media (this will enqueue + upload via outbox)
-            await triggerSOSCapture();
-
-            // send SOS (your current app flow)
-            await sos();
-        } catch (e) {
-            console.log("[SOS_ALERT_HOST] onAnswer failed:", e);
+        console.log("[SOS_ALERT_HOST] Answer pressed / auto-answer fired");
+        await incidentManager.clearIncident().catch(() => { });
+        const capturePromise = triggerSOSCapture();
+        const sosPromise = sos();
+        const [sosResult, captureResult] = await Promise.allSettled([sosPromise, capturePromise]);
+        if (sosResult.status === "rejected") {
+            console.log("[SOS_ALERT_HOST] SOS failed:", sosResult.reason);
         }
+        if (captureResult.status === "rejected") {
+            console.log("[SOS_ALERT_HOST] Media capture/upload enqueue failed:", captureResult.reason);
+        }
+        isSendingRef.current = false;
     }, [triggerSOSCapture, sos]);
-
     const onDecline = useCallback(async () => {
         try {
             console.log("[SOS_ALERT_HOST] Decline pressed");
-
             await incidentManager.snoozeActive();
             await incidentManager.clearIncident();
         } catch (e) {
