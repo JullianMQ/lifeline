@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import "../styles/dashboard.css";
 import "../styles/alertMode.css";
 import { useDashboard } from "../scripts/useDashboard";
@@ -8,6 +8,72 @@ import DashboardUser from "../components/DashboardUser";
 import DashboardContact from "../components/DashboardContact";
 import { useMap } from "../scripts/useMap";
 import type { ContactCard } from "../types/realtime";
+
+const GEOCODE_CACHE_KEY = "lifeline:geocode";
+const GEOCODE_COORD_PRECISION = 6;
+
+type GeocodeCache = Record<string, string>;
+
+type HistoryEntry = {
+  time: string;
+  timestamp: string;
+  lat: number;
+  lng: number;
+  formatted_location: string;
+  sos: boolean;
+};
+
+const buildGeocodeKey = (lat: number, lng: number) =>
+  `${lat.toFixed(GEOCODE_COORD_PRECISION)},${lng.toFixed(GEOCODE_COORD_PRECISION)}`;
+
+const buildHistoryKey = (entry: HistoryEntry) =>
+  `${entry.lat},${entry.lng},${entry.timestamp}`;
+
+const mergeHistoryEntries = (current: HistoryEntry[], incoming: HistoryEntry[]) => {
+  const merged = new Map<string, HistoryEntry>();
+
+  const addEntry = (entry: HistoryEntry) => {
+    const key = buildHistoryKey(entry);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...entry, sos: entry.sos ?? false });
+      return;
+    }
+    const formatted_location =
+      existing.formatted_location || entry.formatted_location || "";
+    const sos = Boolean(existing.sos || entry.sos);
+    merged.set(key, { ...existing, ...entry, formatted_location, sos });
+  };
+
+  current.forEach(addEntry);
+  incoming.forEach(addEntry);
+
+  return Array.from(merged.values()).sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+};
+
+const loadGeocodeCache = (): GeocodeCache => {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(GEOCODE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as GeocodeCache;
+  } catch {
+    return {};
+  }
+};
+
+const persistGeocodeCache = (cache: GeocodeCache) => {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Ignore storage errors (quota, disabled, etc.)
+  }
+};
 
 /** Alert Modal Component */
 function AlertModal({
@@ -132,21 +198,22 @@ function Dashboard() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(
     null,
   );
-  const [history, setHistory] = useState<
-    Record<string, { time: string; timestamp: string; lat: number; lng: number }[]>
-  >({});
+  const [history, setHistory] = useState<Record<string, HistoryEntry[]>>({});
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [userClosedAlertModal, setUserClosedAlertModal] = useState(false);
-  const [hoveredHistoryLocation, setHoveredHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
-  const [selectedHistoryLocation, setSelectedHistoryLocation] = useState<{ lat: number; lng: number; image: string } | null>(null);
+  const [hoveredHistoryLocation, setHoveredHistoryLocation] = useState<{ lat: number; lng: number; image: string; formatted_location: string } | null>(null);
+  const [selectedHistoryLocation, setSelectedHistoryLocation] = useState<{ lat: number; lng: number; image: string; formatted_location: string } | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const prevAlertsSignature = useRef<string>("");
+  const geocodeCacheRef = useRef<GeocodeCache | null>(null);
+  const pendingGeocodeRef = useRef<Map<string, Promise<string>>>(new Map());
+  const activePreviewKeyRef = useRef<string | null>(null);
 
   const {
     handleLocation,
-    getGeocode,
     setAddress,
     address,
+    getGeocode
   } = useMap();
   const {
     user,
@@ -159,6 +226,51 @@ function Dashboard() {
     manualReconnect,
     locationHistory,
   } = useDashboard();
+
+  const getCachedGeocode = useCallback((lat: number, lng: number) => {
+    if (!geocodeCacheRef.current) {
+      geocodeCacheRef.current = loadGeocodeCache();
+    }
+    const key = buildGeocodeKey(lat, lng);
+    return geocodeCacheRef.current[key];
+  }, []);
+
+  const setCachedGeocode = useCallback((lat: number, lng: number, value: string) => {
+    if (!geocodeCacheRef.current) {
+      geocodeCacheRef.current = loadGeocodeCache();
+    }
+    const key = buildGeocodeKey(lat, lng);
+    geocodeCacheRef.current[key] = value;
+    persistGeocodeCache(geocodeCacheRef.current);
+  }, []);
+
+  const resolveGeocode = useCallback(async (lat: number, lng: number) => {
+    const key = buildGeocodeKey(lat, lng);
+    const cached = getCachedGeocode(lat, lng);
+    if (cached) {
+      return cached;
+    }
+
+    const pending = pendingGeocodeRef.current.get(key);
+    if (pending) {
+      return pending;
+    }
+
+    const request = getGeocode(lat, lng)
+      .then((formatted) => {
+        const resolved = formatted || "Unknown location";
+        setCachedGeocode(lat, lng, resolved);
+        pendingGeocodeRef.current.delete(key);
+        return resolved;
+      })
+      .catch((err) => {
+        pendingGeocodeRef.current.delete(key);
+        throw err;
+      });
+
+    pendingGeocodeRef.current.set(key, request);
+    return request;
+  }, [getGeocode, getCachedGeocode, setCachedGeocode]);
 
   // Show modal automatically when new alerts come in
   useEffect(() => {
@@ -248,7 +360,29 @@ function Dashboard() {
     
   }, [contactCards, user]);
 
-  // Update address and history when selected contact's location changes
+  // Sync history from API without discarding newer WS entries
+  useEffect(() => {
+    if (!selectedContact?.phone) return;
+    const apiHistory = locationHistory[selectedContact.phone]?.history;
+    if (!apiHistory) return;
+
+    const mappedApiHistory: HistoryEntry[] = apiHistory.map((loc) => ({
+      time: new Date(loc.timestamp).toLocaleTimeString(),
+      timestamp: loc.timestamp,
+      lat: loc.coords.lat,
+      lng: loc.coords.lng,
+      formatted_location: loc.formatted_location ?? "",
+      sos: loc.sos ?? false,
+    }));
+
+    setHistory((prev) => {
+      const existing = prev[selectedContact.phone] || [];
+      const merged = mergeHistoryEntries(existing, mappedApiHistory);
+      return { ...prev, [selectedContact.phone]: merged };
+    });
+  }, [locationHistory, selectedContact?.phone]);
+
+  // Update history when selected contact's location changes
   useEffect(() => {
     if (!selectedContact) {
       console.log("[Dashboard] No selected contact, skipping address update");
@@ -264,6 +398,7 @@ function Dashboard() {
 
     const lat = selectedContact.location.coords.lat;
     const lng = selectedContact.location.coords.lng;
+    const geocode = selectedContact.location.formatted_location ?? "";
     const isOnline = selectedContact.presence?.status === "online";
 
     console.log("[Dashboard] Selected contact location changed:", {
@@ -273,22 +408,8 @@ function Dashboard() {
       isOnline,
     });
 
-    // Load history from API if available
-    if (locationHistory[selectedContact.phone] && locationHistory[selectedContact.phone].history) {
-      const apiHistory = locationHistory[selectedContact.phone].history;
-      console.log("[Dashboard] Loading history from API for", selectedContact.phone, ":", apiHistory.length, "locations");
-      
-      setHistory((prev) => ({
-        ...prev,
-        [selectedContact.phone]: apiHistory.map((loc) => ({
-          time: new Date(loc.timestamp).toLocaleTimeString(),
-          timestamp: loc.timestamp,
-          lat: loc.coords.lat,
-          lng: loc.coords.lng,
-        })),
-      }));
-    } else {
-      // Fallback: manually populate history like before
+    // Fallback: manually populate history like before
+    if (!locationHistory[selectedContact.phone] || !locationHistory[selectedContact.phone].history) {
       setHistory((prev) => {
         const existingHistory = prev[selectedContact.phone] || [];
         const locationExists = existingHistory.some(
@@ -297,10 +418,11 @@ function Dashboard() {
         if (!locationExists && existingHistory.length === 0) {
           const timestamp = new Date().toLocaleTimeString();
           const fullTimestamp = new Date().toISOString();
+          const sos = selectedContact.location?.sos ?? false;
           return {
             ...prev,
             [selectedContact.phone]: [
-              { time: timestamp, timestamp: fullTimestamp, lat, lng },
+              { time: timestamp, timestamp: fullTimestamp, lat, lng, formatted_location: geocode, sos },
               ...existingHistory,
             ],
           };
@@ -310,28 +432,37 @@ function Dashboard() {
     }
 
     const updateAddress = async () => {
-      console.log("[Dashboard] Fetching geocode for", lat, lng);
-      const res = await getGeocode(lat, lng);
-      const timestamp = new Date().toLocaleTimeString();
-      console.log("[Dashboard] Geocode result:", res);
-      setAddress(res);
+      console.log("[Dashboard] Updating history for", lat, lng);
+      const fullTimestamp = selectedContact.location?.timestamp || new Date().toISOString();
+      const timestamp = new Date(fullTimestamp).toLocaleTimeString();
       
       if (isOnline) {
-        const fullTimestamp = new Date().toISOString();
-        setHistory((prev) => ({
-          ...prev,
-          [selectedContact.phone]: [
-            { time: timestamp, timestamp: fullTimestamp, lat, lng },
-            ...(prev[selectedContact.phone] || []).slice(0, 49), // Keep last 50 entries
-          ],
-        }));
+        setHistory((prev) => {
+          const existing = prev[selectedContact.phone] || [];
+          if (existing.length > 0 && existing[0].lat === lat && existing[0].lng === lng) {
+            return prev;
+          }
+          const sos = selectedContact.location?.sos ?? false;
+          const nextEntry: HistoryEntry = {
+            time: timestamp,
+            timestamp: fullTimestamp,
+            lat,
+            lng,
+            formatted_location: geocode,
+            sos,
+          };
+          const merged = mergeHistoryEntries([nextEntry, ...existing], []);
+          return {
+            ...prev,
+            [selectedContact.phone]: merged,
+          };
+        });
       }
-    };
+      };
 
     updateAddress();
 
     let interval: NodeJS.Timeout | null = null;
-    
     if (isOnline) {
       interval = setInterval(() => {
         if (selectedContact.location?.coords) {
@@ -339,7 +470,6 @@ function Dashboard() {
         }
       }, 30000);
     }
-
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -347,33 +477,87 @@ function Dashboard() {
     selectedContact?.id,
     selectedContact?.location?.coords?.lat,
     selectedContact?.location?.coords?.lng,
+    selectedContact?.location?.formatted_location,
     selectedContact?.presence?.status,
     locationHistory,
   ]);
 
-  // Update geocode when hovering or selecting a history location
+  // Resolve address lazily for selected/hovered previews
   useEffect(() => {
-    const locationToGeocode = selectedHistoryLocation || hoveredHistoryLocation;
+    const contactHistoryEntry =
+      selectedContact?.phone ? history[selectedContact.phone]?.[0] : null;
+    const contactCoords = selectedContact?.location?.coords ?? null;
+    const contactHistoryMatches =
+      !!contactHistoryEntry &&
+      !!contactCoords &&
+      contactHistoryEntry.lat === contactCoords.lat &&
+      contactHistoryEntry.lng === contactCoords.lng;
 
-    if (!locationToGeocode) {
+    const locationToShow =
+      selectedHistoryLocation ||
+      hoveredHistoryLocation ||
+      (contactCoords
+        ? {
+            lat: contactCoords.lat,
+            lng: contactCoords.lng,
+            formatted_location: contactHistoryMatches
+              ? contactHistoryEntry?.formatted_location ?? ""
+              : selectedContact?.location?.formatted_location ?? "",
+          }
+        : null);
+
+    if (!locationToShow) {
+      activePreviewKeyRef.current = null;
+      setAddress("");
       return;
     }
 
-    const updateHistoryAddress = async () => {
-      console.log("[Dashboard] Fetching geocode for history location:", locationToGeocode);
-      const res = await getGeocode(locationToGeocode.lat, locationToGeocode.lng);
-      console.log("[Dashboard] History location geocode result:", res);
-      setAddress(res);
-    };
+    const { lat, lng, formatted_location } = locationToShow;
+    const key = buildGeocodeKey(lat, lng);
+    activePreviewKeyRef.current = key;
 
-    updateHistoryAddress();
+    if (formatted_location) {
+      setAddress(formatted_location);
+      return;
+    }
+
+    const cached = getCachedGeocode(lat, lng);
+    if (cached) {
+      setAddress(cached);
+      return;
+    }
+
+    let cancelled = false;
+    resolveGeocode(lat, lng)
+      .then((resolved) => {
+        if (cancelled || activePreviewKeyRef.current !== key) return;
+        setAddress(resolved);
+      })
+      .catch((err) => {
+        if (cancelled || activePreviewKeyRef.current !== key) return;
+        console.warn("[Dashboard] Failed to resolve geocode:", err);
+        setAddress("Unknown location");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [
+    history,
     hoveredHistoryLocation?.lat,
     hoveredHistoryLocation?.lng,
+    hoveredHistoryLocation?.formatted_location,
     selectedHistoryLocation?.lat,
     selectedHistoryLocation?.lng,
-    getGeocode,
+    selectedHistoryLocation?.formatted_location,
+    selectedContact?.location?.coords?.lat,
+    selectedContact?.location?.coords?.lng,
+    selectedContact?.location?.formatted_location,
+    getCachedGeocode,
+    resolveGeocode,
+    setAddress,
   ]);
+
 
   const handleViewAlertContact = (contact: ContactCard) => {
     console.log(

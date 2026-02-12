@@ -8,12 +8,12 @@ type Props = {
   contact: ContactCard;
   onBack: () => void;
   geocode: string;
-  history: { time: string; timestamp: string; lat: number; lng: number }[];
-  onHistoryHover?: (location: { lat: number; lng: number; image: string } | null) => void;
-  onHistoryClick?: (location: { lat: number; lng: number; image: string } | null, index: number) => void;
+  history: { time: string; timestamp: string; lat: number; lng: number; formatted_location: string; sos: boolean }[];
+  onHistoryHover?: (location: { lat: number; lng: number; image: string; formatted_location: string } | null) => void;
+  onHistoryClick?: (location: { lat: number; lng: number; image: string; formatted_location: string } | null, index: number) => void;
   selectedRowIndex?: number | null;
-  hoveredLocation?: { lat: number; lng: number; image: string } | null;
-  selectedLocation?: { lat: number; lng: number; image: string } | null;
+  hoveredLocation?: { lat: number; lng: number; image: string; formatted_location: string } | null;
+  selectedLocation?: { lat: number; lng: number; image: string; formatted_location: string } | null;
 };
 
 function formatLastSeen(timestamp: string): string {
@@ -49,7 +49,6 @@ export default function DashboardContact({
   const location = selectedLocation || hoveredLocation || contact.location?.coords;
   const isOnline = contact.presence?.status === "online";
   const lastUpdate = contact.activeAlert?.timestamp || contact.location?.timestamp;
-
   // Media modal state
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [activeMediaType, setActiveMediaType] = useState<MediaType>("picture");
@@ -68,7 +67,6 @@ export default function DashboardContact({
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-
     return history.filter((item) => {
       const itemDate = new Date(item.timestamp);
       
@@ -220,7 +218,7 @@ export default function DashboardContact({
         <button className="d-btn" onClick={() => openMediaModal("voice_recording")}>
           <img src="/images/mic.svg" alt="microphone" aria-label="audio recording button" />
         </button>
-        <button className="d-btn" disabled>
+        <button className="d-btn" >
           <img src="/images/docs.svg" alt="documents" aria-label="document button" />
         </button>
       </section>
@@ -250,13 +248,14 @@ export default function DashboardContact({
                 </tr>
                 {getFilteredHistory().map((row, i) => {
                   const isSelected = selectedRowIndex === i;
+                  const isSos = row.sos;
                   return (
                     <tr
                       key={i}
-                      onMouseEnter={() => onHistoryHover?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' })}
+                      onMouseEnter={() => onHistoryHover?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg', formatted_location: row.formatted_location })}
                       onMouseLeave={() => onHistoryHover?.(null)}
-                      onClick={() => onHistoryClick?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg' }, i)}
-                      className={`history-row-hoverable ${isSelected ? 'selected' : ''}`}
+                      onClick={() => onHistoryClick?.({ lat: row.lat, lng: row.lng, image: contact.image || '/images/user-example.svg', formatted_location: row.formatted_location }, i)}
+                      className={`history-row-hoverable${isSelected ? ' selected' : ''}${isSos ? ' sos' : ''}`}
                       style={{ cursor: 'pointer' }}
                     >
                       <td>{row.time}</td>

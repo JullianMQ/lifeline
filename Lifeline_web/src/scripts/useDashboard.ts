@@ -31,6 +31,8 @@ interface LocationApiResponse {
         formatted_location: string | null;
         timestamp: string;
         created_at: string;
+        sos: boolean;
+        acknowledged: boolean;
       }>;
     };
   };
@@ -46,7 +48,6 @@ interface LocationsByPhone {
 
 export function useDashboard(): UseDashboardReturn {
   const navigate = useNavigate();
-
   // REST API state
   const [user, setUser] = useState<User | null>(null);
   const [rawContacts, setRawContacts] = useState<RawContact[]>([]);
@@ -66,94 +67,106 @@ export function useDashboard(): UseDashboardReturn {
     rooms,
     stateVersion,
     manualReconnect,
-    acknowledgeAlert,
+    acknowledgeAlert: acknowledgeWsAlert,
   } = useWebSocket();
 
   // Fetch locations from API
   const fetchLocations = useCallback(async () => {
     try {
-      console.log("[useDashboard] Starting location fetch from:", `${API_BASE_URL}/api/locations/contacts`);
       const res = await fetch(`${API_BASE_URL}/api/locations/contacts`, {
         credentials: "include",
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to fetch locations: ${res.status} ${res.statusText}`);
+        throw new Error(
+          `Failed to fetch locations: ${res.status} ${res.statusText}`
+        );
       }
 
       const data: LocationApiResponse = await res.json();
       console.log("[useDashboard] Raw API response:", data);
-      console.log("[useDashboard] locations_by_user keys:", Object.keys(data.locations_by_user));
+      console.log(
+        "[useDashboard] locations_by_user keys:",
+        Object.keys(data.locations_by_user)
+      );
 
-      // Transform API response into locations mapped by phone number
       const locationsByPhone: LocationsByPhone = {};
       let processedCount = 0;
 
-      Object.entries(data.locations_by_user).forEach(([_userId, userData]) => {
+      for (const [_userId, userData] of Object.entries(data.locations_by_user)) {
         const phoneNumber = userData.user_phone;
-        console.log(`[useDashboard] Processing user: ${userData.user_name} (${phoneNumber}), locations count: ${userData.locations.length}`);
-        
-        if (!phoneNumber) {
-          console.warn("[useDashboard] Skipping user - no phone number");
-          return;
-        }
-        
-        if (!userData.locations || userData.locations.length === 0) {
-          console.warn(`[useDashboard] Skipping ${phoneNumber} - no locations array or empty`);
-          return;
-        }
-
-        // Sort locations by timestamp (most recent first)
-        const sortedLocations = [...userData.locations].sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        console.log(
+          `[useDashboard] Processing user: ${userData.user_name} (${phoneNumber}), locations count: ${userData.locations.length}`
         );
 
-        console.log(`[useDashboard] Sorted ${sortedLocations.length} locations for ${phoneNumber}:`, sortedLocations.map(l => ({ id: l.id, timestamp: l.timestamp })));
+        if (!phoneNumber) {
+          console.warn("[useDashboard] Skipping user - no phone number");
+          continue;
+        }
 
-        // Convert to LocationData format
-        const locationDataArray: LocationData[] = sortedLocations.map((loc) => ({
-          userId: phoneNumber,
-          userName: userData.user_name,
-          roomId: "",
-          coords: {
-            lat: parseFloat(loc.latitude),
-            lng: parseFloat(loc.longitude),
-          },
-          timestamp: loc.timestamp,
-        }));
+        if (!userData.locations || userData.locations.length === 0) {
+          console.warn(
+            `[useDashboard] Skipping ${phoneNumber} - no locations array or empty`
+          );
+          continue;
+        }
 
-        // Store most recent as current and all as history
+        const sortedLocations = [...userData.locations].sort(
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+
+        console.log(
+          `[useDashboard] Sorted ${sortedLocations.length} locations for ${phoneNumber}:`,
+          sortedLocations.map((l) => ({ id: l.id, timestamp: l.timestamp }))
+        );
+
+        const locationDataArray: LocationData[] = await Promise.all(
+          sortedLocations.map(async (loc) => {
+            const lat = parseFloat(loc.latitude);
+            const lng = parseFloat(loc.longitude);
+
+            return {
+              id: loc.id,
+              userId: phoneNumber,
+              userName: userData.user_name,
+              roomId: "",
+              coords: { lat, lng },
+              timestamp: loc.timestamp,
+              formatted_location: loc.formatted_location,
+              sos: loc.sos,
+              acknowledged: loc.acknowledged,
+            };
+          })
+        );
+        
         locationsByPhone[phoneNumber] = {
           current: locationDataArray[0],
           history: locationDataArray,
         };
-        
-        console.log(`[useDashboard] Stored location for ${phoneNumber}:`, locationsByPhone[phoneNumber].current);
-        processedCount++;
-      });
 
-      console.log(`[useDashboard] Processed ${processedCount} users, final locationsByPhone:`, locationsByPhone);
+        console.log(
+          `[useDashboard] Stored location for ${phoneNumber}:`,
+          locationsByPhone[phoneNumber].current
+        );
+        processedCount++;
+      }
+
+      console.log(
+        `[useDashboard] Processed ${processedCount} users, final locationsByPhone:`,
+        locationsByPhone
+      );
       setApiLocations(locationsByPhone);
     } catch (err) {
       console.error("[useDashboard] Failed to fetch locations:", err);
     }
-  }, [])
+  }, []);
+
 
   // Fetch locations on mount and periodically
   useEffect(() => {
     console.log("[useDashboard] Setting up location fetching");
     fetchLocations();
-
-    // Fetch locations every 30 seconds
-    const locationInterval = setInterval(() => {
-      console.log("[useDashboard] Refreshing locations from API");
-      fetchLocations();
-    }, 30000);
-
-    return () => {
-      console.log("[useDashboard] Cleaning up location fetching");
-      clearInterval(locationInterval);
-    };
   }, [fetchLocations]);
 
   // Debug: Log whenever WebSocket state changes
@@ -235,10 +248,83 @@ export function useDashboard(): UseDashboardReturn {
     }
   };
 
-
-
   // Merge REST contact data with WebSocket real-time data AND API locations
   // Match by phone number since that's consistent across REST API, WebSocket and location API
+  const locationAlerts: EmergencyAlert[] = useMemo(() => {
+    const derived: EmergencyAlert[] = [];
+
+    Object.values(apiLocations).forEach(({ history }) => {
+      const sosLocation = history.find((loc) => loc.sos && !loc.acknowledged);
+      if (!sosLocation) return;
+      const locationId = sosLocation.id ? `location:${sosLocation.id}` : `location:${sosLocation.userId}:${sosLocation.timestamp}`;
+      derived.push({
+        id: locationId,
+        emergencyUserId: sosLocation.userId,
+        emergencyUserName: sosLocation.userName,
+        roomId: sosLocation.roomId,
+        message: "Emergency SOS",
+        timestamp: sosLocation.timestamp,
+        acknowledged: false,
+      });
+    });
+
+    return derived;
+  }, [apiLocations]);
+
+  const combinedAlerts: EmergencyAlert[] = useMemo(() => {
+    const merged = new Map<string, EmergencyAlert>();
+    locationAlerts.forEach((alert) => merged.set(alert.id, alert));
+    alerts.forEach((alert) => {
+      if (!alert.acknowledged) {
+        merged.set(alert.id, alert);
+      }
+    });
+    return Array.from(merged.values());
+  }, [alerts, locationAlerts]);
+
+  const acknowledgeAlert = useCallback(async (alertId: string) => {
+    if (alertId.startsWith("location:")) {
+      const rawId = alertId.slice("location:".length).split(":")[0];
+      const locationId = Number.parseInt(rawId, 10);
+      if (!Number.isFinite(locationId)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/locations/${locationId}/acknowledge`,
+          { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" } }
+        );
+
+        if (!res.ok) {
+          throw new Error(`Failed to acknowledge location: ${res.status}`);
+        }
+
+        setApiLocations((prev) => {
+          const next: LocationsByPhone = {};
+          Object.entries(prev).forEach(([phone, data]) => {
+            const updatedHistory = data.history.map((loc) =>
+              String(loc.id) === String(locationId)
+                ? { ...loc, acknowledged: true }
+                : loc
+            );
+            const updatedCurrent =
+              String(data.current.id) === String(locationId)
+                ? { ...data.current, acknowledged: true }
+                : data.current;
+            next[phone] = { current: updatedCurrent, history: updatedHistory };
+          });
+          return next;
+        });
+      } catch (err) {
+        console.error("[useDashboard] Failed to acknowledge SOS location:", err);
+      }
+      return;
+    }
+
+    acknowledgeWsAlert(alertId);
+  }, [acknowledgeWsAlert]);
+
   const contactCards: ContactCard[] = useMemo(() => {
     console.log("[useDashboard] Recalculating contactCards...");
     console.log("  - rawContacts count:", rawContacts.length);
@@ -285,9 +371,8 @@ export function useDashboard(): UseDashboardReturn {
       }
 
       // Check for active alerts for this contact
-      const activeAlert = alerts.find(
+      const activeAlert = combinedAlerts.find(
         (alert) =>
-          !alert.acknowledged &&
           (alert.emergencyUserId === contactUserId ||
             alert.emergencyUserId === contactPhone ||
             (roomId && alert.roomId === roomId))
@@ -318,12 +403,12 @@ export function useDashboard(): UseDashboardReturn {
         roomId,
       };
     });
-  }, [rawContacts, locations, presence, rooms, alerts, stateVersion, apiLocations]);
+  }, [rawContacts, locations, presence, rooms, combinedAlerts, stateVersion, apiLocations]);
 
   // Get active (unacknowledged) alerts
   const activeAlerts: EmergencyAlert[] = useMemo(() => {
-    return alerts.filter((alert) => !alert.acknowledged);
-  }, [alerts]);
+    return combinedAlerts.filter((alert) => !alert.acknowledged);
+  }, [combinedAlerts]);
 
   // Fetch data on mount
   useEffect(() => {

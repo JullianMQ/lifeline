@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS user_locations (
     latitude DECIMAL(10, 7) NOT NULL,
     longitude DECIMAL(10, 7) NOT NULL,
     formatted_location TEXT,
+    sos BOOLEAN NOT NULL DEFAULT false,
+    acknowledged BOOLEAN NOT NULL DEFAULT false,
     recorded_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

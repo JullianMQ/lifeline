@@ -159,6 +159,8 @@ export function webSocketReducer(
         },
         accuracy: data.accuracy,
         timestamp: data.timestamp,
+        sos: data.sos === true,
+        acknowledged: false,
       };
       
       console.log("[WebSocket Reducer] LOCATION_UPDATE - created locationData:", locationData);
@@ -447,6 +449,7 @@ export function useWebSocket(): UseWebSocketReturn {
                 longitude: data?.longitude || 0,
                 timestamp: data?.timestamp || "",
                 accuracy: data?.accuracy,
+                sos: data?.sos === true,
               }
             } as LocationUpdateMessage
           });
