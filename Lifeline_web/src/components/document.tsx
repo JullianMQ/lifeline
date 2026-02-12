@@ -84,9 +84,9 @@ async function captureFixedLayoutScreenshot(
   element: HTMLElement,
   opts?: { width?: number; height?: number; scale?: number }
 ): Promise<string> {
-  const width = opts?.width;  
-  const height = opts?.height;
-  const scale = opts?.scale;
+  const width = opts?.width ?? 1024;  
+  const height = opts?.height ?? 768;
+  const scale = opts?.scale ?? 1;
 
   const wrapper = document.createElement("div");
   wrapper.style.position = "fixed";
@@ -218,7 +218,7 @@ function buildDocumentHtml({
     </html>`;
 }
 
-function waitForImages(printDocument: Document, onComplete: () => void) {
+function waitForImages(printDocument: Document, onComplete: () => void, timeoutMs = 10_000) {
   const images = Array.from(printDocument.images);
   if (images.length === 0) {
     onComplete();
@@ -226,11 +226,21 @@ function waitForImages(printDocument: Document, onComplete: () => void) {
   }
 
   let loaded = 0;
+  let completed = false;  
+  const finish = () => {  
+    if (completed) return;  
+    completed = true;  
+    onComplete();  
+  };  
+  const timer = setTimeout(finish, timeoutMs); 
+
   images.forEach((image) => {
     image.onload = image.onerror = () => {
       loaded += 1;
       if (loaded === images.length) {
         onComplete();
+        clearTimeout(timer);  
+        finish();  
       }
     };
   });
@@ -289,6 +299,12 @@ export async function printHistoryDocument({
       frameWindow.focus();
       frameWindow.print();
       document.body.removeChild(printFrame);
+      const cleanup = () => {  
+        printFrame.parentNode?.removeChild(printFrame);  
+      };
+      frameWindow.addEventListener("afterprint", cleanup, { once: true });  
+      frameWindow.print();  
+      setTimeout(cleanup, 60_000);  
     });
   } catch (error) {
     console.error("Failed to generate printable document.", error);
