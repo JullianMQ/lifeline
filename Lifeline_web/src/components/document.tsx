@@ -220,7 +220,7 @@ function buildDocumentHtml({
       <body>
         <section class="page screenshot">
           ${headerHtml}
-          <img src="${screenshotUrl}" alt="Device screen capture" />
+          <img src="${escapeHtml(screenshotUrl)}" alt="Device screen capture" />
         </section>
 
         <section class="page">

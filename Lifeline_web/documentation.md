@@ -170,5 +170,5 @@ npm install
 
 - Different display for SOS-sent locations
 - Added document evidence print
-- Evidence PDF contains displays date/time, coordinates, and geocoded location
+- Evidence PDF displays date/time, coordinates, and geocoded location
 - implemented html2canvas for map printing
