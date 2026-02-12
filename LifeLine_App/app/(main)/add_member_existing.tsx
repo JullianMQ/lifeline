@@ -74,7 +74,7 @@ const AddExistingMember = () => {
     };
 
     const handleSkip = () => {
-        router.replace("/(main)/landing");
+        router.replace("/(main)/home_page");
     };
 
     if (success) {

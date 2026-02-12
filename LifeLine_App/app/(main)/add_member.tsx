@@ -28,7 +28,7 @@ const AddMember = () => {
                 <View className="mb-10">
                     {/* Add */}
                     <TouchableOpacity
-                        onPress={() => router.push("/(auth)/select_role")}
+                        onPress={() => router.push("/(main)/select_role")}
                         className="bg-lifelineRed py-4 rounded-full mb-4"
                     >
                         <Text className="text-center text-white font-semibold text-lg">
@@ -38,7 +38,7 @@ const AddMember = () => {
 
                     {/* Skip */}
                     <TouchableOpacity
-                        onPress={() => router.push("/(auth)/add_member_existing")}
+                        onPress={() => router.push("/(main)/add_member_existing")}
                         className="border-2 border-black py-4 mt-2 rounded-full flex-row justify-center items-center"
                     >
                         <Text className="text-center text-black font-semibold text-lg">
