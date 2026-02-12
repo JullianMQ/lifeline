@@ -3,6 +3,7 @@ import type { ContactCard } from "../types/realtime";
 import MediaModal, { type MediaFile, type MediaType } from "./MediaModal";
 import { API_BASE_URL } from "../config/api";
 import { debugMedia } from "../scripts/debug";
+import { printHistoryDocument } from "./document";
 
 type Props = {
   contact: ContactCard;
@@ -150,6 +151,13 @@ export default function DashboardContact({
     setMediaError(null);
   };
 
+  const handlePrintDocuments = useCallback(async () => {
+    await printHistoryDocument({
+      contactName: contact?.name,
+      history: getFilteredHistory(),
+    });
+  }, [contact?.name, getFilteredHistory]);
+
   return (
     <div className={`dashboard-contact-wrapper ${contact.hasActiveAlert ? 'alert-mode' : ''}`}>
 
@@ -218,7 +226,7 @@ export default function DashboardContact({
         <button className="d-btn" onClick={() => openMediaModal("voice_recording")}>
           <img src="/images/mic.svg" alt="microphone" aria-label="audio recording button" />
         </button>
-        <button className="d-btn" >
+        <button className="d-btn" onClick={handlePrintDocuments}>
           <img src="/images/docs.svg" alt="documents" aria-label="document button" />
         </button>
       </section>
