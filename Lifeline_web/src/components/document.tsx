@@ -43,9 +43,26 @@ function buildTableRows(history: HistoryEntry[]): string {
     `;
   }
 
-  return history
+  let geocodeCache: Record<string, string> = {};
+  try {
+    const raw = localStorage.getItem("lifeline:geocode");
+    if (raw) {
+      geocodeCache = JSON.parse(raw) as Record<string, string>;
+    }
+  } catch {
+    geocodeCache = {};
+  }
+
+  let cacheUpdated = false;
+  const rowsHtml = history
     .map((row) => {
-      const formattedLocation = resolveFormattedLocation(row);
+      const formattedLocation = resolveFormattedLocationCached(
+        row,
+        geocodeCache,
+        () => {
+          cacheUpdated = true;
+        }
+      );
       const dateValue = row.timestamp ? new Date(row.timestamp).toLocaleDateString() : "";
       const rowClass = row.sos ? "sos-row" : "";
       return `<tr class="${rowClass}">
@@ -57,30 +74,35 @@ function buildTableRows(history: HistoryEntry[]): string {
           </tr>`;
     })
     .join("");
+
+  if (cacheUpdated) {
+    try {
+      localStorage.setItem("lifeline:geocode", JSON.stringify(geocodeCache));
+    } catch {
+      // Ignore storage errors (quota, disabled, etc.)
+    }
+  }
+
+  return rowsHtml;
 }
 
-function resolveFormattedLocation(row: HistoryEntry): string {
+function resolveFormattedLocationCached(
+  row: HistoryEntry,
+  cache: Record<string, string>,
+  onUpdate: () => void
+): string {
   const rawLocation = row.formatted_location?.trim();
   const roundedKey = `${row.lat.toFixed(6)},${row.lng.toFixed(6)}`;
   const rawKey = `${row.lat},${row.lng}`;
 
-  try {
-    if (rawLocation) {
-      const cachedValue = localStorage.getItem("lifeline:geocode");
-      const cache = cachedValue ? (JSON.parse(cachedValue) as Record<string, string>) : {};
-      cache[roundedKey] = rawLocation;
-      cache[rawKey] = rawLocation;
-      localStorage.setItem("lifeline:geocode", JSON.stringify(cache));
-      return rawLocation;
-    }
-
-    const cachedValue = localStorage.getItem("lifeline:geocode");
-    if (!cachedValue) return "";
-    const cache = JSON.parse(cachedValue) as Record<string, string>;
-    return cache[roundedKey] ?? cache[rawKey] ?? "";
-  } catch {
-    return rawLocation ?? "";
+  if (rawLocation) {
+    cache[roundedKey] = rawLocation;
+    cache[rawKey] = rawLocation;
+    onUpdate();
+    return rawLocation;
   }
+
+  return cache[roundedKey] ?? cache[rawKey] ?? "";
 }
 
 async function captureFixedLayoutScreenshot(
@@ -249,65 +271,68 @@ function waitForImages(printDocument: Document, onComplete: () => void, timeoutM
   });
 }
 
-export async function printHistoryDocument({
-  contactName,
-  history,
-  captureTarget,
-}: PrintHistoryDocumentOptions): Promise<void> {
-  const target = captureTarget ?? document.getElementById("root") ?? document.body;
-  if (!target) return;
+export async function printHistoryDocument({  
+  contactName,  
+  history,  
+  captureTarget,  
+}: PrintHistoryDocumentOptions): Promise<void> {  
+  const target = captureTarget ?? document.getElementById("root") ?? document.body;  
+  if (!target) return;  
 
-  try {
-    const screenshotUrl = await captureFixedLayoutScreenshot(target, {
-      width: 820,
-      height: 1180,
-      scale: 2,
-    });
+  try {  
+    const screenshotUrl = await captureFixedLayoutScreenshot(target, {  
+      width: 820,  
+      height: 1180,  
+      scale: 2,  
+    });  
 
-    const reportTitle = "LIFELINE";
-    const headerName = contactName || "Contact";
-    const generatedAt = new Date().toLocaleString();
-    const tableRowsHtml = buildTableRows(history);
+    const reportTitle = "LIFELINE";  
+    const headerName = contactName || "Contact";  
+    const generatedAt = new Date().toLocaleString();  
+    const tableRowsHtml = buildTableRows(history);  
 
-    const html = buildDocumentHtml({
-      screenshotUrl,
-      reportTitle,
-      generatedAt,
-      tableRowsHtml,
-      headerName,
-    });
+    const html = buildDocumentHtml({  
+      screenshotUrl,  
+      reportTitle,  
+      generatedAt,  
+      tableRowsHtml,  
+      headerName,  
+    });  
 
-    const printFrame = document.createElement("iframe");
-    printFrame.style.position = "fixed";
-    printFrame.style.right = "0";
-    printFrame.style.bottom = "0";
-    printFrame.style.width = "0";
-    printFrame.style.height = "0";
-    printFrame.style.border = "0";
-    printFrame.setAttribute("aria-hidden", "true");
-    document.body.appendChild(printFrame);
+    const printFrame = document.createElement("iframe");  
+    printFrame.style.position = "fixed";  
+    printFrame.style.right = "0";  
+    printFrame.style.bottom = "0";  
+    printFrame.style.width = "0";  
+    printFrame.style.height = "0";  
+    printFrame.style.border = "0";  
+    printFrame.setAttribute("aria-hidden", "true");  
+    document.body.appendChild(printFrame);  
 
-    const frameDocument = printFrame.contentDocument;
-    const frameWindow = printFrame.contentWindow;
-    if (!frameDocument || !frameWindow) {
-      document.body.removeChild(printFrame);
-      return;
-    }
+    const frameDocument = printFrame.contentDocument;  
+    const frameWindow = printFrame.contentWindow;  
+    if (!frameDocument || !frameWindow) {  
+      document.body.removeChild(printFrame);  
+      return;  
+    }  
 
-    frameDocument.open();
-    frameDocument.write(html);
-    frameDocument.close();
+    frameDocument.open();  
+    frameDocument.write(html);  
+    frameDocument.close();  
 
-    waitForImages(frameDocument, () => {
-      frameWindow.focus();
-      const cleanup = () => {  
-        printFrame.parentNode?.removeChild(printFrame);  
-      };
-      frameWindow.addEventListener("afterprint", cleanup, { once: true });  
-      frameWindow.print();  
-      setTimeout(cleanup, 60_000);  
-    });
-  } catch (error) {
-    console.error("Failed to generate printable document.", error);
-  }
+    await new Promise<void>((resolve) => {  
+      waitForImages(frameDocument, () => {  
+        frameWindow.focus();  
+        const cleanup = () => {  
+          printFrame.parentNode?.removeChild(printFrame);  
+          resolve();  
+        };  
+        frameWindow.addEventListener("afterprint", cleanup, { once: true });  
+        frameWindow.print();  
+        setTimeout(cleanup, 60_000);  
+      });  
+    });  
+  } catch (error) {  
+    console.error("Failed to generate printable document.", error);  
+  }  
 }
