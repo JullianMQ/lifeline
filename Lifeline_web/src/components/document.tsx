@@ -110,7 +110,7 @@ async function captureFixedLayoutScreenshot(
     const canvas = await html2canvas(wrapper, {
       backgroundColor: "#ffffff",
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false,
       scale,
       width,
       height,
@@ -242,7 +242,6 @@ function waitForImages(printDocument: Document, onComplete: () => void, timeoutM
     image.onload = image.onerror = () => {
       loaded += 1;
       if (loaded === images.length) {
-        onComplete();
         clearTimeout(timer);  
         finish();  
       }
@@ -301,8 +300,6 @@ export async function printHistoryDocument({
 
     waitForImages(frameDocument, () => {
       frameWindow.focus();
-      frameWindow.print();
-      document.body.removeChild(printFrame);
       const cleanup = () => {  
         printFrame.parentNode?.removeChild(printFrame);  
       };
