@@ -1,5 +1,5 @@
 // lib/services/media_upload.ts
-import { API_BASE_URL } from "../api/config";
+import { API_BASE_URL, SESSION_COOKIE_NAME } from "../api/config";
 import { getToken } from "../api/storage/user";
 
 export type MediaType = "picture" | "video" | "voice_recording";
@@ -56,12 +56,10 @@ function guessMime(uri: string, kind: MediaType) {
         return "video/mp4";
     }
 
-    // voice_recording
     if (u.endsWith(".wav")) return "audio/wav";
     if (u.endsWith(".ogg")) return "audio/ogg";
     if (u.endsWith(".webm")) return "audio/webm";
     if (u.endsWith(".aac")) return "audio/aac";
-    // NOTE: your backend lists audio/m4a + audio/x-m4a as allowed
     if (u.endsWith(".m4a")) return "audio/m4a";
     if (u.endsWith(".mp3")) return "audio/mpeg";
     if (u.endsWith(".mp4")) return "audio/mp4";
@@ -78,27 +76,28 @@ async function safeReadJson(res: Response) {
     }
 }
 
-/**
- * Upload a single local media file (image/video/audio) to:
- *   POST {API_BASE_URL}/api/media/upload
- *
- * Backend expects multipart/form-data:
- * - file: File
- * - media_type: "picture" | "video" | "voice_recording"
- * - description?: string
- */
+// Small helper: build a timeout-abortable fetch
+async function fetchWithTimeout(
+    input: RequestInfo,
+    init: RequestInit,
+    timeoutMs: number
+) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const res = await fetch(input, { ...init, signal: controller.signal });
+        return res;
+    } finally {
+        clearTimeout(t);
+    }
+}
+
 export async function uploadMediaFile(params: {
     fileUri: string;
     mediaType: MediaType;
     description?: string;
-    /**
-     * Extra optional fields (only use if backend ignores unknown fields or you’ve added support)
-     */
     metadata?: Record<string, string | number | boolean | null | undefined>;
-    /**
-     * If true, tries to attach Cookie header using stored token.
-     * Keep enabled if your backend needs explicit cookie header in RN.
-     */
     attachCookieFromStoredToken?: boolean;
 }): Promise<MediaUploadResponse> {
     const {
@@ -110,6 +109,7 @@ export async function uploadMediaFile(params: {
     } = params;
 
     const url = `${API_BASE_URL}/api/media/upload`;
+    const timeoutMs = 45_000;
 
     const name =
         mediaType === "picture"
@@ -120,38 +120,42 @@ export async function uploadMediaFile(params: {
 
     const primaryMime = guessMime(fileUri, mediaType);
 
-    const form = new FormData();
-    form.append("file", { uri: fileUri, type: primaryMime, name } as any);
-    form.append("media_type", mediaType);
-    if (description) form.append("description", description);
+    const buildForm = (mime: string) => {
+        const form = new FormData();
+        form.append("file", { uri: fileUri, type: mime, name } as any);
+        form.append("media_type", mediaType);
+        if (description) form.append("description", description);
 
-    if (metadata) {
-        for (const [k, v] of Object.entries(metadata)) {
-            if (v === undefined || v === null) continue;
-            form.append(k, String(v));
+        if (metadata) {
+            for (const [k, v] of Object.entries(metadata)) {
+                if (v === undefined || v === null) continue;
+                form.append(k, String(v));
+            }
         }
-    }
+        return form;
+    };
 
     const headers: Record<string, string> = {
         Accept: "application/json",
-        // DO NOT set Content-Type manually for multipart in RN fetch.
-        // RN will set boundary correctly.
     };
 
     if (attachCookieFromStoredToken) {
         const token = await getToken().catch(() => null);
-        // Docs show cookie name: better-auth.session_token=...
-        // Only helpful if the token you stored is actually that session token.
-        if (token) headers["Cookie"] = `better-auth.session_token=${token}`;
+        if (token) headers["Cookie"] = `${SESSION_COOKIE_NAME}=${token}`;
     }
 
     try {
-        const res = await fetch(url, {
-            method: "POST",
-            body: form,
-            credentials: "include", // include session cookie (per docs)
-            headers,
-        });
+        // MAIN UPLOAD (timeout protected)
+        const res = await fetchWithTimeout(
+            url,
+            {
+                method: "POST",
+                body: buildForm(primaryMime),
+                credentials: "include",
+                headers,
+            },
+            timeoutMs
+        );
 
         const data = await safeReadJson(res);
 
@@ -160,30 +164,23 @@ export async function uploadMediaFile(params: {
                 (data && (data.error || data.message)) ||
                 `Upload failed (HTTP ${res.status})`;
 
-            // Voice fallback: if backend complains invalid type, flip m4a/mp4
+            // Voice fallback retry on invalid type
             if (mediaType === "voice_recording") {
                 const lower = String(msg).toLowerCase();
                 if (res.status === 400 && lower.includes("invalid file type")) {
                     const fallbackMime =
                         primaryMime === "audio/m4a" ? "audio/mp4" : "audio/m4a";
 
-                    const retryForm = new FormData();
-                    retryForm.append("file", { uri: fileUri, type: fallbackMime, name } as any);
-                    retryForm.append("media_type", mediaType);
-                    if (description) retryForm.append("description", description);
-                    if (metadata) {
-                        for (const [k, v] of Object.entries(metadata)) {
-                            if (v === undefined || v === null) continue;
-                            retryForm.append(k, String(v));
-                        }
-                    }
-
-                    const retryRes = await fetch(url, {
-                        method: "POST",
-                        body: retryForm,
-                        credentials: "include",
-                        headers,
-                    });
+                    const retryRes = await fetchWithTimeout(
+                        url,
+                        {
+                            method: "POST",
+                            body: buildForm(fallbackMime),
+                            credentials: "include",
+                            headers,
+                        },
+                        timeoutMs
+                    );
 
                     const retryData = await safeReadJson(retryRes);
 
@@ -191,27 +188,58 @@ export async function uploadMediaFile(params: {
                         const retryMsg =
                             (retryData && (retryData.error || retryData.message)) ||
                             `Upload failed (HTTP ${retryRes.status})`;
-
-                        return { success: false, error: retryMsg, status: retryRes.status, details: retryData };
+                        return {
+                            success: false,
+                            error: retryMsg,
+                            status: retryRes.status,
+                            details: retryData,
+                        };
                     }
 
-                    // success
-                    if (retryData?.success) return retryData as MediaUploadSuccess;
-                    return { success: true, file: retryData?.file } as any;
+                    // ensure success+file exists
+                    if (retryData?.success === true && retryData?.file) {
+                        return retryData as MediaUploadSuccess;
+                    }
+
+                    // If backend returns file directly on success
+                    if (retryData?.file) {
+                        return { success: true, file: retryData.file } as MediaUploadSuccess;
+                    }
+
+                    return {
+                        success: false,
+                        error: "Upload succeeded but response missing file (retry)",
+                        details: retryData,
+                    };
                 }
             }
 
             return { success: false, error: msg, status: res.status, details: data };
         }
 
-        // Success shape per docs is { success: true, file: {...} }
-        if (data?.success) return data as MediaUploadSuccess;
+        // ensure success+file exists
+        if (data?.success === true && data?.file) return data as MediaUploadSuccess;
 
-        // If your backend returns the file directly, still treat as success
-        if (data?.file) return { success: true, file: data.file } as any;
+        if (data?.file) return { success: true, file: data.file } as MediaUploadSuccess;
 
-        return { success: false, error: "Upload succeeded but response format was unexpected", details: data };
+        return {
+            success: false,
+            error: "Upload succeeded but response format was unexpected",
+            details: data,
+        };
     } catch (e: any) {
+        const isAbort =
+            e?.name === "AbortError" ||
+            String(e?.message || "").toLowerCase().includes("abort");
+
+        if (isAbort) {
+            return {
+                success: false,
+                error: `Upload timed out after ${Math.round(timeoutMs / 1000)}s`,
+                details: e,
+            };
+        }
+
         return {
             success: false,
             error: e?.message || "Network error during upload",

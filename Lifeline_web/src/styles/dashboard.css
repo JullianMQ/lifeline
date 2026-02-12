@@ -1227,6 +1227,21 @@ ul{
     cursor: not-allowed;
 }
 
+.sos{
+    background-color: rgba(223, 55, 33, 0.4);
+    font-weight: 700;
+}
+
+.sos:hover, .sos.selected:hover{
+    font-weight: 700;
+    background-color: rgba(223, 55, 33, 0.8);
+}
+
+.sos.selected{
+    background-color: rgba(223, 55, 33, 0.7);
+    border-left: var(--highlight-green) 4px solid;
+}
+
 /* Responsive adjustments */
 @media screen and (max-width: 768px) {
     .media-modal {

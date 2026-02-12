@@ -595,6 +595,7 @@ async function handleEmergencySOS(clientId: string, clientInfo: ClientInfo, data
                 latitude,
                 longitude,
                 formattedLocation: formattedLocation ?? data?.formattedLocation ?? null,
+                sos: true,
             }, ws);
         }
 
@@ -711,6 +712,7 @@ function handlePing(ws: any): void {
 
 function handleLocationUpdate(clientId: string, clientInfo: ClientInfo, data: any, ws: any): void {
     const { roomId, latitude, longitude, timestamp, accuracy, formattedLocation } = data;
+    const isSos = data?.sos === true;
 
     // Validate required fields
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
@@ -841,9 +843,9 @@ function handleLocationUpdate(clientId: string, clientInfo: ClientInfo, data: an
 
                 await client.query(
                     `INSERT INTO user_locations (
-                        user_id, latitude, longitude, formatted_location, recorded_at
-                    ) VALUES ($1, $2, $3, $4, $5)`,
-                    [clientInfo.user.id, latitude, longitude, formattedLocationValue, recordedAt]
+                        user_id, latitude, longitude, formatted_location, sos, acknowledged, recorded_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [clientInfo.user.id, latitude, longitude, formattedLocationValue, isSos, false, recordedAt]
                 );
 
                 await client.query(
@@ -889,7 +891,8 @@ function handleLocationUpdate(clientId: string, clientInfo: ClientInfo, data: an
             latitude,
             longitude,
             timestamp: timestampStr,
-            accuracy: accuracy || null
+            accuracy: accuracy || null,
+            sos: isSos
         },
         timestamp: new Date().toISOString()
     };

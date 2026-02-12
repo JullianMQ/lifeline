@@ -88,6 +88,8 @@ const mockContactCard: ContactCard = {
     roomId: "room-1",
     coords: { lat: 40.73, lng: -73.99 },
     timestamp: "2026-01-25T12:00:00.000Z",
+    sos: false,
+    acknowledged: false,
   },
   presence: {
     userId: "contact-1",
@@ -419,13 +421,15 @@ describe("Dashboard", () => {
     it("displays coordinates when location data is present", () => {
       const contactWithLocation: ContactCard = {
         ...mockContactCard,
-        location: {
-          userId: "contact-1",
-          userName: "Jane Smith",
-          roomId: "room-1",
-          coords: { lat: 40.7589, lng: -73.9851 },
-          timestamp: "2026-01-25T12:00:00.000Z",
-        },
+      location: {
+        userId: "contact-1",
+        userName: "Jane Smith",
+        roomId: "room-1",
+        coords: { lat: 40.7589, lng: -73.9851 },
+        timestamp: "2026-01-25T12:00:00.000Z",
+        sos: false,
+        acknowledged: false,
+      },
       };
 
       mockDashboardReturn = {
@@ -443,13 +447,15 @@ describe("Dashboard", () => {
     it("calls handleLocation for user and contacts with location", () => {
       const contactWithLocation: ContactCard = {
         ...mockContactCard,
-        location: {
-          userId: "contact-1",
-          userName: "Jane Smith",
-          roomId: "room-1",
-          coords: { lat: 40.73, lng: -73.99 },
-          timestamp: "2026-01-25T12:00:00.000Z",
-        },
+      location: {
+        userId: "contact-1",
+        userName: "Jane Smith",
+        roomId: "room-1",
+        coords: { lat: 40.73, lng: -73.99 },
+        timestamp: "2026-01-25T12:00:00.000Z",
+        sos: false,
+        acknowledged: false,
+      },
       };
 
       mockDashboardReturn = {
