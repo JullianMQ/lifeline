@@ -152,11 +152,48 @@ export default function DashboardContact({
   };
 
   const handlePrintDocuments = useCallback(async () => {
-    await printHistoryDocument({
-      contactName: contact?.name,
-      history: getFilteredHistory(),
-    });
-  }, [contact?.name, getFilteredHistory]);
+    let previousHover = hoveredLocation ?? null;
+    let previewLocation =
+      selectedLocation ||
+      hoveredLocation ||
+      (contact.location?.coords
+        ? {
+            lat: contact.location.coords.lat,
+            lng: contact.location.coords.lng,
+            image: contact.image || "/images/user-example.svg",
+            formatted_location:
+              contact.location.formatted_location || geocode || "",
+          }
+        : null);
+
+    if (onHistoryHover && previewLocation) {
+      onHistoryHover(previewLocation);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    await sleep(150);
+    try {
+      await printHistoryDocument({
+        contactName: contact?.name,
+        history: getFilteredHistory(),
+      });
+    } finally {
+      if (onHistoryHover && previewLocation) {
+        onHistoryHover(previousHover);
+      }
+    }
+    previewLocation = null;previousHover = null;
+  }, [
+    contact?.name,
+    contact.image,
+    contact.location?.coords,
+    contact.location?.formatted_location,
+    geocode,
+    getFilteredHistory,
+    hoveredLocation,
+    onHistoryHover,
+    selectedLocation,
+  ]);
 
   return (
     <div className={`dashboard-contact-wrapper ${contact.hasActiveAlert ? 'alert-mode' : ''}`}>

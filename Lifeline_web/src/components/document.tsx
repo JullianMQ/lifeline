@@ -2,6 +2,7 @@ import html2canvas from "html2canvas";
 
 type HistoryEntry = {
   time: string;
+  timestamp?: string;
   lat: number;
   lng: number;
   formatted_location: string;
@@ -37,7 +38,7 @@ function buildTableRows(history: HistoryEntry[]): string {
   if (!history.length) {
     return `
       <tr>
-        <td colspan="4" class="empty">No history available</td>
+        <td colspan="5" class="empty">No history available</td>
       </tr>
     `;
   }
@@ -45,8 +46,10 @@ function buildTableRows(history: HistoryEntry[]): string {
   return history
     .map((row) => {
       const formattedLocation = resolveFormattedLocation(row);
+      const dateValue = row.timestamp ? new Date(row.timestamp).toLocaleDateString() : "";
       const rowClass = row.sos ? "sos-row" : "";
       return `<tr class="${rowClass}">
+            <td>${escapeHtml(dateValue)}</td>
             <td>${escapeHtml(row.time)}</td>
             <td>${escapeHtml(String(row.lat))}</td>
             <td>${escapeHtml(String(row.lng))}</td>
@@ -203,6 +206,7 @@ function buildDocumentHtml({
           <table>
             <thead>
               <tr>
+                <th>Date</th>
                 <th>Time</th>
                 <th>Lat</th>
                 <th>Lng</th>

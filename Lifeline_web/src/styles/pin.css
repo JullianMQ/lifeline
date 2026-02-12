@@ -14,9 +14,11 @@
 }
 
 .map-pin-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
+  position: absolute;
+  top: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 100%;
   object-fit: cover;
   background: #fff;
   z-index: 1;
@@ -31,7 +33,7 @@
   height: 0;
   border-left: 14px solid transparent;
   border-right: 14px solid transparent;
-  border-top: 16px solid var(--lifeline-red, #E53935);
+  border-top: 13px solid var(--text-black, #E53935);
   filter: drop-shadow(0 4px 4px rgba(0,0,0,0.2));
 }
 
@@ -41,13 +43,13 @@
 
 /* Online/Offline Status Styling */
 
-.map-pin.online .map-pin-avatar { border: 3px solid var(--lifeline-red); }
+.map-pin.online .map-pin-avatar { border: 5px solid var(--lifeline-red); }
 .map-pin.online .map-pin-tail { border-top-color: var(--lifeline-red); }
 
-.map-pin.offline .map-pin-avatar { border: 3px solid var(--muted-grey); }
+.map-pin.offline .map-pin-avatar { border: 5px solid var(--muted-grey); }
 .map-pin.offline .map-pin-tail { border-top-color: var(--muted-grey); }
 
-.map-pin.preview-marker .map-pin-avatar { border: 3px solid var(--highlight-green); }
+.map-pin.preview-marker .map-pin-avatar { border: 5px solid var(--highlight-green); }
 .map-pin.preview-marker .map-pin-tail { border-top-color: var(--highlight-green); }
 
 .map-pin.preview-marker {
