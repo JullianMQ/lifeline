@@ -32,11 +32,29 @@ export function useSignup() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
+    if (name === "phoneNo") {
+        let v = value.replace(/\D/g, "");
+        const phoneError = () => {
+            setInvalidFields((prev) => Array.from(new Set([...prev, "phoneNo"])));
+            setError("Phone number must start with 09 and be 11 digits.");
+        }
+
+        if (v.length > 0 && v[0] !== "0") { phoneError(); return; }
+        if (v.length > 1 && v[1] !== "9") { phoneError(); return; }
+        v = v.slice(0, 11);
+
+        setFormData((prev) => ({ ...prev, phoneNo: v }));
+        setInvalidFields((prev) => prev.filter((f) => f !== "phoneNo"));
+        setError(null);
+        return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
     setInvalidFields(prev => prev.filter(f => f !== name));
     setError(null);
   };
-
+  
   const validateStep1 = () => {
     const errors: string[] = [];
     if (!formData.firstName) errors.push("firstName");
@@ -69,6 +87,7 @@ export function useSignup() {
     }
     return errors;
   };
+
 
   const checkEmail = async () => {
     if (!formData.email) return;

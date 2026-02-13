@@ -126,7 +126,7 @@ function AddContactNew({ setMode }: Props) {
                 </button>
             )}
             {(step === 2) && (  //step 2
-                <button className="pos-btn" disabled={loading} onClick={handleCreate}>
+                <button type="submit" className="pos-btn" disabled={loading || invalidFields.length>0} onClick={handleCreate}>
                 {loading ? "Creating Account..." : "Submit"}
                 </button>   
             )}
