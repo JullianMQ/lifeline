@@ -25,6 +25,18 @@ const mapContact = (
     type,
 });
 
+// Small helper: safely parse response body that might be JSON or plain text
+const readAsJsonOrText = async (res: Response) => {
+    const text = await res.text();
+    if (!text) return { text: "", json: null as any };
+
+    try {
+        return { text, json: JSON.parse(text) };
+    } catch {
+        return { text, json: null as any };
+    }
+};
+
 // Fetch contacts
 export const getContacts = async (): Promise<Contact[]> => {
     try {
@@ -109,7 +121,28 @@ export const getUserByPhone = async (
     }
 };
 
+export const checkPhone = async (phone: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/check/phone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ phone }),
+    });
 
+    const { text, json } = await readAsJsonOrText(res);
+
+    if (!res.ok) {
+        const msg =
+            json?.message ||
+            json?.error ||
+            text ||
+            "Phone number already in use";
+        throw new Error(msg);
+    }
+
+    // Return whatever server returns (some APIs return { available: true } or similar)
+    return json ?? text;
+};
 
 
 export const generateMagicLinkQr = async ({

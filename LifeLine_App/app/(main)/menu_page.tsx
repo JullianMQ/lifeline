@@ -11,7 +11,6 @@ import { resetWSForAuthSwitch } from "@/lib/services/websocket";
 const MenuPage = () => {
     const { stopMonitoring } = useContext(SensorContext);
     const router = useRouter();
-    const [darkMode, setDarkMode] = useState(false);
     const [user, setUser] = useState<any>(null);
 
     useEffect(() => {
@@ -58,15 +57,10 @@ const MenuPage = () => {
             <View className="px-6 py-4 flex-1">
                 <TouchableOpacity
                     className="py-3 border-b border-gray-200"
-                    onPress={() => router.push("/(main)/settings_page")}
+                    onPress={() => router.push("/(main)/profile_page")}
                 >
-                    <Text className="text-base">Settings</Text>
+                    <Text className="text-base">Edit Profile</Text>
                 </TouchableOpacity>
-
-                <View className="flex-row justify-between items-center py-3 border-b border-gray-200">
-                    <Text className="text-base">Dark Mode</Text>
-                    <Switch value={darkMode} onValueChange={setDarkMode} />
-                </View>
             </View>
 
             {/* Logout Button */}

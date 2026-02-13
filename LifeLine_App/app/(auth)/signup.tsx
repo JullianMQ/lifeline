@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { signUp, checkEmail, signInWithGoogle } from "@/lib/api/auth";
+import { checkPhone } from "@/lib/api/contact";
 import TermsConditionsModal from "@/components/terms_conditions";
 
 interface SignupForm {
@@ -54,9 +55,12 @@ const Signup: React.FC = () => {
 
         try {
             await checkEmail(email);
+            await checkPhone(phone_no);
+
             setStep(2);
         } catch (err: any) {
-            Alert.alert("Email Error", err.message || "Unable to verify email");
+            const msg = err?.message || "Unable to verify details";
+            Alert.alert("Validation Error", msg);
         }
     };
 
