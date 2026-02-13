@@ -260,15 +260,22 @@ function waitForImages(printDocument: Document, onComplete: () => void, timeoutM
   };  
   const timer = setTimeout(finish, timeoutMs); 
 
-  images.forEach((image) => {
-    image.onload = image.onerror = () => {
-      loaded += 1;
-      if (loaded === images.length) {
+  images.forEach((image) => {  
+    if (image.complete) {  
+      loaded += 1;  
+      if (loaded === images.length) {  
         clearTimeout(timer);  
         finish();  
-      }
-    };
-  });
+      } return;  
+    }  
+     image.onload = image.onerror = () => {  
+       loaded += 1;  
+       if (loaded === images.length) {  
+         clearTimeout(timer);  
+         finish();  
+       }  
+     };  
+   });  
 }
 
 export async function printHistoryDocument({  
