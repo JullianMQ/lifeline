@@ -165,3 +165,10 @@ npm install
 - Active alerts now derived from DB locations
 - Modified dismss to acknowledge SOS locations
 - Added sos styling to history rows with sos flag
+
+### 2026-02-13
+
+- Different display for SOS-sent locations
+- Added document evidence print
+- Evidence PDF displays date/time, coordinates, and geocoded location
+- implemented html2canvas for map printing

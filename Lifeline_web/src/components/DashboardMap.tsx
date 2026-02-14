@@ -73,7 +73,7 @@ function DashboardMap({ center, onSelectContact, contacts, hoveredLocation, sele
         pin.addEventListener("click", handler);
         listeners.push(() => pin.removeEventListener("click", handler));
       }
-
+      if (!m.location) return;
       const mk = new google.maps.marker.AdvancedMarkerElement({
         map,
         position: { lat: m.location?.coords.lat || 0, lng: m.location?.coords.lng || 0 },

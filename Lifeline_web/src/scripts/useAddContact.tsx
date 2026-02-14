@@ -40,9 +40,28 @@ export function useAddContact() {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setcreateForm(prev => ({ ...prev, [name]: value }));
-        setaddForm(prev => ({ ...prev, [name]: value }));
-        setInvalidFields(prev => prev.filter(f => f !== name));
+
+        if (name === "phoneNo") {
+            let v = value.replace(/\D/g, "");
+            const phoneError = () => {
+                setInvalidFields((prev) => Array.from(new Set([...prev, "phoneNo"])));
+                setError("Phone number must start with 09 and be 11 digits.");
+            }
+
+            if (v.length > 0 && v[0] !== "0") { phoneError(); return; }
+            if (v.length > 1 && v[1] !== "9") { phoneError(); return; }
+            v = v.slice(0, 11);
+
+            setcreateForm((prev) => ({ ...prev, phoneNo: v }));
+            setaddForm((prev) => ({ ...prev, phoneNo: v }));
+            setInvalidFields((prev) => prev.filter((f) => f !== "phoneNo"));
+            setError(null);
+            return;
+        }
+
+        setcreateForm((prev) => ({ ...prev, [name]: value }));
+        setaddForm((prev) => ({ ...prev, [name]: value }));
+        setInvalidFields((prev) => prev.filter((f) => f !== name));
         setError(null);
     };
 
@@ -103,7 +122,7 @@ export function useAddContact() {
         }
         setLoading(true);
         try {
-            const { error } = await authClient.signUp.email({
+            const res = await authClient.signUp.email({
                 name: `${createForm.firstName} ${createForm.lastName}`,
                 email: createForm.email,
                 password: createForm.password,
@@ -111,17 +130,17 @@ export function useAddContact() {
                 role: createForm.role,
             } as any);
 
-            if (error) {
-                const message = error.message?.toLowerCase() || "";
+            if (res.error) {
+                const message = JSON.stringify(res.error).toLowerCase();
 
-                if (message.includes("phone")) {
+                if (message.includes("phone") || message.includes("phone_no")) {
                     setInvalidFields(["phoneNo"]);
                     setError("Phone number already exists.");
                 } else if (message.includes("email")) {
                     setInvalidFields(["email"]);
                     setError("Email already exists.");
                 } else {
-                    setError(error.message || "Failed to sign up");
+                    setError(res.error.message || "Failed to create account");
                 }
                 return;
             }

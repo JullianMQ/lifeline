@@ -3,6 +3,7 @@ import type { ContactCard } from "../types/realtime";
 import MediaModal, { type MediaFile, type MediaType } from "./MediaModal";
 import { API_BASE_URL } from "../config/api";
 import { debugMedia } from "../scripts/debug";
+import { printHistoryDocument } from "./document";
 
 type Props = {
   contact: ContactCard;
@@ -150,6 +151,50 @@ export default function DashboardContact({
     setMediaError(null);
   };
 
+  const handlePrintDocuments = useCallback(async () => {
+    let previousHover = hoveredLocation ?? null;
+    let previewLocation =
+      selectedLocation ||
+      hoveredLocation ||
+      (contact.location?.coords
+        ? {
+            lat: contact.location.coords.lat,
+            lng: contact.location.coords.lng,
+            image: contact.image || "/images/user-example.svg",
+            formatted_location:
+              contact.location.formatted_location || geocode || "",
+          }
+        : null);
+
+    if (onHistoryHover && previewLocation) {
+      onHistoryHover(previewLocation);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    await sleep(150);
+    try {
+      await printHistoryDocument({
+        contactName: contact?.name,
+        history: getFilteredHistory(),
+      });
+    } finally {
+      if (onHistoryHover && previewLocation) {
+        onHistoryHover(previousHover);
+      }
+    }
+    previewLocation = null;previousHover = null;
+  }, [
+    contact?.name,
+    contact.image,
+    contact.location?.coords,
+    contact.location?.formatted_location,
+    geocode,
+    getFilteredHistory,
+    hoveredLocation,
+    onHistoryHover,
+    selectedLocation,
+  ]);
+
   return (
     <div className={`dashboard-contact-wrapper ${contact.hasActiveAlert ? 'alert-mode' : ''}`}>
 
@@ -218,7 +263,7 @@ export default function DashboardContact({
         <button className="d-btn" onClick={() => openMediaModal("voice_recording")}>
           <img src="/images/mic.svg" alt="microphone" aria-label="audio recording button" />
         </button>
-        <button className="d-btn" >
+        <button className="d-btn" onClick={handlePrintDocuments}>
           <img src="/images/docs.svg" alt="documents" aria-label="document button" />
         </button>
       </section>
