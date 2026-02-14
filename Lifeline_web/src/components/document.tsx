@@ -225,13 +225,14 @@ function buildDocumentHtml({
 
         <section class="page">
           ${headerHtml}
+        <div style="text-align: center;" class="doc-header-brand">History Location Table</div>
           <table>
             <thead>
               <tr>
                 <th>Date</th>
                 <th>Time</th>
-                <th>Lat</th>
-                <th>Lng</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
                 <th>Formatted Location</th>
               </tr>
             </thead>
