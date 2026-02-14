@@ -273,7 +273,7 @@ router.post("/location", async (c) => {
         timestamp: timestampStr,
         rooms: userRoomIds
     });
-}).basePath("/api");
+});
 
 router.post("/sos", async (c) => {
     const user = c.get("user");
@@ -422,7 +422,7 @@ router.post("/sos", async (c) => {
         timestamp: timestampStr,
         rooms: userRoomIds
     });
-}).basePath("/api");
+});
 
 router.get("/locations", async (c) => {
     const user = c.get("user");
@@ -458,7 +458,7 @@ router.get("/locations", async (c) => {
         console.error("Failed to fetch locations:", error);
         return c.json({ error: "Failed to fetch locations" }, 500);
     }
-}).basePath("/api");
+});
 
 router.get("/locations/contacts", async (c) => {
     const user = c.get("user");
@@ -528,7 +528,7 @@ router.get("/locations/contacts", async (c) => {
         console.error("Failed to fetch contact locations:", error);
         return c.json({ error: "Failed to fetch contact locations" }, 500);
     }
-}).basePath("/api");
+});
 
 router.patch("/locations/:id/acknowledge", async (c) => {
     const user = c.get("user");
@@ -571,6 +571,6 @@ router.patch("/locations/:id/acknowledge", async (c) => {
         console.error("Failed to acknowledge location:", error);
         return c.json({ error: "Failed to acknowledge location" }, 500);
     }
-}).basePath("/api");
+});
 
 export default router;
