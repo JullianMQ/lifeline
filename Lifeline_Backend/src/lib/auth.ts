@@ -92,6 +92,9 @@ export const auth = betterAuth({
             ipAddressHeaders: ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"],
             disableIpTracking: false
         },
+        defaultCookieAttributes: {
+            secure: process.env.NODE_ENV === "production",
+        },
         // COMMENTED OUT, DOES MORE WRONG THAN GOOD
         // defaultCookieAttributes: {
         //     httpOnly: false,
