@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL } from "../config/api";
+import { clearMediaCache, isMediaCacheBypassActive } from "../scripts/mediaCache";
+import { clearBlobCache, getCachedBlob, setCachedBlob } from "../scripts/mediaBlobCache";
 
 export type MediaType = "picture" | "video" | "voice_recording";
 
@@ -21,6 +23,7 @@ export interface MediaFile {
   owner_email?: string;
   owner_phone?: string | null;
 }
+
 
 type MediaModalProps = {
   open: boolean;
@@ -113,14 +116,21 @@ export default function MediaModal({
     }
   }, [open]);
 
-  const fetchMediaBlob = async (fileId: number) => {
-    const response = await fetch(getDownloadUrl(fileId), {
+  const fetchMediaBlob = async (file: MediaFile) => {
+    const cached = await getCachedBlob(file.id);
+    if (cached) {
+      return URL.createObjectURL(cached.blob);
+    }
+
+    const response = await fetch(getDownloadUrl(file.id), {
       credentials: "include",
     });
     if (!response.ok) {
       throw new Error("Failed to fetch media");
     }
     const blob = await response.blob();
+    const contentType = blob.type || file.mime_type || "application/octet-stream";
+    await setCachedBlob(file.id, file.user_id, blob, contentType);
     return URL.createObjectURL(blob);
   };
 
@@ -134,7 +144,7 @@ export default function MediaModal({
       for (const file of files) {
         if (blobUrlsRef.current[file.id]) continue;
         try {
-          const url = await fetchMediaBlob(file.id);
+          const url = await fetchMediaBlob(file);
           if (cancelled) {
             URL.revokeObjectURL(url);
             continue;
@@ -175,6 +185,20 @@ export default function MediaModal({
       return next;
     });
   }, [files]);
+
+  useEffect(() => {
+    if (!open || files.length === 0) return;
+    const bypassUsers = new Set(
+      files.map((file) => file.user_id).filter((userId) => isMediaCacheBypassActive(userId))
+    );
+    if (bypassUsers.size === 0) return;
+    clearBlobCache();
+    clearMediaCache();
+    setBlobUrls((prev) => {
+      Object.values(prev).forEach((url) => URL.revokeObjectURL(url));
+      return {};
+    });
+  }, [open, files]);
 
   if (!open) return null;
 
