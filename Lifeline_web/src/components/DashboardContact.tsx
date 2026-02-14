@@ -4,6 +4,7 @@ import MediaModal, { type MediaFile, type MediaType } from "./MediaModal";
 import { API_BASE_URL } from "../config/api";
 import { debugMedia } from "../scripts/debug";
 import { printHistoryDocument } from "./document";
+import { getCachedMedia, setCachedMedia } from "../scripts/mediaCache";
 
 type Props = {
   contact: ContactCard;
@@ -106,6 +107,14 @@ export default function DashboardContact({
       return;
     }
 
+    const cachedFiles = getCachedMedia(userId, mediaType);
+    if (cachedFiles) {
+      setMediaFiles(cachedFiles);
+      setMediaError(null);
+      setMediaLoading(false);
+      return;
+    }
+
     shouldStopLoading = true;
     setMediaLoading(true);
     setMediaError(null);
@@ -127,7 +136,9 @@ export default function DashboardContact({
       }
 
       const data = await response.json();
-      setMediaFiles(data.files || []);
+      const files = data.files || [];
+      setMediaFiles(files);
+      setCachedMedia(userId, mediaType, files);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load media";
       setMediaError(message);

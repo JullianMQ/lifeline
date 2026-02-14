@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { authClient } from "./auth-client";
 import { useWebSocket } from "./useWebSocket";
+import { clearMediaCache, handleSosMediaCache } from "./mediaCache";
+import { clearBlobCache, clearBlobCacheForUser } from "./mediaBlobCache";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { API_BASE_URL } from "../config/api";
 import type { User } from "../types";
@@ -242,6 +244,8 @@ export function useDashboard(): UseDashboardReturn {
   const handleLogout = async () => {
     try {
       await authClient.signOut();
+      clearMediaCache();
+      await clearBlobCache();
       window.location.reload();
     } catch (err) {
       console.error("Logout failed:", err);
@@ -281,6 +285,18 @@ export function useDashboard(): UseDashboardReturn {
     });
     return Array.from(merged.values());
   }, [alerts, locationAlerts]);
+
+  useEffect(() => {
+    if (combinedAlerts.length === 0) return;
+    const pendingAlerts = combinedAlerts.filter((alert) => !alert.acknowledged);
+    if (pendingAlerts.length === 0) return;
+    pendingAlerts.forEach((alert) => {
+      if (alert.emergencyUserId) {
+        handleSosMediaCache(alert.emergencyUserId, 10);
+        clearBlobCacheForUser(alert.emergencyUserId);
+      }
+    });
+  }, [combinedAlerts]);
 
   const acknowledgeAlert = useCallback(async (alertId: string) => {
     if (alertId.startsWith("location:")) {
