@@ -36,7 +36,7 @@ export class EmergencyDetector {
     // NOTE: These assume accelerometer magnitude is expressed in "g" (1g ~ 9.80665 m/s^2).
     // In your current pipeline we feed TOTAL accel magnitude in g (includes gravity).
     private FREE_FALL_MAX_G = 0.3; // 0.25–0.35g is common
-    private IMPACT_MIN_G = 2.2; // 2.0–3.0g fall impact candidate
+    private IMPACT_MIN_G = 2.5; // 2.0–3.0g fall impact candidate
     private CRASH_MIN_G = 3.0; // 3.0–6.0g crash candidate
     private CRASH_HIGH_G = 5.5; // high confidence (may saturate on low-range sensors)
 
