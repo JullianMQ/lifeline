@@ -67,6 +67,9 @@ export const isMediaCacheBypassActive = (userId: string): boolean => {
 };
 
 export const setCachedMedia = (userId: string, mediaType: MediaType, files: MediaFile[]) => {
+  if (!Array.isArray(files) || files.length === 0) {
+    return;
+  }
   writeCacheEntry(userId, mediaType, {
     files,
     cachedAt: Date.now(),
@@ -83,7 +86,9 @@ export const clearMediaCache = () => {
         keysToRemove.push(key);
       }
     }
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key);
+    });
   } catch {
     // Ignore storage errors
   }
@@ -100,7 +105,9 @@ export const clearMediaCacheForUser = (userId: string) => {
         keysToRemove.push(key);
       }
     }
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key);
+    });
     localStorage.removeItem(buildBypassKey(userId));
   } catch {
     // Ignore storage errors

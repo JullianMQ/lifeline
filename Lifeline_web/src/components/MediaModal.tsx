@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL } from "../config/api";
 import { clearMediaCache, isMediaCacheBypassActive } from "../scripts/mediaCache";
-import { clearBlobCache, getCachedBlob, setCachedBlob } from "../scripts/mediaBlobCache";
+import { clearBlobCacheForUser, getCachedBlob, setCachedBlob } from "../scripts/mediaBlobCache";
 
 export type MediaType = "picture" | "video" | "voice_recording";
 
@@ -192,10 +192,13 @@ export default function MediaModal({
       files.map((file) => file.user_id).filter((userId) => isMediaCacheBypassActive(userId))
     );
     if (bypassUsers.size === 0) return;
-    clearBlobCache();
-    clearMediaCache();
+    bypassUsers.forEach((userId) => {
+      clearBlobCacheForUser(userId);
+    });
     setBlobUrls((prev) => {
-      Object.values(prev).forEach((url) => URL.revokeObjectURL(url));
+      Object.values(prev).forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
       return {};
     });
   }, [open, files]);

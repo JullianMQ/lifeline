@@ -108,7 +108,7 @@ export default function DashboardContact({
     }
 
     const cachedFiles = getCachedMedia(userId, mediaType);
-    if (cachedFiles) {
+    if (Array.isArray(cachedFiles) && cachedFiles.length > 0) {
       setMediaFiles(cachedFiles);
       setMediaError(null);
       setMediaLoading(false);

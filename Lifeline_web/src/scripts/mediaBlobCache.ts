@@ -18,6 +18,7 @@ const openDb = (): Promise<IDBDatabase> => {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     if (!canUseIndexedDb()) {
+      dbPromise = null;
       reject(new Error("IndexedDB not available"));
       return;
     }
@@ -30,7 +31,10 @@ const openDb = (): Promise<IDBDatabase> => {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("Failed to open IndexedDB"));
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error || new Error("Failed to open IndexedDB"));
+    };
   });
   return dbPromise;
 };
