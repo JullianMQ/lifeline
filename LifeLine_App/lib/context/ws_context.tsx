@@ -28,6 +28,25 @@ export type AppNotification = {
     clientId?: string;
 };
 
+
+
+export type SOSLocationPayload = {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    /**
+     * Reverse-geocoded address string (optional).
+     */
+    formattedLocation?: string;
+    /**
+     * ISO timestamp string (optional).
+     */
+    timestamp?: string;
+    /**
+     * Optional roomId if you want the SOS-triggered location update to target one room.
+     */
+    roomId?: string;
+};
 type WSContextValue = {
     isConnected: boolean;
     activeRoomId: string | null;
@@ -41,8 +60,7 @@ type WSContextValue = {
     ensureMyRoom: () => Promise<void>;
     setActiveRoomId: (roomId: string) => void;
     requestUsers: (roomId: string) => void;
-
-    sos: () => Promise<void> | void;
+    sos: (payload: SOSLocationPayload) => Promise<void>;
 };
 
 const WSContext = createContext<WSContextValue | null>(null);
@@ -563,9 +581,9 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         getRoomUsers(roomId);
     };
 
-    const sos = async () => {
+    const sos = async (payload: SOSLocationPayload) => {
         await ensureOwnerRoom();
-        sendEmergencySOS();
+        sendEmergencySOS(payload);
     };
 
     const value = useMemo<WSContextValue>(

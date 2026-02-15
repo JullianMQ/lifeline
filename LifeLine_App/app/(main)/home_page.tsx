@@ -124,7 +124,38 @@ export default function HomePage() {
 
         setIsSOSSending(true);
         try {
-            await sos();
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== "granted") {
+                Alert.alert(
+                    "Location permission required",
+                    "Please allow location access so we can send your current position with the SOS.",
+                    [{ text: "OK" }]
+                );
+                return;
+            }
+
+            const loc = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+            });
+
+            const latitude = loc.coords.latitude;
+            const longitude = loc.coords.longitude;
+            const accuracy = loc.coords.accuracy ?? undefined;
+            const timestamp = new Date().toISOString();
+            let formattedLocation: string | undefined;
+            try {
+                formattedLocation = (await reverseGeocodeWithGoogle(latitude, longitude)) ?? undefined;
+            } catch (geoErr) {
+                console.warn("reverseGeocodeWithGoogle failed (SOS):", geoErr);
+            }
+
+            await sos({
+                latitude,
+                longitude,
+                accuracy,
+                timestamp,
+                formattedLocation,
+            });
         } catch (err) {
             console.error("SOS failed:", err);
             Alert.alert(
