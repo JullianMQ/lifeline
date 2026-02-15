@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL } from "../config/api";
-import { clearMediaCache, isMediaCacheBypassActive } from "../scripts/mediaCache";
+import { isMediaCacheBypassActive } from "../scripts/mediaCache";
 import { clearBlobCacheForUser, getCachedBlob, setCachedBlob } from "../scripts/mediaBlobCache";
 
 export type MediaType = "picture" | "video" | "voice_recording";
