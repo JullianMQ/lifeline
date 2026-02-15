@@ -138,17 +138,27 @@ router.put("/update-user", async (c) => {
 
             // If phone number was changed, update contacts where this user is listed
             if (updateData.phone_no !== undefined && updateData.phone_no !== currentUser.phone_no) {
-                // Update emergency contacts arrays
-                await dbPool.query(
-                    `UPDATE contacts SET emergency_contacts = array_replace(emergency_contacts, $1, $2) WHERE $1 = ANY(emergency_contacts)`,
-                    [currentUser.phone_no, updateData.phone_no || null]
-                );
+                if (updateData.phone_no === null) {
+                    await dbPool.query(
+                        `UPDATE contacts SET emergency_contacts = array_remove(emergency_contacts, $1) WHERE $1 = ANY(emergency_contacts)`,
+                        [currentUser.phone_no]
+                    );
 
-                // Update dependent contacts arrays
-                await dbPool.query(
-                    `UPDATE contacts SET dependent_contacts = array_replace(dependent_contacts, $1, $2) WHERE $1 = ANY(dependent_contacts)`,
-                    [currentUser.phone_no, updateData.phone_no || null]
-                );
+                    await dbPool.query(
+                        `UPDATE contacts SET dependent_contacts = array_remove(dependent_contacts, $1) WHERE $1 = ANY(dependent_contacts)`,
+                        [currentUser.phone_no]
+                    );
+                } else {
+                    await dbPool.query(
+                        `UPDATE contacts SET emergency_contacts = array_replace(emergency_contacts, $1, $2) WHERE $1 = ANY(emergency_contacts)`,
+                        [currentUser.phone_no, updateData.phone_no]
+                    );
+
+                    await dbPool.query(
+                        `UPDATE contacts SET dependent_contacts = array_replace(dependent_contacts, $1, $2) WHERE $1 = ANY(dependent_contacts)`,
+                        [currentUser.phone_no, updateData.phone_no]
+                    );
+                }
             }
 
             await dbPool.query('COMMIT');
