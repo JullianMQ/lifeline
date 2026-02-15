@@ -424,9 +424,19 @@ export function sendRoomMessage(roomId: string, content: string) {
     safeEmit({ type: "room-message", roomId, content });
 }
 
-export function sendEmergencySOS() {
-    safeEmit({ type: "emergency-sos" });
+export type EmergencySOSPayload = {
+    roomId?: string;
+    latitude?: number;
+    longitude?: number;
+    accuracy?: number;
+    timestamp?: string | number;
+    formattedLocation?: string;
+};
+
+export function sendEmergencySOS(payload?: EmergencySOSPayload) {
+    safeEmit({ type: "emergency-sos", ...(payload ?? {}) });
 }
+
 
 export function isWSConnected() {
     return !!socket && socket.readyState === WebSocket.OPEN;
