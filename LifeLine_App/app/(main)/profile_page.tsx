@@ -152,10 +152,10 @@ const ProfilePage = () => {
                             )}
                         </View>
 
-                        <TouchableOpacity onPress={handleChangePhoto} className="flex-row items-center mb-6">
+                        {/* <TouchableOpacity onPress={handleChangePhoto} className="flex-row items-center mb-6">
                             <Ionicons name="cloud-upload-outline" size={24} color="black" />
                             <Text className="ml-2 font-semibold">Change Photo</Text>
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
 
                         <View className="w-3/4">
                             <TextInput
