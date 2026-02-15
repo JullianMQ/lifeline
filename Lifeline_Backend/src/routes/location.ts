@@ -54,6 +54,60 @@ function parseNumber(value: unknown): number | null {
     return null;
 }
 
+async function insertLocationWithRetention(
+    userId: string,
+    latitude: number,
+    longitude: number,
+    formattedLocation: string | null,
+    sos: boolean,
+    acknowledged: boolean,
+    recordedAt: Date,
+    retentionDays: number
+): Promise<void> {
+    const client = await dbPool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        await client.query(
+            `INSERT INTO user_locations (
+                user_id, latitude, longitude, formatted_location, sos, acknowledged, recorded_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [userId, latitude, longitude, formattedLocation, sos, acknowledged, recordedAt]
+        );
+
+        await client.query(
+            `WITH day_list AS (
+                SELECT DISTINCT (recorded_at AT TIME ZONE $2)::date AS day
+                FROM user_locations
+                WHERE user_id = $1
+            ),
+            ordered_days AS (
+                SELECT day
+                FROM day_list
+                ORDER BY day DESC
+            ),
+            days_to_delete AS (
+                SELECT day
+                FROM ordered_days
+                OFFSET $3
+            )
+            DELETE FROM user_locations ul
+            USING days_to_delete d
+            WHERE ul.user_id = $1
+              AND (ul.recorded_at AT TIME ZONE $2)::date = d.day`,
+            [userId, LOCATION_TIMEZONE, retentionDays]
+        );
+
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
 function extractSosLocation(data: any): { formattedLocation: string | null; latitude: number | null; longitude: number | null } {
     const formattedLocation =
         (typeof data?.formattedLocation === "string" && data.formattedLocation.trim()) ||
@@ -206,48 +260,21 @@ router.post("/location", async (c) => {
     }
 
     const retentionDays = getRetentionDays(user);
-    const client = await dbPool.connect();
 
     try {
-        await client.query("BEGIN");
-
-        await client.query(
-            `INSERT INTO user_locations (
-                user_id, latitude, longitude, formatted_location, sos, acknowledged, recorded_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [user.id, latitude, longitude, formattedLocation || null, sos === true, false, recordedAt]
+        await insertLocationWithRetention(
+            user.id,
+            latitude,
+            longitude,
+            formattedLocation || null,
+            sos === true,
+            false,
+            recordedAt,
+            retentionDays
         );
-
-        await client.query(
-            `WITH day_list AS (
-                SELECT DISTINCT (recorded_at AT TIME ZONE $2)::date AS day
-                FROM user_locations
-                WHERE user_id = $1
-            ),
-            ordered_days AS (
-                SELECT day
-                FROM day_list
-                ORDER BY day DESC
-            ),
-            days_to_delete AS (
-                SELECT day
-                FROM ordered_days
-                OFFSET $3
-            )
-            DELETE FROM user_locations ul
-            USING days_to_delete d
-            WHERE ul.user_id = $1
-              AND (ul.recorded_at AT TIME ZONE $2)::date = d.day`,
-            [user.id, LOCATION_TIMEZONE, retentionDays]
-        );
-
-        await client.query("COMMIT");
     } catch (error) {
-        await client.query("ROLLBACK");
         console.error("Failed to save location:", error);
         return c.json({ error: "Failed to save location" }, 500);
-    } finally {
-        client.release();
     }
 
     const locationMessage = {
@@ -335,48 +362,21 @@ router.post("/sos", async (c) => {
     }
 
     const retentionDays = getRetentionDays(user);
-    const client = await dbPool.connect();
 
     try {
-        await client.query("BEGIN");
-
-        await client.query(
-            `INSERT INTO user_locations (
-                user_id, latitude, longitude, formatted_location, sos, acknowledged, recorded_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [user.id, parsed.data.latitude, parsed.data.longitude, parsed.data.formattedLocation || null, true, false, recordedAt]
+        await insertLocationWithRetention(
+            user.id,
+            parsed.data.latitude,
+            parsed.data.longitude,
+            parsed.data.formattedLocation || null,
+            true,
+            false,
+            recordedAt,
+            retentionDays
         );
-
-        await client.query(
-            `WITH day_list AS (
-                SELECT DISTINCT (recorded_at AT TIME ZONE $2)::date AS day
-                FROM user_locations
-                WHERE user_id = $1
-            ),
-            ordered_days AS (
-                SELECT day
-                FROM day_list
-                ORDER BY day DESC
-            ),
-            days_to_delete AS (
-                SELECT day
-                FROM ordered_days
-                OFFSET $3
-            )
-            DELETE FROM user_locations ul
-            USING days_to_delete d
-            WHERE ul.user_id = $1
-              AND (ul.recorded_at AT TIME ZONE $2)::date = d.day`,
-            [user.id, LOCATION_TIMEZONE, retentionDays]
-        );
-
-        await client.query("COMMIT");
     } catch (error) {
-        await client.query("ROLLBACK");
         console.error("Failed to save SOS location:", error);
         return c.json({ error: "Failed to save SOS" }, 500);
-    } finally {
-        client.release();
     }
 
     const timestampStr = recordedAt.toISOString();
