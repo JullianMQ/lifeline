@@ -140,6 +140,23 @@ export default function MediaModal({
     let cancelled = false;
 
     const load = async () => {
+      const bypassUsers = new Set(
+        files.map((file) => file.user_id).filter((userId) => isMediaCacheBypassActive(userId))
+      );
+
+      if (bypassUsers.size > 0) {
+        for (const userId of bypassUsers) {
+          await clearBlobCacheForUser(userId);
+        }
+        if (cancelled) return;
+        setBlobUrls((prev) => {
+          Object.values(prev).forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+          return {};
+        });
+      }
+
       const nextUrls: Record<number, string> = {};
       for (const file of files) {
         if (blobUrlsRef.current[file.id]) continue;
@@ -186,22 +203,6 @@ export default function MediaModal({
     });
   }, [files]);
 
-  useEffect(() => {
-    if (!open || files.length === 0) return;
-    const bypassUsers = new Set(
-      files.map((file) => file.user_id).filter((userId) => isMediaCacheBypassActive(userId))
-    );
-    if (bypassUsers.size === 0) return;
-    bypassUsers.forEach((userId) => {
-      clearBlobCacheForUser(userId);
-    });
-    setBlobUrls((prev) => {
-      Object.values(prev).forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
-      return {};
-    });
-  }, [open, files]);
 
   if (!open) return null;
 

@@ -67,7 +67,7 @@ export const isMediaCacheBypassActive = (userId: string): boolean => {
 };
 
 export const setCachedMedia = (userId: string, mediaType: MediaType, files: MediaFile[]) => {
-  if (!Array.isArray(files) || files.length === 0) {
+  if (!Array.isArray(files)) {
     return;
   }
   writeCacheEntry(userId, mediaType, {
