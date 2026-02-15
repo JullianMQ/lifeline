@@ -13,6 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import ScreenWrapper from "../../components/screen_wrapper";
 import { router } from "expo-router";
 import { getContacts, Contact } from "@/lib/api/contact";
+import { getAvatarSvgFromStoredValue } from "@/lib/avatars";
+const isRemoteUrl = (v: string) => /^https?:\/\//i.test(v);
 
 const RenderHeader = ({
   search,
@@ -44,12 +46,28 @@ const RenderHeader = ({
   </View>
 );
 
+const ContactAvatar = ({ image }: { image: string | null }) => {
+  const AvatarSvg = getAvatarSvgFromStoredValue(image);
+
+  return (
+    <View className="w-10 h-10 rounded-full mr-3 overflow-hidden bg-gray-200 items-center justify-center">
+      {AvatarSvg ? (
+        <AvatarSvg width={40} height={40} />
+      ) : image && isRemoteUrl(image) ? (
+        <Image source={{ uri: image }} className="w-10 h-10 rounded-full" />
+      ) : (
+        <Image
+          source={require("../../assets/images/user_placeholder.png")}
+          className="w-10 h-10 rounded-full"
+        />
+      )}
+    </View>
+  );
+};
+
 const ContactRow = ({ item }: { item: Contact }) => (
   <View className="flex-row items-center mb-4 px-5">
-    <Image
-      source={require("../../assets/images/user_placeholder.png")}
-      className="w-10 h-10 rounded-full mr-3"
-    />
+    <ContactAvatar image={item.image ?? null} />
     <Text className="text-lg">{item.name}</Text>
   </View>
 );
