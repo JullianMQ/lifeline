@@ -8,6 +8,7 @@ export const SCREEN_TITLES: Record<string, string> = {
     "/manual_page": "Manual",
     "/settings_page": "Settings",
     "/add_contact": "Add Contact",
+    "/live_tracking": "Dashboard",
 };
 
 export default SCREEN_TITLES;
