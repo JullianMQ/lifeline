@@ -162,6 +162,15 @@ type EmergencyAlertEmailInput = {
     triggeredAt?: Date;
 };
 
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 export async function sendEmergencyAlertEmail(input: EmergencyAlertEmailInput) {
     await ensureContact(input.toEmail);
 
@@ -174,6 +183,10 @@ export async function sendEmergencyAlertEmail(input: EmergencyAlertEmailInput) {
     const mapUrl = (typeof input.latitude === "number" && typeof input.longitude === "number")
         ? `https://maps.google.com/?q=${input.latitude},${input.longitude}`
         : null;
+
+    const safeUserName = escapeHtml(input.emergencyUserName || "A Lifeline user");
+    const safeUserPhone = escapeHtml(input.emergencyUserPhone || "Unavailable");
+    const safeLocationText = escapeHtml(locationText);
 
     const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -188,13 +201,13 @@ export async function sendEmergencyAlertEmail(input: EmergencyAlertEmailInput) {
             <div style="background-color: #fff4f4; padding: 24px; border-radius: 10px;">
                 <h1 style="color: #b91c1c; margin-bottom: 12px;">Emergency SOS Activated</h1>
                 <p style="color: #333; font-size: 16px; margin: 0 0 12px;">
-                    ${input.emergencyUserName || "A Lifeline user"} has triggered an emergency SOS.
+                    ${safeUserName} has triggered an emergency SOS.
                 </p>
                 <p style="color: #333; font-size: 16px; margin: 0 0 12px;">
-                    Phone: ${input.emergencyUserPhone || "Unavailable"}
+                    Phone: ${safeUserPhone}
                 </p>
                 <p style="color: #333; font-size: 16px; margin: 0 0 12px;">
-                    Location: ${locationText}
+                    Location: ${safeLocationText}
                 </p>
                 ${mapUrl ? `
                 <p style="margin: 0 0 12px;">
