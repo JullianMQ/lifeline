@@ -25,6 +25,8 @@ const Signup: React.FC = () => {
         password: "",
         confirmPassword: "",
     });
+    const [invalidFields, setInvalidFields] = useState<string[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -34,34 +36,84 @@ const Signup: React.FC = () => {
 
     const inputClass = "border-2 border-black rounded-full px-4 py-3 mb-4 h-16";
 
-    const updateField = (field: keyof SignupForm, value: string) =>
-        setForm({ ...form, [field]: value });
+    const handleChange = (field: keyof SignupForm, value: string) => {
+        // Mirror lifeline_web: phone number input is digits only, must start with 09, max 11 digits
+        if (field === "phone_no") {
+            let v = value.replace(/\D/g, "");
+            const phoneError = () => {
+                setInvalidFields((prev) => Array.from(new Set([...prev, "phoneNo"])));
+                setError("Phone number must start with 09 and be 11 digits.");
+            };
+
+            if (v.length > 0 && v[0] !== "0") { phoneError(); return; }
+            if (v.length > 1 && v[1] !== "9") { phoneError(); return; }
+            v = v.slice(0, 11);
+
+            setForm((prev) => ({ ...prev, phone_no: v }));
+            setInvalidFields((prev) => prev.filter((f) => f !== "phoneNo"));
+            setError(null);
+            return;
+        }
+
+        setForm((prev) => ({ ...prev, [field]: value }));
+        const invalidKey =
+            field === "firstName" ? "firstName" :
+                field === "lastName" ? "lastName" :
+                    field === "email" ? "email" :
+                        field === "password" ? "password" :
+                            field === "confirmPassword" ? "confirmPassword" :
+                                String(field);
+
+        setInvalidFields((prev) => prev.filter((f) => f !== invalidKey));
+        setError(null);
+    };
 
     const handleNext = async () => {
+        setError(null);
+        setInvalidFields([]);
+
         const { firstName, lastName, email, phone_no } = form;
 
-        if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone_no.trim()) {
-            Alert.alert("Error", "Please fill in all fields");
+        const errors: string[] = [];
+        if (!firstName.trim()) errors.push("firstName");
+        if (!lastName.trim()) errors.push("lastName");
+        if (!email.trim()) errors.push("email");
+        if (!phone_no.trim()) errors.push("phoneNo");
+
+        if (errors.length > 0) {
+            setInvalidFields(errors);
             return;
         }
-        if (!/\S+@\S+\.\S+/.test(email)) {
-            Alert.alert("Error", "Please enter a valid email");
-            return;
-        }
-        if (!/^09\d{9}$/.test(phone_no)) {
-            Alert.alert("Error", "Please enter a valid Philippine phone number (09XXXXXXXXX)");
+
+        const phoneRegex = /^09\d{9}$/;
+        if (!phoneRegex.test(phone_no)) {
+            setInvalidFields((prev) => Array.from(new Set([...prev, "phoneNo"])));
+            setError("Invalid phone number. Must start with 09 and be 11 digits.");
             return;
         }
 
         try {
             await checkEmail(email);
-            await checkPhone(phone_no);
-
-            setStep(2);
         } catch (err: any) {
-            const msg = err?.message || "Unable to verify details";
-            Alert.alert("Validation Error", msg);
+            setInvalidFields((prev) => Array.from(new Set([...prev, "email"])));
+            setError(err?.message || "Email already in use");
+            return;
         }
+
+        try {
+            await checkPhone(phone_no);
+        } catch (err: any) {
+            const rawLower = String(err?.message ?? "").toLowerCase();
+            setInvalidFields((prev) => Array.from(new Set([...prev, "phoneNo"])));
+            if (rawLower.includes("exists") || rawLower.includes("already")) {
+                setError("Phone number already exists.");
+            } else {
+                setError(err?.message || "Signup failed");
+            }
+            return;
+        }
+
+        setStep(2);
     };
 
     const handleGoogleSignUp = async () => {
@@ -82,18 +134,33 @@ const Signup: React.FC = () => {
     };
 
     const handleSignup = async () => {
+        setError(null);
+
         const { password, confirmPassword, firstName, lastName, email, phone_no } = form;
 
-        if (!password.trim() || !confirmPassword.trim()) {
-            Alert.alert("Error", "Please enter your password and confirm it");
-            return;
+        const errors: string[] = [];
+
+        const phoneRegex = /^09\d{9}$/;
+        if (!phone_no.trim()) {
+            errors.push("phoneNo");
+            setError("Phone number is required");
+        } else if (!phoneRegex.test(phone_no)) {
+            errors.push("phoneNo");
+            setError("Invalid phone number. Must start with 09 and be 11 digits.");
         }
-        if (password !== confirmPassword) {
-            Alert.alert("Error", "Passwords do not match");
+
+        if (!password.trim()) errors.push("password");
+        if (!confirmPassword.trim() || password !== confirmPassword) {
+            errors.push("confirmPassword");
+            setError(!confirmPassword.trim() ? "Please confirm your password" : "Passwords do not match");
+        }
+
+        if (errors.length > 0) {
+            setInvalidFields(Array.from(new Set(errors)));
             return;
         }
 
-        // Enforce T&C on Step 2
+        // Enforce T&C on Step 2 (keep existing mobile flow)
         if (!tcAccepted) {
             Alert.alert("Terms required", "Please agree to the Terms and Conditions to continue.");
             return;
@@ -114,7 +181,21 @@ const Signup: React.FC = () => {
             router.replace("/(auth)/verify-email");
         } catch (err: any) {
             console.error("Signup error:", err);
-            Alert.alert("Error", err.message || "Signup failed. Please try again.");
+
+            const raw = String(err?.message ?? "").trim();
+            const rawLower = raw.toLowerCase();
+
+            if (raw === "USER_ALREADY_EXISTS" || rawLower.includes("user_already_exists")) {
+                setInvalidFields(["email"]);
+                setError("Email already exists.");
+            } else if (rawLower.includes("phone") || rawLower.includes("phone_no") || rawLower.includes("phoneno")) {
+                setInvalidFields(["phoneNo"]);
+                setError("Phone number already exists.");
+            } else if (raw) {
+                setError(raw);
+            } else {
+                setError("Signup failed");
+            }
         }
     };
 
@@ -155,12 +236,18 @@ const Signup: React.FC = () => {
                                     key={field.key}
                                     placeholder={field.placeholder}
                                     value={form[field.key as keyof SignupForm]}
-                                    onChangeText={(text) => updateField(field.key as keyof SignupForm, text)}
-                                    className={inputClass}
+                                    onChangeText={(text) => handleChange(field.key as keyof SignupForm, text)}
+                                    className={`${inputClass} ${invalidFields.includes(field.key === "phone_no" ? "phoneNo" : String(field.key)) ? "border-lifelineRed" : "border-black"}`}
                                     keyboardType={field.keyboardType}
                                     autoCapitalize={field.autoCapitalize}
                                 />
                             ))}
+
+                            {error && (
+                                <Text className="text-lifelineRed mb-4">
+                                    {error}
+                                </Text>
+                            )}
 
                             <TouchableOpacity onPress={handleNext} className="bg-lifelineRed py-4 rounded-full mb-4">
                                 <Text className="text-center text-white font-semibold text-lg">Next</Text>
@@ -199,17 +286,23 @@ const Signup: React.FC = () => {
                             <TextInput
                                 placeholder="Password"
                                 value={form.password}
-                                onChangeText={(text) => updateField("password", text)}
+                                onChangeText={(text) => handleChange("password", text)}
                                 secureTextEntry
-                                className={inputClass}
+                                className={`${inputClass} ${invalidFields.includes("password") ? "border-lifelineRed" : "border-black"}`}
                             />
                             <TextInput
                                 placeholder="Confirm Password"
                                 value={form.confirmPassword}
-                                onChangeText={(text) => updateField("confirmPassword", text)}
+                                onChangeText={(text) => handleChange("confirmPassword", text)}
                                 secureTextEntry
-                                className={inputClass}
+                                className={`${inputClass} ${invalidFields.includes("confirmPassword") ? "border-lifelineRed" : "border-black"}`}
                             />
+
+                            {error && (
+                                <Text className="text-lifelineRed mb-4">
+                                    {error}
+                                </Text>
+                            )}
 
                             {/* Buttons */}
                             <TouchableOpacity
@@ -232,35 +325,38 @@ const Signup: React.FC = () => {
                                 </Text>
                             </TouchableOpacity>
 
-                            {/* Terms row (below buttons) */}
+                            {/* Terms */}
+                            <Pressable onPress={() => setTCModal(true)} className="mb-2">
+                                <Text className="text-center text-blue-600 font-semibold">
+                                    View Terms and Conditions
+                                </Text>
+                            </Pressable>
+
                             <Pressable
-                                onPress={() => setTCAccepted((v) => !v)}
-                                style={{ flexDirection: "row", alignItems: "center" }}
+                                onPress={() => setTCAccepted((prev) => !prev)}
+                                className="flex-row items-center justify-center"
                             >
                                 <Ionicons
                                     name={tcAccepted ? "checkbox" : "square-outline"}
                                     size={22}
-                                    color={tcAccepted ? "#DF3721" : "#666"}
+                                    color={tcAccepted ? "#DF3721" : "#111"}
+                                    style={{ marginRight: 8 }}
                                 />
-                                <Text style={{ marginLeft: 10, color: "#333", flex: 1 }}>
-                                    I agree to the{" "}
-                                    <Text
-                                        style={{ color: "#2563eb", fontWeight: "700" }}
-                                        onPress={() => setTCModal(true)}
-                                    >
-                                        Terms and Conditions
-                                    </Text>
+                                <Text className="text-gray-700 font-semibold">
+                                    I agree to the Terms and Conditions
                                 </Text>
                             </Pressable>
                         </>
                     )}
                 </View>
 
-                {/* BOTTOM LOGIN LINK */}
+                {/* Bottom Login */}
                 <View className="mb-10">
                     <Text className="text-center text-gray-600">
                         Already have an account?
-                        <Link href="/(auth)/login" className="text-blue-600 font-semibold"> Log In</Link>
+                        <Link href="/(auth)/login" className="text-blue-600 font-semibold">
+                            {" "}Login
+                        </Link>
                     </Text>
                 </View>
             </View>

@@ -42,7 +42,7 @@ const AddPhoneNum = () => {
             if (data.user) {
                 await saveUser(data.user);
                 Alert.alert("Success", "Phone number updated!");
-                router.replace("/(auth)/add_member");
+                router.replace("/(auth)/login");
             } else {
                 throw new Error("No user data returned from backend");
             }

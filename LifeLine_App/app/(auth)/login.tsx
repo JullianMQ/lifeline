@@ -12,6 +12,7 @@ const Login = () => {
     const [password, setPassword] = useState("");
     const [emailError, setEmailError] = useState(false);
     const [passwordError, setPasswordError] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [loginLoading, setLoginLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -20,10 +21,23 @@ const Login = () => {
     useEffect(() => {
         setEmail("");
         setPassword("");
+        setError(null);
     }, []);
 
     // Standard email/password login
     const handleLogin = async () => {
+        setError(null);
+
+        const missingEmail = !email.trim();
+        const missingPassword = !password.trim();
+
+        if (missingEmail || missingPassword) {
+            // Mirror lifeline_web: highlight missing fields (no custom message)
+            setEmailError(missingEmail);
+            setPasswordError(missingPassword);
+            return;
+        }
+
         setLoginLoading(true);
         try {
             const data = await login(email, password);
@@ -34,7 +48,17 @@ const Login = () => {
         } catch (err: any) {
             setEmailError(true);
             setPasswordError(true);
-            alert("Login failed");
+
+            const raw = String(err?.message ?? "").trim();
+
+            // Mirror lifeline_web wording exactly
+            if (raw === "INVALID_EMAIL_OR_PASSWORD" || raw.includes("INVALID_EMAIL_OR_PASSWORD")) {
+                setError("Please check your email and password");
+            } else if (!raw || raw === "Failed to login" || raw.toLowerCase().includes("network")) {
+                setError("Failed to connect. Please try again later.");
+            } else {
+                setError(raw);
+            }
         } finally {
             setLoginLoading(false);
         }
@@ -52,17 +76,15 @@ const Login = () => {
             if (!data) return;
 
         } catch (err: any) {
+            // keep existing behavior (not part of this task)
             alert(err.message || "Google login failed");
         } finally {
             setGoogleLoading(false);
         }
     };
 
-
-
     // QR Scanner success
-
- const handleQRScanSuccess = async (data: string) => {
+    const handleQRScanSuccess = async (data: string) => {
         setShowScanner(false);
 
         try {
@@ -78,47 +100,21 @@ const Login = () => {
 
                 if (!path && !queryParams?.token && !queryParams?.error) return;
 
-
                 if (queryParams?.error) {
-                    alert(
-                        "This magic link has already been used or has expired. Please generate a new QR code."
-                    );
+                    alert(String(queryParams.error));
                     return;
                 }
-                if (queryParams?.token) {
-                    try {
-                        const response = await loginWithToken(queryParams.token as string);
-                        await saveUser(response.user);
-                        router.replace("/(main)/landing");
-                    } catch (err: any) {
-                        console.log("Caught magic link error:", err.message);
 
-                        alert(
-                            "This magic link has already been used or has expired."
-                        );
-                        router.replace("/(auth)/login");
-                    }
+                if (token) {
+                    const verified = await loginWithToken(String(token));
+                    await saveUser(verified.user);
+                    router.replace("/(main)/landing");
                 }
-
-                return;
-            }
-
-
-            if (data.trim().startsWith("{")) {
-                const qrData = JSON.parse(data);
-                const response = await login(qrData.email, qrData.token);
-                await saveUser(response.user);
-                router.replace("/(main)/landing");
-            } else {
-                console.warn("QR data not recognized:", data);
             }
         } catch (err: any) {
-            console.error("QR handling failed:", err);
-            alert("Invalid QR code or login failed");
+            alert(err.message || "QR login failed");
         }
     };
-
-
 
     const handleQRScanCancel = () => {
         setShowScanner(false);
@@ -151,7 +147,7 @@ const Login = () => {
                     <TextInput
                         placeholder="Email"
                         value={email}
-                        onChangeText={(text) => { setEmail(text); setEmailError(false); }}
+                        onChangeText={(text) => { setEmail(text); setEmailError(false); setError(null); }}
                         className={`border-2 ${emailError ? "border-lifelineRed" : "border-black"} rounded-full px-4 py-3 mt-8 mb-6 h-16`}
                         keyboardType="email-address"
                         autoCapitalize="none"
@@ -161,10 +157,16 @@ const Login = () => {
                     <TextInput
                         placeholder="Password"
                         value={password}
-                        onChangeText={(text) => { setPassword(text); setPasswordError(false); }}
+                        onChangeText={(text) => { setPassword(text); setPasswordError(false); setError(null); }}
                         secureTextEntry
                         className={`border-2 ${passwordError ? "border-lifelineRed" : "border-black"} rounded-full px-4 py-3 mb-6 h-16`}
                     />
+
+                    {error && (
+                        <Text className="text-lifelineRed mb-4">
+                            {error}
+                        </Text>
+                    )}
 
                     {/* Login Button */}
                     <TouchableOpacity
