@@ -132,10 +132,6 @@ function resetConnectionState() {
     openReject = null;
     socket = null;
 
-    // IMPORTANT: do not force intentionalClose=false here, because onclose can fire after reset.
-    // We'll clear it when starting a new connection instead.
-    // intentionalClose = false;
-
     // connection-scoped truth
     currentRoomIds = [];
     currentActiveRoomId = null;
@@ -247,6 +243,9 @@ function isIntentionalCloseFor(ws: any) {
 
 /**
  * Connect to WS. Safe for repeated calls; if same auth key & socket open/connecting, it reuses.
+ *
+ * IMPORTANT: this promise can reject if the socket closes before open.
+ * Callers should ALWAYS await/catch to avoid unhandled rejections.
  */
 export async function connectWS(args: ConnectWSArgs) {
     const desiredAuthKey = args.authToken ?? JSON.stringify(args.headers ?? {});
@@ -257,17 +256,14 @@ export async function connectWS(args: ConnectWSArgs) {
     onCloseRef = args.onClose ?? null;
     onErrorRef = args.onError ?? null;
 
-
     if (socket && existingKey === desiredAuthKey) {
         if (socket.readyState === WebSocket.OPEN) {
             return Promise.resolve();
         }
         if (socket.readyState === WebSocket.CONNECTING) {
-            // Return the in-flight promise instead of undefined
             if (openPromise) return openPromise;
         }
     }
-
 
     if (socket && existingKey !== desiredAuthKey) {
         resetWSForAuthSwitch();
@@ -310,9 +306,13 @@ export async function connectWS(args: ConnectWSArgs) {
 
                 onOpenRef?.();
 
-                openResolve?.();
-                openResolve = null;
-                openReject = null;
+                // Settle connect promise
+                try {
+                    openResolve?.();
+                } finally {
+                    openResolve = null;
+                    openReject = null;
+                }
             };
 
             ws.onmessage = (evt: any) => {
@@ -333,30 +333,51 @@ export async function connectWS(args: ConnectWSArgs) {
             };
 
             ws.onclose = (e: any) => {
-                if (!isIntentionalCloseFor(ws) && openReject) {
+                // If connect promise is still pending and this wasn't intentional, reject it.
+                const shouldRejectConnect = !isIntentionalCloseFor(ws) && !!openReject;
+
+                if (shouldRejectConnect) {
                     const err = new Error(
                         `WebSocket closed before open (code=${String(e?.code ?? "unknown")}, reason=${String(e?.reason ?? "")})`
                     );
                     (err as any).event = e;
                     try {
-                        openReject(err);
+                        openReject?.(err);
                     } catch {
                         // ignore
+                    } finally {
+                        openResolve = null;
+                        openReject = null;
                     }
                 }
 
-                onCloseRef?.(e);
+                // Notify consumer (never throw)
+                try {
+                    onCloseRef?.(e);
+                } catch {
+                    // ignore
+                }
 
-                // Reset after we reject (or after open already resolved)
+                // Reset after close
                 resetConnectionState();
             };
 
             ws.onerror = (e: any) => {
                 if (isIntentionalCloseFor(ws)) return;
-                onErrorRef?.(e);
+                try {
+                    onErrorRef?.(e);
+                } catch {
+                    // ignore
+                }
             };
         } catch (err) {
-            if (!intentionalClose) onErrorRef?.(err as any);
+            if (!intentionalClose) {
+                try {
+                    onErrorRef?.(err as any);
+                } catch {
+                    // ignore
+                }
+            }
             resetConnectionState();
             reject(err);
         }
@@ -436,7 +457,6 @@ export type EmergencySOSPayload = {
 export function sendEmergencySOS(payload?: EmergencySOSPayload) {
     safeEmit({ type: "emergency-sos", ...(payload ?? {}) });
 }
-
 
 export function isWSConnected() {
     return !!socket && socket.readyState === WebSocket.OPEN;

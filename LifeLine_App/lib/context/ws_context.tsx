@@ -19,6 +19,13 @@ import {
 import { getToken } from "@/lib/api/storage/user";
 import { getOwnerRoomId, setOwnerRoomId, clearOwnerRoomId } from "@/lib/api/storage/ws_rooms";
 
+import {
+    appendSmsFallbackLog,
+    wasSmsAttempted,
+} from "@/lib/api/storage/sms_fallback";
+
+import { triggerSmsFallback, resumePendingSmsIfAny } from "@/lib/services/sms_fallback";
+
 export type AppNotification = {
     type: "info" | "error" | "join-request" | "emergency-alert" | "emergency-confirmed";
     message: string;
@@ -27,8 +34,6 @@ export type AppNotification = {
     fromUser?: { id: string; name?: string };
     clientId?: string;
 };
-
-
 
 export type SOSLocationPayload = {
     latitude: number;
@@ -137,6 +142,64 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
     // suppress WS onError logging during logout / auth-switch teardown
     const suppressErrorLogsRef = useRef(false);
+
+    // Emergency delivery confirmation (ACK) gate.
+    // We treat "emergency-confirmed" as the server ACK for the most recent SOS we sent.
+    const pendingEmergencyAckRef = useRef<{
+        timeoutId: ReturnType<typeof setTimeout> | null;
+        resolve: (ok: boolean) => void;
+    } | null>(null);
+
+    const waitForEmergencyConfirmed = (timeoutMs: number) => {
+        // Only one in-flight wait at a time (SOS should be single-shot).
+        if (pendingEmergencyAckRef.current) {
+            try {
+                if (pendingEmergencyAckRef.current.timeoutId) clearTimeout(pendingEmergencyAckRef.current.timeoutId);
+                pendingEmergencyAckRef.current.resolve(false);
+            } catch {
+                // ignore
+            }
+            pendingEmergencyAckRef.current = null;
+        }
+
+        return new Promise<boolean>((resolve) => {
+            const timeoutId = setTimeout(() => {
+                if (pendingEmergencyAckRef.current?.timeoutId === timeoutId) {
+                    pendingEmergencyAckRef.current = null;
+                    resolve(false);
+                }
+            }, timeoutMs);
+
+            pendingEmergencyAckRef.current = { timeoutId, resolve };
+        });
+    };
+
+    const resolveEmergencyAck = (ok: boolean) => {
+        const p = pendingEmergencyAckRef.current;
+        if (!p) return;
+        pendingEmergencyAckRef.current = null;
+        try {
+            if (p.timeoutId) clearTimeout(p.timeoutId);
+        } catch {
+            // ignore
+        }
+        try {
+            p.resolve(ok);
+        } catch {
+            // ignore
+        }
+    };
+
+    const resumePendingSmsIfAnyLocal = async () => {
+        // When fallback was triggered in background, we store the pending message.
+        // Once the user brings the app to foreground (notification tap), we auto-send
+        // via SmsManager (native module) WITHOUT opening the composer.
+        try {
+            await resumePendingSmsIfAny();
+        } catch {
+            // ignore
+        }
+    };
 
     const addNotif = (n: AppNotification) => {
         setNotifications((prev) => [n, ...prev].slice(0, 50));
@@ -438,6 +501,9 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                     message: m.message ?? "Emergency confirmed",
                     timestamp: m.timestamp,
                 });
+
+                // Treat as ACK for our in-flight SOS (if any).
+                resolveEmergencyAck(true);
                 break;
             }
 
@@ -481,31 +547,51 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         hasHandshakeRef.current = false;
         ownedRoomReadyRef.current = false;
 
+        // If we were waiting for emergency ACK, fail fast.
+        resolveEmergencyAck(false);
+
         // FIX (coderabbit): explicitly clear ensureInFlight and recovery on close
         clearEnsureInFlight({ clearRecovery: true });
     };
 
-    const connectOnce = (token: string) => {
-        connectWS({
-            authToken: token,
-            headers,
-            onOpen: () => setIsConnected(true),
-            onMessage: handleMessage,
-            onClose: handleClose,
+    /**
+     * CRITICAL FIX:
+     * Always await/catch connectWS to avoid "Uncaught (in promise)" when the socket closes before open.
+     */
+    const connectOnce = async (token: string) => {
+        try {
+            await connectWS({
+                authToken: token,
+                headers,
+                onOpen: () => setIsConnected(true),
+                onMessage: handleMessage,
+                onClose: handleClose,
+                onError: (e) => {
+                    if (suppressErrorLogsRef.current) return;
+                    if (!isWSConnected()) return;
 
-            onError: (e) => {
-                if (suppressErrorLogsRef.current) return;
-                if (!isWSConnected()) return;
+                    if (__DEV__) {
+                        const rs =
+                            (e as any)?.currentTarget?.readyState ??
+                            (e as any)?.target?.readyState ??
+                            "unknown";
+                        console.log("[WS] onError", { readyState: rs });
+                    }
+                },
+            });
+        } catch (err: any) {
+            // No crash. Treat as disconnected and let SOS fallback logic handle emergencies.
+            setIsConnected(false);
+            hasHandshakeRef.current = false;
+            ownedRoomReadyRef.current = false;
 
-                if (__DEV__) {
-                    const rs =
-                        (e as any)?.currentTarget?.readyState ??
-                        (e as any)?.target?.readyState ??
-                        "unknown";
-                    console.log("[WS] onError", { readyState: rs });
-                }
-            },
-        });
+            // Fail any in-flight ACK waits
+            resolveEmergencyAck(false);
+
+            if (__DEV__) {
+                console.log("[WS] connectOnce failed", err?.message ?? String(err));
+            }
+        }
     };
 
     // Resolve token if parent didn't pass it
@@ -578,8 +664,6 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
             // "inactive" often happens during permission dialogs.
             // Do NOT disconnect WS on inactive, or you will thrash connections.
             if (state === "background") {
-                // disconnectWS({ wipeKnownRooms: false, wipePending: false });
-                // setIsConnected(false);
                 hasHandshakeRef.current = false;
                 ownedRoomReadyRef.current = false;
 
@@ -609,10 +693,20 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
             if (resolvedToken) {
                 ensureOwnerRoom().catch(() => { });
             }
+
+            if (state === "active") {
+                resumePendingSmsIfAnyLocal().catch(() => { });
+            }
         });
 
         return () => sub.remove();
     }, [authToken, resolvedToken]);
+
+    // On mount, also try to resume any pending SMS (e.g., app opened via notification)
+    useEffect(() => {
+        resumePendingSmsIfAnyLocal().catch(() => { });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -636,9 +730,76 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         getRoomUsers(roomId);
     };
 
+    /**
+     * CRITICAL FIX:
+     * SOS must NEVER crash if WS/ensureOwnerRoom fails.
+     * Any primary exception => treat as "delivery cannot be completed" => trigger SMS fallback.
+     */
     const sos = async (payload: SOSLocationPayload) => {
-        await ensureOwnerRoom();
-        sendEmergencySOS(payload);
+        const incidentId = `inc_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+
+        await appendSmsFallbackLog({
+            t: Date.now(),
+            incidentId,
+            event: "PRIMARY_SENT",
+        });
+
+        const PRIMARY_ACK_TIMEOUT_MS = 8_000;
+
+        let ok = false;
+
+        try {
+            await ensureOwnerRoom(); // may throw if connect promise rejects
+            sendEmergencySOS(payload); // may queue if not open; should not crash
+            ok = await waitForEmergencyConfirmed(PRIMARY_ACK_TIMEOUT_MS);
+        } catch (err: any) {
+            ok = false;
+
+            await appendSmsFallbackLog({
+                t: Date.now(),
+                incidentId,
+                event: "PRIMARY_TIMEOUT",
+                meta: { reason: "exception", message: err?.message ?? String(err) },
+            });
+        }
+
+        if (ok) {
+            await appendSmsFallbackLog({
+                t: Date.now(),
+                incidentId,
+                event: "PRIMARY_CONFIRMED",
+            });
+            return;
+        }
+
+        await appendSmsFallbackLog({
+            t: Date.now(),
+            incidentId,
+            event: "PRIMARY_TIMEOUT",
+            meta: { timeoutMs: PRIMARY_ACK_TIMEOUT_MS },
+        });
+
+        // Idempotency: never attempt SMS twice for the same incident.
+        const already = await wasSmsAttempted(incidentId);
+        if (already) {
+            await appendSmsFallbackLog({
+                t: Date.now(),
+                incidentId,
+                event: "SMS_ALREADY_ATTEMPTED",
+            });
+            return;
+        }
+
+        const lastKnownLocation =
+            payload.formattedLocation ?? `${payload.latitude.toFixed(6)}, ${payload.longitude.toFixed(6)}`;
+
+        // Paper scope: incident status + last-known location only.
+        await triggerSmsFallback({
+            incidentId,
+            status: "EMERGENCY",
+            lastKnownLocation,
+            timestampIso: payload.timestamp,
+        });
     };
 
     const value = useMemo<WSContextValue>(

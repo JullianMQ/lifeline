@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "./config";
 import { getUser, saveUser } from "./storage/user";
+import { cacheContacts } from "./storage/contacts_cache";
 
 export interface Contact {
     id: string;
@@ -57,7 +58,12 @@ export const getContacts = async (): Promise<Contact[]> => {
         const dependentContacts = (data.dependent_contacts ?? []).map(
             (c: any, index: number) => mapContact(c, index, "dep", "dependent")
         );
-        return [...emergencyContacts, ...dependentContacts];
+        const all = [...emergencyContacts, ...dependentContacts];
+
+        // Cache for offline SMS fallback.
+        cacheContacts(all as any).catch(() => { });
+
+        return all;
     } catch (error) {
         console.error("Error fetching contacts:", error);
         return [];

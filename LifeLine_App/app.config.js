@@ -8,7 +8,7 @@ export default {
     owner: "lifeline-emergency-app",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/images/LifelineLogo.png",
+    icon: "./assets/images/lifeline_round.png",
     scheme: "lifeline",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
