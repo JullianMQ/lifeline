@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Text, ScrollView, TouchableOpacity, View } from "react-native";
 import ScreenWrapper from "../../components/screen_wrapper";
+import { router } from "expo-router";
 
 const faqs = [
     {
@@ -31,7 +32,14 @@ const FaqsPage = () => {
     };
 
     return (
-        <ScreenWrapper>
+        <ScreenWrapper
+            showBottomNav={false}
+            scrollable={false}
+            topNavProps={{
+                backButtonOnly: true,
+                onBackPress: () => router.back(),
+            }}
+        >
             <ScrollView className="flex-1 px-4 py-4 bg-[#EFF2F5]">
                 {faqs.map((item, index) => {
                     const isOpen = openStates[index];

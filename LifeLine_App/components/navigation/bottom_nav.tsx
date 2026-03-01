@@ -3,12 +3,12 @@ import { usePathname, useRouter } from "expo-router";
 import React from "react";
 import { TouchableOpacity, View } from "react-native";
 
-type RouteHref = "/home_page" | "/contact_page" | "/faqs_page" | "/menu_page";
+type RouteHref = "/home_page" | "/contact_page" | "/live_tracking" | "/menu_page";
 
 const navItems: { name: string; href: RouteHref; icon: string; activeIcon?: string }[] = [
     { name: "Contacts", href: "/contact_page", icon: "people-outline" },
     { name: "Home", href: "/home_page", icon: "home-outline" },
-    { name: "FAQs", href: "/faqs_page", icon: "information-circle-outline" },
+    { name: "Dashboard", href: "/live_tracking", icon: "map-outline" },
     { name: "Menu", href: "/menu_page", icon: "menu-outline", activeIcon: "close-outline" },
 ];
 

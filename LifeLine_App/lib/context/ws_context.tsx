@@ -53,6 +53,26 @@ export type SOSLocationPayload = {
     roomId?: string;
 };
 
+/**
+ * Real-time location payload broadcast by the backend over WebSocket.
+ *
+ * NOTE: The web dashboard uses `visiblePhone` (a masked/visible phone number)
+ * as the stable identifier coming from the backend.
+ */
+export type LiveLocation = {
+    /** Stable identifier from backend (usually the contact's visible phone). */
+    id: string;
+    visiblePhone?: string;
+    userName?: string;
+    roomId?: string;
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    timestamp?: string;
+    /** Optional SOS flag if backend includes it. */
+    sos?: boolean;
+};
+
 type WSContextValue = {
     isConnected: boolean;
     activeRoomId: string | null;
@@ -62,6 +82,9 @@ type WSContextValue = {
 
     roomUsers: Record<string, any[]>;
     notifications: AppNotification[];
+
+    /** Live location updates keyed by user id (typically `visiblePhone`). */
+    liveLocations: Record<string, LiveLocation>;
 
     ensureMyRoom: () => Promise<void>;
     setActiveRoomId: (roomId: string) => void;
@@ -93,6 +116,8 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
 
     const [roomUsers, setRoomUsers] = useState<Record<string, any[]>>({});
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+    const [liveLocations, setLiveLocations] = useState<Record<string, LiveLocation>>({});
 
     // FIX (coderabbit): avoid stale activeRoomIdState in message handlers
     const activeRoomIdRef = useRef<string | null>(activeRoomIdState);
@@ -426,6 +451,34 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
                 break;
             }
 
+            case "location-update": {
+                // Backend format mirrors the web dashboard:
+                // msg.data = { visiblePhone, userName, latitude, longitude, accuracy, timestamp, sos? }
+                const m = msg as any;
+                const data = m?.data ?? {};
+                const idRaw = data?.visiblePhone ?? data?.userId ?? data?.id;
+                const id = typeof idRaw === "string" ? idRaw.trim() : "";
+
+                const lat = Number(data?.latitude);
+                const lng = Number(data?.longitude);
+                if (!id || !Number.isFinite(lat) || !Number.isFinite(lng)) break;
+
+                const loc: LiveLocation = {
+                    id,
+                    visiblePhone: typeof data?.visiblePhone === "string" ? data.visiblePhone : undefined,
+                    userName: typeof data?.userName === "string" ? data.userName : undefined,
+                    roomId: typeof m?.roomId === "string" ? m.roomId : undefined,
+                    latitude: lat,
+                    longitude: lng,
+                    accuracy: typeof data?.accuracy === "number" ? data.accuracy : undefined,
+                    timestamp: typeof data?.timestamp === "string" ? data.timestamp : undefined,
+                    sos: data?.sos === true,
+                };
+
+                setLiveLocations((prev) => ({ ...prev, [id]: loc }));
+                break;
+            }
+
             case "emergency-alert": {
                 const m = msg as any;
                 const myId = getCurrentUserId();
@@ -581,6 +634,7 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
         setLastError(null);
         setRoomUsers({});
         setNotifications([]);
+        setLiveLocations({});
 
         hasHandshakeRef.current = false;
         ownedRoomReadyRef.current = false;
@@ -757,12 +811,13 @@ export function WSProvider({ children, authToken, headers }: WSProviderProps) {
             lastError,
             roomUsers,
             notifications,
+            liveLocations,
             ensureMyRoom,
             setActiveRoomId,
             requestUsers,
             sos,
         }),
-        [isConnected, activeRoomIdState, rooms, serverTimestamp, lastError, roomUsers, notifications]
+        [isConnected, activeRoomIdState, rooms, serverTimestamp, lastError, roomUsers, notifications, liveLocations]
     );
 
     return <WSContext.Provider value={value}>{children}</WSContext.Provider>;

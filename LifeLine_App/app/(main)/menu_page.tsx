@@ -72,6 +72,13 @@ const MenuPage = () => {
                 >
                     <Text className="text-base">Edit Profile</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                    className="py-3 border-b border-gray-200"
+                    onPress={() => router.push("/(main)/faqs_page")}
+                >
+                    <Text className="text-base">FAQ</Text>
+                </TouchableOpacity>
             </View>
 
             {/* Logout Button */}
