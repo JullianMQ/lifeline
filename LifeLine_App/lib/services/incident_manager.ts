@@ -6,7 +6,7 @@ export type IncidentReason =
     | 'FALL_CONFIRMED'
     | 'CRASH_CONFIRMED'
     | 'EMERGENCY_CONFIRMED'
-    | 'LOUD_WITH_MOTION'
+    | 'LOUD_DETECTED'
     | 'UNKNOWN';
 
 export type ActiveIncident = {
@@ -35,7 +35,6 @@ class IncidentManager {
         this.listeners.add(fn);
         return () => { this.listeners.delete(fn); };
     }
-
 
     getActive() {
         return this.active;
@@ -109,14 +108,18 @@ class IncidentManager {
         }
 
         // Only trigger UI on high-confidence “confirmed” events.
-        // (You can expand this mapping.)
         let reason: IncidentReason | null = null;
+
+        // --- Existing confirmed reasons (unchanged behavior) ---
         if (evt.type === 'FALL_CONFIRMED') reason = 'FALL_CONFIRMED';
         if (evt.type === 'CRASH_CONFIRMED') reason = 'CRASH_CONFIRMED';
 
-        // Optional: allow loud + abnormal motion fusion
-        // (Example: your detector also emits LOUD_SUSTAINED and ABNORMAL_MOTION)
-        // You can add a fusion buffer later.
+        // Motion keeps its own incident pathway
+        if (evt.type === 'ABNORMAL_MOTION') reason = 'EMERGENCY_CONFIRMED';
+
+        // Loud has its own incident pathway (separate from motion)
+        if (evt.type === 'LOUD_IMPULSE' || evt.type === 'LOUD_SUSTAINED') reason = 'LOUD_DETECTED';
+
         if (!reason) return;
 
         // Create incident

@@ -33,37 +33,47 @@ type FallState = 'NORMAL' | 'FREEFALL' | 'IMPACT';
 
 export class EmergencyDetector {
     // ---- Thresholds (starting points; tune per device/testing) ----
-    // NOTE: These assume accelerometer magnitude is expressed in "g" (1g ~ 9.80665 m/s^2).
-    // In your current pipeline we feed TOTAL accel magnitude in g (includes gravity).
-    private FREE_FALL_MAX_G = 0.3; // 0.25–0.35g is common
-    private IMPACT_MIN_G = 2.5; // 2.0–3.0g fall impact candidate
-    private CRASH_MIN_G = 3.0; // 3.0–6.0g crash candidate
-    private CRASH_HIGH_G = 5.5; // high confidence (may saturate on low-range sensors)
+    private FREE_FALL_MAX_G = 0.3;
+    private IMPACT_MIN_G = 2.5;
+    private CRASH_MIN_G = 3.0;
+    private CRASH_HIGH_G = 5.5;
 
-    private IMPACT_WINDOW_MS = 1000; // free-fall -> impact timing window
-    private STILL_WINDOW_MS = 2000; // post-impact stillness window
-    // Because we use TOTAL accel magnitude (includes gravity), stillness means "near 1g" for a sustained window.
+    private IMPACT_WINDOW_MS = 1000;
+    private STILL_WINDOW_MS = 2000;
     private STILL_TARGET_G = 1.0;
-    private STILL_TOL_G = 0.10; // 0.06–0.15 depending on device/noise
+    private STILL_TOL_G = 0.10;
 
-    // Gyro (rad/s) - use as confirmation, not as primary trigger
-    private OMEGA_FALL_CONFIRM = 3.1; // strong rotation confirm
+    // Gyro confirm
+    private OMEGA_FALL_CONFIRM = 3.1;
     private OMEGA_MOTION_CANDIDATE = 0.9;
 
-    // Mic (dBFS) - use baseline + delta (since dBFS varies by device)
-    private MIC_BASE_ALPHA = 0.95; // baseline EMA smoothing
-    private MIC_IMPULSE_DELTA_DB = 18; // +12..+24 dB over baseline
-    private MIC_SUSTAIN_DELTA_DB = 14; // sustained loudness threshold (delta over baseline); tune 12–18
-    private MIC_SUSTAIN_ABS_MIN_DBFS = -32; // absolute floor for sustained loudness; tune -35..-25
-    private MIC_SUSTAIN_MS = 1500; // require louder sound for longer to reduce handling-noise false positives
+    // ABNORMAL_MOTION (Option 2): accel + recent gyro corroboration
+    private MOTION_ACCEL_MIN_G = 2.1;
+    private OMEGA_MOTION_CONFIRM = 1.2;
+    private MOTION_GYRO_WINDOW_MS = 500;
+
+    // Mic baseline (EMA)
+    private MIC_BASE_ALPHA = 0.95;
+
+    // Mic sustained
+    private MIC_SUSTAIN_DELTA_DB = 14;
+    private MIC_SUSTAIN_ABS_MIN_DBFS = -32;
+    private MIC_SUSTAIN_MS = 1500;
+
+    // ---- Mic impulse false-positive gating (IMPORTANT) ----
+    // Fan/handling frequently sits around -30 to -40 dBFS on some devices.
+    // Require a truly loud absolute level for impulse (clap/shout is often closer to -10..-20).
+    private MIC_IMPULSE_BASELINE_FLOOR_DBFS = -60; // baseline must be >= this
+    private MIC_IMPULSE_ABS_MIN_DBFS = -20;        // peak must be >= this (fan at -26 fails)
+    private MIC_IMPULSE_MAX_DELTA_DB = 30;         // reject inflated deltas
+
     private lastMicDbfs: number | null = null;
     private pendingImpulseStart: number | null = null;
     private pendingImpulsePeak: number | null = null;
 
-
     // Drop/bounce rejection
     private BOUNCE_WINDOW_MS = 800;
-    private MAX_BOUNCE_IMPACTS = 1; // >1 impacts in bounce window => likely phone drop
+    private MAX_BOUNCE_IMPACTS = 1;
 
     // ---- State ----
     private fallState: FallState = 'NORMAL';
@@ -74,13 +84,11 @@ export class EmergencyDetector {
     private micBaselineDbfs = -50;
     private loudSustainStart: number | null = null;
 
-    // Recent samples for stillness + bounce checks
     private recentAccel: Array<{ t: number; g: number }> = [];
     private recentImpactTimes: number[] = [];
 
-    // Optional: keep last omega for context
     private lastOmega: number | null = null;
-    // Keep last accel magnitude (total, in g) for mic gating / context
+    private lastOmegaAt: number = 0;
     private lastAccelG: number | null = null;
 
     public setThresholds(
@@ -92,7 +100,6 @@ export class EmergencyDetector {
             STILL_TARGET_G: number;
             STILL_TOL_G: number;
             OMEGA_FALL_CONFIRM: number;
-            MIC_IMPULSE_DELTA_DB: number;
             MIC_SUSTAIN_DELTA_DB: number;
             MIC_SUSTAIN_ABS_MIN_DBFS: number;
             MIC_SUSTAIN_MS: number;
@@ -105,7 +112,6 @@ export class EmergencyDetector {
         if (partial.STILL_TARGET_G != null) this.STILL_TARGET_G = partial.STILL_TARGET_G;
         if (partial.STILL_TOL_G != null) this.STILL_TOL_G = partial.STILL_TOL_G;
         if (partial.OMEGA_FALL_CONFIRM != null) this.OMEGA_FALL_CONFIRM = partial.OMEGA_FALL_CONFIRM;
-        if (partial.MIC_IMPULSE_DELTA_DB != null) this.MIC_IMPULSE_DELTA_DB = partial.MIC_IMPULSE_DELTA_DB;
         if (partial.MIC_SUSTAIN_DELTA_DB != null) this.MIC_SUSTAIN_DELTA_DB = partial.MIC_SUSTAIN_DELTA_DB;
         if (partial.MIC_SUSTAIN_ABS_MIN_DBFS != null) this.MIC_SUSTAIN_ABS_MIN_DBFS = partial.MIC_SUSTAIN_ABS_MIN_DBFS;
         if (partial.MIC_SUSTAIN_MS != null) this.MIC_SUSTAIN_MS = partial.MIC_SUSTAIN_MS;
@@ -120,8 +126,12 @@ export class EmergencyDetector {
         this.recentAccel = [];
         this.recentImpactTimes = [];
         this.lastOmega = null;
+        this.lastOmegaAt = 0;
         this.lastAccelG = null;
-        // Keep mic baseline; resetting it fully can cause bursts of false impulses.
+        // Keep mic baseline to avoid false bursts.
+        this.pendingImpulseStart = null;
+        this.pendingImpulsePeak = null;
+        this.lastMicDbfs = null;
     }
 
     public push(event: IncomingSensorEvent): DetectorEvent[] {
@@ -135,17 +145,29 @@ export class EmergencyDetector {
             const g = typeof event.magnitude === 'number' ? event.magnitude : null;
             if (g == null) return out;
 
-            // keep last accel for context / gating
             this.lastAccelG = g;
 
-            // keep recent accel (trim ~3 seconds)
             this.recentAccel.push({ t, g });
             const cutoff = t - 3500;
             while (this.recentAccel.length && this.recentAccel[0].t < cutoff) this.recentAccel.shift();
 
-            // quick "abnormal movement" candidate (not fall/crash)
-            if (g >= 1.8 && g < this.IMPACT_MIN_G) {
-                out.push(this.mk('ABNORMAL_MOTION', t, sessionId, { accelG: g }));
+            // ABNORMAL_MOTION Option 2: accel spike + fresh gyro corroboration
+            if (g >= this.MOTION_ACCEL_MIN_G && g < this.IMPACT_MIN_G) {
+                const omega = this.lastOmega;
+                const omegaFresh =
+                    omega != null &&
+                    omega >= this.OMEGA_MOTION_CONFIRM &&
+                    (t - this.lastOmegaAt) <= this.MOTION_GYRO_WINDOW_MS;
+
+                if (omegaFresh) {
+                    out.push(
+                        this.mk('ABNORMAL_MOTION', t, sessionId, {
+                            accelG: g,
+                            omega,
+                            omegaAgeMs: t - this.lastOmegaAt,
+                        })
+                    );
+                }
             }
 
             // crash candidates
@@ -156,7 +178,7 @@ export class EmergencyDetector {
                 }
             }
 
-            // fall state machine: free-fall -> impact -> stillness
+            // fall state machine
             if (this.fallState === 'NORMAL') {
                 if (g < this.FREE_FALL_MAX_G) {
                     this.fallState = 'FREEFALL';
@@ -172,7 +194,6 @@ export class EmergencyDetector {
                     return out;
                 }
                 if (g >= this.IMPACT_MIN_G) {
-                    // impact
                     this.fallState = 'IMPACT';
                     this.tImpact = t;
 
@@ -186,18 +207,15 @@ export class EmergencyDetector {
             }
 
             if (this.fallState === 'IMPACT') {
-                // bounce/drop rejection: if multiple impacts quickly, likely phone drop/bounce
                 const bounceCutoff = t - this.BOUNCE_WINDOW_MS;
                 this.recentImpactTimes = this.recentImpactTimes.filter(x => x >= bounceCutoff);
                 const impactCount = this.recentImpactTimes.length;
 
-                // Wait for stillness window after the impact
                 if (t - this.tImpact >= this.STILL_WINDOW_MS) {
                     const still = this.isStill(t);
                     const bounced = impactCount > this.MAX_BOUNCE_IMPACTS;
 
                     if (still && !bounced) {
-                        // If we saw strong rotation during freefall/impact, confirm. Otherwise keep as possible.
                         if (this.sawHighRotation) {
                             out.push(
                                 this.mk('FALL_CONFIRMED', t, sessionId, {
@@ -226,7 +244,6 @@ export class EmergencyDetector {
         }
 
         if (event.sensor === 'gyroscope') {
-            // Prefer omega if provided; else compute from x/y/z; else fall back to rotationSpeed
             let omega: number | null = null;
 
             if (typeof event.omega === 'number') omega = event.omega;
@@ -235,18 +252,15 @@ export class EmergencyDetector {
             } else if (typeof event.rotationSpeed === 'number') omega = event.rotationSpeed;
 
             if (omega == null) return out;
-            this.lastOmega = omega;
 
-            // during fall states, use as confirm
+            this.lastOmega = omega;
+            this.lastOmegaAt = t;
+
             if ((this.fallState === 'FREEFALL' || this.fallState === 'IMPACT') && omega >= this.OMEGA_FALL_CONFIRM) {
                 this.sawHighRotation = true;
             }
 
-            // general abnormal rotation candidate
-            if (omega >= this.OMEGA_MOTION_CANDIDATE) {
-                out.push(this.mk('ABNORMAL_MOTION', t, sessionId, { omega }));
-            }
-
+            // No ABNORMAL_MOTION from gyro alone (Option 2)
             return out;
         }
 
@@ -254,7 +268,7 @@ export class EmergencyDetector {
             const m = typeof event.metering === 'number' ? event.metering : null;
             if (m == null) return out;
 
-            if (m <= -150) return out; // ignore -160 sentinel
+            if (m <= -150) return out;
 
             // Update baseline slowly (only when not loud)
             if (m < this.micBaselineDbfs + 6) {
@@ -263,27 +277,36 @@ export class EmergencyDetector {
 
             const delta = m - this.micBaselineDbfs;
 
-            // ---- IMPULSE (spike) detection ----
+            // ---- IMPULSE detection (spike) with strict gating ----
             const prev = this.lastMicDbfs;
             this.lastMicDbfs = m;
 
             const riseDb = prev == null ? 0 : (m - prev);
 
-            // Start a pending impulse only if:
-            // 1) loud relative to baseline, AND
-            // 2) rises quickly (spike)
-            const IMPULSE_RISE_DB = 12;          // tune 8–15
-            const IMPULSE_MIN_DELTA = 20;        // stricter than 18 to avoid speech (tune 18–28)
-            const IMPULSE_VERIFY_MS = 600;       // must drop back within this window
-            const IMPULSE_DROP_DB = 10;          // drop relative to peak to confirm it's transient
+            const IMPULSE_RISE_DB = 8;     // must be a real rise
+            const IMPULSE_MIN_DELTA = 18;  // relative to baseline
+            const IMPULSE_VERIFY_MS = 600; // must drop within this
+            const IMPULSE_DROP_DB = 10;    // drop relative to peak
+
+            const baselineOk = this.micBaselineDbfs >= this.MIC_IMPULSE_BASELINE_FLOOR_DBFS;
+            const absOkNow = m >= this.MIC_IMPULSE_ABS_MIN_DBFS;
+            const deltaOkNow = delta <= this.MIC_IMPULSE_MAX_DELTA_DB;
+
+            const canStartImpulse =
+                prev != null &&
+                m > prev &&                    // ensures rise direction
+                riseDb >= IMPULSE_RISE_DB &&   // ensures enough rise
+                baselineOk &&
+                absOkNow &&
+                deltaOkNow &&
+                delta >= IMPULSE_MIN_DELTA;
 
             if (this.pendingImpulseStart == null) {
-                if (delta >= IMPULSE_MIN_DELTA && riseDb >= IMPULSE_RISE_DB) {
+                if (canStartImpulse) {
                     this.pendingImpulseStart = t;
                     this.pendingImpulsePeak = m;
                 }
             } else {
-                // update peak while pending
                 if (this.pendingImpulsePeak == null || m > this.pendingImpulsePeak) {
                     this.pendingImpulsePeak = m;
                 }
@@ -291,25 +314,36 @@ export class EmergencyDetector {
                 const start = this.pendingImpulseStart;
                 const peak = this.pendingImpulsePeak ?? m;
 
-                // if we dropped enough from peak quickly, confirm impulse
+                // Confirm if we dropped enough from peak quickly
                 if ((peak - m) >= IMPULSE_DROP_DB) {
-                    out.push(this.mk('LOUD_IMPULSE', t, sessionId, {
-                        metering: peak,
-                        baseline: this.micBaselineDbfs,
-                        delta: peak - this.micBaselineDbfs,
-                        riseDb,
-                        confirm: 'spike_drop',
-                    }));
+                    const peakDelta = peak - this.micBaselineDbfs;
+
+                    const peakAbsOk = peak >= this.MIC_IMPULSE_ABS_MIN_DBFS;
+                    const peakDeltaOk = peakDelta >= IMPULSE_MIN_DELTA && peakDelta <= this.MIC_IMPULSE_MAX_DELTA_DB;
+                    const peakBaselineOk = baselineOk;
+
+                    if (peakAbsOk && peakDeltaOk && peakBaselineOk) {
+                        out.push(
+                            this.mk('LOUD_IMPULSE', t, sessionId, {
+                                metering: peak,
+                                baseline: this.micBaselineDbfs,
+                                delta: peakDelta,
+                                riseDb,
+                                confirm: 'spike_drop',
+                            })
+                        );
+                    }
+
                     this.pendingImpulseStart = null;
                     this.pendingImpulsePeak = null;
                 } else if (t - start > IMPULSE_VERIFY_MS) {
-                    // timed out: it wasn't a short impulse (probably speech / sustained)
+                    // not a transient impulse; drop it
                     this.pendingImpulseStart = null;
                     this.pendingImpulsePeak = null;
                 }
             }
 
-            // ---- SUSTAINED detection (kept from previous fix) ----
+            // ---- SUSTAINED detection ----
             if (delta >= this.MIC_SUSTAIN_DELTA_DB && m >= this.MIC_SUSTAIN_ABS_MIN_DBFS) {
                 const allowed = this.isMicSustainAllowed(this.lastAccelG, this.lastOmega);
                 if (!allowed) {
@@ -321,12 +355,14 @@ export class EmergencyDetector {
                 const start = this.loudSustainStart;
 
                 if (start != null && (t - start) >= this.MIC_SUSTAIN_MS) {
-                    out.push(this.mk('LOUD_SUSTAINED', t, sessionId, {
-                        metering: m,
-                        baseline: this.micBaselineDbfs,
-                        delta,
-                        sustainMs: t - start,
-                    }));
+                    out.push(
+                        this.mk('LOUD_SUSTAINED', t, sessionId, {
+                            metering: m,
+                            baseline: this.micBaselineDbfs,
+                            delta,
+                            sustainMs: t - start,
+                        })
+                    );
                     this.loudSustainStart = t;
                 }
             } else {
@@ -336,19 +372,16 @@ export class EmergencyDetector {
             return out;
         }
 
-
         return out;
     }
 
     private isMicSustainAllowed(currentAccelG: number | null, currentOmega: number | null) {
-        // Guard against false sustained triggers from handling noise:
-        // if the phone is being moved/rotated a lot, sustained mic level is often friction/wind/rubbing.
         const omega = currentOmega ?? 0;
         const accelG = currentAccelG ?? 1.0;
         const accelDev = Math.abs(accelG - 1.0);
 
-        if (omega > 1.2) return false;        // tune 1.0–1.8
-        if (accelDev > 0.25) return false;    // tune 0.20–0.40
+        if (omega > 1.2) return false;
+        if (accelDev > 0.25) return false;
         return true;
     }
 
@@ -356,8 +389,6 @@ export class EmergencyDetector {
         const windowStart = now - this.STILL_WINDOW_MS;
         const samples = this.recentAccel.filter(s => s.t >= windowStart);
         if (samples.length === 0) return false;
-        // With TOTAL accel magnitude, stillness means "gravity only".
-        // i.e., magnitude stays close to 1g for the window.
         return samples.every(s => Math.abs(s.g - this.STILL_TARGET_G) <= this.STILL_TOL_G);
     }
 
@@ -366,5 +397,4 @@ export class EmergencyDetector {
     }
 }
 
-// Singleton (simple default usage)
 export const emergencyDetector = new EmergencyDetector();
