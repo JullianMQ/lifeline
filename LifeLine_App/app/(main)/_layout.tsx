@@ -6,6 +6,8 @@ import { getToken } from "@/lib/api/storage/user";
 import { WSProvider } from "@/lib/context/ws_context";
 import { SosMediaProvider } from "@/lib/services/sos_media_provider";
 import SosAlertHost from "@/components/sos_alert_host";
+import SosEmergencyModalHost from "@/components/sos_emergency_modal_host";
+import { SosViewIntentProvider } from "@/lib/context/sos_view_intent";
 
 export default function MainLayout() {
     const router = useRouter();
@@ -56,8 +58,11 @@ export default function MainLayout() {
     return (
         <SosMediaProvider>
             <WSProvider authToken={token}>
-                <SosAlertHost />
-                <Slot />
+                <SosViewIntentProvider>
+                    <SosAlertHost />
+                    <SosEmergencyModalHost />
+                    <Slot />
+                </SosViewIntentProvider>
             </WSProvider>
         </SosMediaProvider>
     );
