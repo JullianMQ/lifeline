@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import reverseGeocodeWithGoogle from "@/lib/services/geocode";
 import { SensorContext } from "@/lib/context/sensor_context";
 import { useWS } from "@/lib/context/ws_context";
+import { useSosMedia } from "@/lib/services/sos_media_provider";
 
 import {
     startForegroundLocationSharing,
@@ -16,19 +17,14 @@ import {
     setRoomIdForBackgroundUploads,
 } from "@/lib/services/background_location";
 
-
 export default function HomePage() {
     const { isMonitoring, stopMonitoring, startMonitoring } = useContext(SensorContext);
     const { isConnected, activeRoomId, ensureMyRoom, sos } = useWS();
-
-
-
+    const { triggerSOSCapture } = useSosMedia();
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState<string>("");
     const [locationLoading, setLocationLoading] = useState(true);
     const [isSOSSending, setIsSOSSending] = useState(false);
-
-
 
     // Fetch user location (for the map UI only)
     useEffect(() => {
@@ -61,7 +57,6 @@ export default function HomePage() {
             }
         })();
     }, []);
-
 
     /**
      * Monitoring orchestration (SEQUENCED):
@@ -143,19 +138,39 @@ export default function HomePage() {
             const accuracy = loc.coords.accuracy ?? undefined;
             const timestamp = new Date().toISOString();
             let formattedLocation: string | undefined;
+
             try {
                 formattedLocation = (await reverseGeocodeWithGoogle(latitude, longitude)) ?? undefined;
             } catch (geoErr) {
                 console.warn("reverseGeocodeWithGoogle failed (SOS):", geoErr);
             }
 
-            await sos({
+            //  ADDED: trigger the SAME existing media capture flow (no duplicated logic)
+            // Run capture + SOS send together; SOS payload remains unchanged.
+            const capturePromise = triggerSOSCapture();
+            const sosPromise = sos({
                 latitude,
                 longitude,
                 accuracy,
                 timestamp,
                 formattedLocation,
             });
+
+            const [sosResult, captureResult] = await Promise.allSettled([sosPromise, capturePromise]);
+
+            if (sosResult.status === "rejected") {
+                console.error("SOS failed:", sosResult.reason);
+                Alert.alert(
+                    "SOS failed",
+                    "We couldn’t send your SOS right now. Please check your connection and try again.",
+                    [{ text: "OK" }]
+                );
+            }
+
+            if (captureResult.status === "rejected") {
+                console.log("Media capture/upload enqueue failed:", captureResult.reason);
+                // no alert here (keeps behavior minimal; SOS may still succeed)
+            }
         } catch (err) {
             console.error("SOS failed:", err);
             Alert.alert(
@@ -166,11 +181,10 @@ export default function HomePage() {
         } finally {
             setIsSOSSending(false);
         }
-    }, [isSOSSending, sos]);
+    }, [isSOSSending, sos, triggerSOSCapture]);
 
     return (
         <ScreenWrapper>
-
             {/* MAP BOX */}
             <View className="bg-white mx-4 mt-4 rounded-2xl overflow-hidden border" style={{ height: 384 }}>
                 {locationLoading ? (
@@ -221,7 +235,6 @@ export default function HomePage() {
             </View>
 
             <View style={{ flex: 1 }} />
-
 
             {/* SOS and STOP BUTTON */}
             <View className="items-center mt-12">
