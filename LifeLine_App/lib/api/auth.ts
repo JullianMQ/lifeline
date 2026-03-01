@@ -124,7 +124,14 @@ export const loginWithToken = async (token: string) => {
 
     if (!res.ok) throw new Error("Magic link verification failed");
 
-    return await res.json();
+    const data = await res.json();
+
+    const accessToken = data?.token || data?.accessToken || data?.sessionToken;
+    if (accessToken) {
+        await saveToken(accessToken);
+    }
+
+    return data;
 };
 
 

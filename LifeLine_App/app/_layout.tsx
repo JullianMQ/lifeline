@@ -6,8 +6,8 @@ import { useEffect } from "react";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { saveUser } from "@/lib/api/storage/user";
-import { API_BASE_URL } from "@/lib/api/config";
 import { Alert } from "react-native";
+import { loginWithToken } from "@/lib/api/auth";
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_WEB_CLIENT_ID,
@@ -36,9 +36,7 @@ export default function RootLayout() {
         const token = queryParams?.token;
         if (token) {
           try {
-            const res = await fetch(`${API_BASE_URL}/auth/magic-link/verify?token=${token}`, { method: "POST" });
-            if (!res.ok) throw new Error("Token verification failed");
-            const data = await res.json();
+            const data = await loginWithToken(String(token));
             await saveUser(data.user);
             router.replace("/(main)/landing");
           } catch (err) {

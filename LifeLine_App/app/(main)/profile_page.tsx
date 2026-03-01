@@ -14,8 +14,9 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import ScreenWrapper from "../../components/screen_wrapper";
 import { Ionicons } from "@expo/vector-icons";
-import { getUser } from "../../lib/api/storage/user";
+import { getUser, saveUser } from "../../lib/api/storage/user";
 import { updateMyProfile } from "../../lib/api/contact";
+import { checkSession } from "../../lib/api/auth";
 
 import {
     AVATAR_KEYS,
@@ -59,8 +60,32 @@ const ProfilePage = () => {
         const { first, last } = splitName(local.name);
         setFirstName(first);
         setLastName(last);
+
+        // This is the field you said is missing
         setPhone(local.phone_no ?? "");
+
         setAvatar(local.image ?? null);
+    }, []);
+    const hydratePhoneIfMissing = useCallback(async () => {
+        try {
+            const local = await getUser();
+            const hasPhone = !!(local && local.phone_no && String(local.phone_no).trim());
+            if (hasPhone) return;
+
+            const session = await checkSession();
+            const sessionUser = session?.user;
+
+            const sessionPhone = sessionUser?.phone_no;
+            if (sessionUser && sessionPhone && String(sessionPhone).trim()) {
+                setPhone(String(sessionPhone));
+                await saveUser({
+                    ...local,
+                    ...sessionUser,
+                });
+            }
+        } catch (e) {
+            console.warn("Profile hydration skipped/failed:", e);
+        }
     }, []);
 
     useFocusEffect(
@@ -69,11 +94,12 @@ const ProfilePage = () => {
             (async () => {
                 try {
                     await loadFromStorage();
+                    await hydratePhoneIfMissing();
                 } finally {
                     setLoading(false);
                 }
             })();
-        }, [loadFromStorage])
+        }, [loadFromStorage, hydratePhoneIfMissing])
     );
 
     const handleChangePhoto = () => {
@@ -151,11 +177,6 @@ const ProfilePage = () => {
                                 />
                             )}
                         </View>
-
-                        {/* <TouchableOpacity onPress={handleChangePhoto} className="flex-row items-center mb-6">
-                            <Ionicons name="cloud-upload-outline" size={24} color="black" />
-                            <Text className="ml-2 font-semibold">Change Photo</Text>
-                        </TouchableOpacity> */}
 
                         <View className="w-3/4">
                             <TextInput
