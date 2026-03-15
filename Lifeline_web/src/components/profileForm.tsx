@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { API_BASE_URL } from "../config/api";
 import AvatarModal from "./avatarModal";
+import DeleteAccountModal from "./deleteAccountModal";
 
 type Props = {
     email: string;
@@ -17,6 +18,7 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
     const [updateForm, setUpdateForm] = useState(initialValues);
     const [loading, setLoading] = useState(false);
     const [openAvatar, setOpenAvatar] = useState(false);
+    const [showDeleteAccount, setShowDeleteAccount] = useState(false);
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setUpdateForm(prev => ({ ...prev, [name]: value }));
@@ -96,7 +98,13 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
                     </div>
                 </div>
             </div>
+            
+        </div>
+        
+        <div className="acc-delete">
+            <p className="uline-btn neg" onClick={() => setShowDeleteAccount(true)}>Delete Account</p>
         </div> 
+
         <hr />
 
         <div className="profile-edit btn">
@@ -112,6 +120,10 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
             {loading ? "Saving..." : "Save"}
             </button>
         </div>
+        <DeleteAccountModal
+            open={showDeleteAccount}
+            onClose={() => setShowDeleteAccount(false)}
+        />
         </form>
     );
 }

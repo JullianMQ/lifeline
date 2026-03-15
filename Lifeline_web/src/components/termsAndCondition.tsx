@@ -26,7 +26,7 @@ export default function TermsCondition({
             <div>
                 <p><strong>Last Updated:</strong> February 2026</p>
                 <p>
-                Welcome to Lifeline. By accessing or using the Lifeline, you agree to be
+                Welcome to Lifeline. By accessing or using Lifeline, you agree to be
                 bound by these Terms and Conditions. If you do not agree with any part
                 of these Terms, please do not use the App.
                 </p>
