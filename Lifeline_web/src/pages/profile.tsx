@@ -83,7 +83,7 @@ function Profile() {
                             )}
                         </div>
                         <div className="scrollable">
-                            <ul className="profile-grid">
+                                <ul className={contactCards.length >= 5 ? "profile-grid column-grid" : "profile-grid"}>
                                 {contactCards.filter((c) => c.role === "mutual").map((contact, index) => (
                                     <li key={index} className="profile-card" >
                                         <div className="profile-card-content">
@@ -111,7 +111,7 @@ function Profile() {
                     <div>
                         <h2>Dependent</h2>
                         <div className="scrollable">
-                            <ul className="profile-grid">
+                            <ul className={contactCards.length >= 5 ? "profile-grid column-grid" : "profile-grid"}>
                             {contactCards.filter((c) => c.role === "dependent").map((contact, index) => (
                                 <li key={index} className="profile-card" >
                                     <div className="profile-card-content">
