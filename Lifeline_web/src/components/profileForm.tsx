@@ -43,7 +43,7 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
     };
 
     return (
-        <form className="profile-user">
+        <div className="profile-user">
         <div className="profile-user-content">
             <div className="profile-id">
 
@@ -124,6 +124,6 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
             open={showDeleteAccount}
             onClose={() => setShowDeleteAccount(false)}
         />
-        </form>
+        </div>
     );
 }

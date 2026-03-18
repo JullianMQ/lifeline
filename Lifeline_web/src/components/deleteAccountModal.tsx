@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { FormEvent, MouseEvent } from "react";
+import type { FormEvent } from "react";
 import { API_BASE_URL } from "../config/api";
 import { authClient } from "../scripts/auth-client";
 
@@ -15,8 +15,6 @@ type DeleteMethod = "password" | "recent-session";
 type LinkedAccount = {
   providerId: string;
 };
-
-type DeleteEvent = FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement>;
 
 const WARNING_COUNTDOWN = 3;
 const SUCCESS_COUNTDOWN = 3;
@@ -70,7 +68,6 @@ export default function DeleteAccountModal({
         const response = await fetch(`${API_BASE_URL}/api/auth/list-accounts`, {
           credentials: "include",
         });
-        
         if (!response.ok) {
           throw new Error(`Failed to load accounts: ${response.status}`);
         }
@@ -168,8 +165,8 @@ export default function DeleteAccountModal({
     setError(null);
   };
 
-  const handleDelete = async (event?: DeleteEvent) => {
-    event?.preventDefault();
+  const handleDelete = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setError(null);
 
     if (deleteMethod === "password" && !password) {
@@ -187,6 +184,7 @@ export default function DeleteAccountModal({
               password,
             })
           : await authClient.deleteUser({});
+      localStorage.setItem("response", JSON.stringify(res));
 
       if (
         res?.error &&
@@ -291,26 +289,24 @@ export default function DeleteAccountModal({
               </>
             )}
             {error && <p className="error">{error}</p>}
+            <div className="btn-row">
+              <button
+                type="submit"
+                className="neg-btn"
+                disabled={isDeleting || isLoadingDeleteMethod}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+              <button
+                type="button"
+                className="pos-btn"
+                onClick={handleBack}
+                disabled={isDeleting}
+              >
+                Back
+              </button>
+            </div>
           </form>
-
-          <div className="btn-row">
-            <button
-              type="button"
-              className="neg-btn"
-              onClick={handleDelete}
-              disabled={isDeleting || isLoadingDeleteMethod}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </button>
-             <button
-              type="button"
-              className="pos-btn"
-              onClick={handleBack}
-              disabled={isDeleting}
-            >
-              Back
-            </button>
-          </div>
         </div>
       )}
 
