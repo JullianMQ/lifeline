@@ -86,7 +86,8 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
 
                 <div>
                     <p className="info-label">Role:</p>
-                    <div className="info-options">
+                    <p>{updateForm.role}</p>
+                    {/* <div className="info-options">
                         <label className="info-radio">
                             <input type="radio" name="role" value="mutual" checked={updateForm.role === "mutual"} onChange={handleChange}/>
                             Mutual
@@ -95,7 +96,7 @@ export default function ProfileForm({ email,initialValues, onCancel }: Props) {
                             <input type="radio" name="role" value="dependent" checked={updateForm.role === "dependent"} onChange={handleChange}/>
                             Dependent
                         </label>
-                    </div>
+                    </div> */}
                 </div>
             </div>
             
