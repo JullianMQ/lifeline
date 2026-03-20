@@ -15,14 +15,16 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         autoSignIn: false,
-        requireEmailVerification: process.env.NODE_ENV === 'production',
+        // requireEmailVerification: process.env.NODE_ENV === 'production', // INFO: can be changed to this if email service is bought
+        requireEmailVerification: false,
         revokeSessionsOnPasswordReset: true,
         // TODO: ADDING PASSWORD RESET WHEN DOMAIN IS READY
         // sendResetPassword
         // onPasswordReset
     },
     emailVerification: {
-        sendOnSignUp: process.env.NODE_ENV === 'production',
+        // sendOnSignUp: process.env.NODE_ENV === 'production',  // INFO: can be changed to this if email service is bought
+        sendOnSignUp: false,
         sendVerificationEmail: async ({ user, url, token }, request) => {
             // console.log("request", request)
             // console.log("token", token)
@@ -72,7 +74,7 @@ export const auth = betterAuth({
                 input: false
             }
         },
-        deleteUser:{
+        deleteUser: {
             enabled: true,
         }
     },
