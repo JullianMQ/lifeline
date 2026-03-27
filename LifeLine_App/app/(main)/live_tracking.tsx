@@ -17,8 +17,10 @@ import { useFocusEffect } from "expo-router";
 
 import ScreenWrapper from "../../components/screen_wrapper";
 import { useWS, type LiveLocation } from "@/lib/context/ws_context";
+import { useSosViewIntent } from "@/lib/context/sos_view_intent";
 import { getContacts, type Contact } from "@/lib/api/contact";
 import { getAvatarSvgFromStoredValue } from "@/lib/avatars";
+import reverseGeocodeWithGoogle from "@/lib/services/geocode";
 
 const isRemoteUrl = (v: string) => /^https?:\/\//i.test(v);
 
@@ -78,6 +80,49 @@ const ContactAvatar = ({ image }: { image: string | null }) => {
                     source={require("../../assets/images/user_placeholder.png")}
                     className="w-10 h-10 rounded-full"
                 />
+            )}
+        </View>
+    );
+};
+
+
+const SosModalAvatar = ({
+    image,
+    name,
+    size = 56,
+}: {
+    image: string | null | undefined;
+    name: string;
+    size?: number;
+}) => {
+    const AvatarSvg = getAvatarSvgFromStoredValue(image ?? null);
+    const initial = (name?.trim()?.[0] ?? "C").toUpperCase();
+    const innerSize = Math.round(size * 0.72);
+
+    return (
+        <View
+            style={{
+                width: size,
+                height: size,
+                borderRadius: size / 2,
+                backgroundColor: "#E13B2B",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+            }}
+        >
+            {AvatarSvg ? (
+                <AvatarSvg width={innerSize} height={innerSize} />
+            ) : image && isRemoteUrl(image) ? (
+                <Image
+                    source={{ uri: image }}
+                    style={{ width: size, height: size, borderRadius: size / 2 }}
+                    resizeMode="cover"
+                />
+            ) : (
+                <Text style={{ color: "white", fontSize: Math.round(size * 0.42), fontWeight: "900" }}>
+                    {initial}
+                </Text>
             )}
         </View>
     );
@@ -284,10 +329,12 @@ const GroupSection = memo(function GroupSection({
 const DetailPanel = memo(function DetailPanel({
     row,
     addressLabel,
+    resolvedAddress,
     onClose,
 }: {
     row: ContactRow;
     addressLabel: string;
+    resolvedAddress: string;
     onClose: () => void;
 }) {
     const contact = row.contact;
@@ -328,7 +375,7 @@ const DetailPanel = memo(function DetailPanel({
 
                 <View>
                     <Text className="text-xs font-bold text-gray-900">Address</Text>
-                    <Text className="mt-1 text-xs text-gray-700">{addressLabel || "—"}</Text>
+                    <Text className="mt-1 text-xs text-gray-700">{resolvedAddress}</Text>
                 </View>
 
                 <View className="flex-row gap-4">
@@ -361,6 +408,7 @@ const LiveTrackingView = memo(function LiveTrackingView(props: {
     markers: LiveMarker[];
     selectedMarkerId: string | null;
     selectedAddress: AddressInfo | null;
+    resolvedAddress: string;
     isLocating: boolean;
     contactRows: ContactRow[];
     selectedContactId: string | null;
@@ -375,6 +423,7 @@ const LiveTrackingView = memo(function LiveTrackingView(props: {
         markers,
         selectedMarkerId,
         selectedAddress,
+        resolvedAddress,
         isLocating,
         contactRows,
         selectedContactId,
@@ -457,6 +506,7 @@ const LiveTrackingView = memo(function LiveTrackingView(props: {
                         <DetailPanel
                             row={selectedRow}
                             addressLabel={selectedAddress?.label ?? ""}
+                            resolvedAddress={resolvedAddress}
                             onClose={onClearSelection}
                         />
                     ) : (
@@ -474,12 +524,21 @@ const LiveTrackingView = memo(function LiveTrackingView(props: {
 const LiveTrackingScreen: React.FC = () => {
     const { liveLocations } = useWS();
 
+    const { consumePendingViewContactId } = useSosViewIntent();
+
     const mapRef = useRef<MapView | null>(null);
     const mapReadyRef = useRef(false);
 
     // UI-only selection state
     const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+    // Keep latest selection in a ref so async init logic can respect it (e.g., arriving via SOS View).
+    const selectedContactIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        selectedContactIdRef.current = selectedContactId;
+    }, [selectedContactId]);
+
     const [selectedAddress, setSelectedAddress] = useState<AddressInfo | null>(null);
+    const [resolvedAddress, setResolvedAddress] = useState<string>("--");
 
     // Contacts
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -590,10 +649,12 @@ const LiveTrackingScreen: React.FC = () => {
 
                 setInitialRegion(next);
 
-                // If map is already mounted, do an initial animate too
-                requestAnimationFrame(() => {
-                    mapRef.current?.animateToRegion(next, 450);
-                });
+                // If map is already mounted, do an initial animate too (skip if a contact is already selected).
+                if (!selectedContactIdRef.current) {
+                    requestAnimationFrame(() => {
+                        mapRef.current?.animateToRegion(next, 450);
+                    });
+                }
             } catch {
                 // Keep DEFAULT_REGION
             } finally {
@@ -673,17 +734,29 @@ const LiveTrackingScreen: React.FC = () => {
         [focusOnContact]
     );
 
+    // Consume "View" intent from the global SOS modal exactly once (UI-only).
+    // IMPORTANT: This does NOT run on location updates, only when a user pressed "View" in the global modal.
+    useFocusEffect(
+        useCallback(() => {
+            const pending = consumePendingViewContactId();
+            if (!pending) return;
+
+            // Reuse existing stable selection path (focus + open panel + follow mode if applicable).
+            handleSelectContact(pending);
+        }, [consumePendingViewContactId, handleSelectContact])
+    );
+
     const handleClearSelection = useCallback(() => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setSelectedContactId(null);
         setSelectedAddress(null);
-        // follow mode stops naturally because selectedContactId becomes null
+
+        // Stop follow mode immediately.
         lastFollowKeyRef.current = "";
     }, []);
 
-    // ---------- Follow mode ----------
-    // Follow ONLY while a contact is selected and we have live coords.
-    // Throttled + avoids duplicate animations for same coordinate tick.
+    // Follow mode: only while a contact is selected.
+    // Keeps camera synced to the selected contact's marker updates (throttled + de-duped).
     useEffect(() => {
         if (!selectedContactId) return; // follow stops when panel closed
         if (!selectedMarker) return;
@@ -698,14 +771,38 @@ const LiveTrackingScreen: React.FC = () => {
         requestAnimationFrame(() => {
             animateTo(selectedMarker.latitude, selectedMarker.longitude, FOLLOW_ANIM_MS);
         });
-    }, [
-        selectedContactId,
-        selectedMarker?.id,
-        selectedMarker?.latitude,
-        selectedMarker?.longitude,
-        animateTo,
-        selectedMarker,
-    ]);
+    }, [selectedContactId, selectedMarker, animateTo]);
+
+    // NOTE: SOS modal is rendered globally in MainLayout via SosEmergencyModalHost.
+
+    // Reverse geocode selected marker (Google) for human-readable address in the contact card.
+    useEffect(() => {
+        let cancelled = false;
+
+        (async () => {
+            if (!selectedMarker) {
+                setResolvedAddress("--");
+                return;
+            }
+
+            try {
+                const googleAddress = await reverseGeocodeWithGoogle(
+                    selectedMarker.latitude,
+                    selectedMarker.longitude
+                );
+
+                if (cancelled) return;
+
+                setResolvedAddress(googleAddress ?? "Address unavailable");
+            } catch {
+                if (!cancelled) setResolvedAddress("Address unavailable");
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedMarker?.latitude, selectedMarker?.longitude]);
 
     // Reverse geocode selected marker (unchanged)
     useEffect(() => {
@@ -745,6 +842,7 @@ const LiveTrackingScreen: React.FC = () => {
             markers={markers}
             selectedMarkerId={selectedMarker?.id ?? null}
             selectedAddress={selectedAddress}
+            resolvedAddress={resolvedAddress}
             isLocating={isLocating}
             contactRows={contactRows}
             selectedContactId={selectedContactId}
