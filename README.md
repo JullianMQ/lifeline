@@ -24,6 +24,22 @@ Lifeline enables users to:
 - **Document** - Capture and store media evidence during emergencies
 - **Coordinate** - View location history and receive real-time updates via WebSocket
 
+## Screenshots
+![Dashboard Web](https://github.com/JullianMQ/lifeline/blob/master/Lifeline_web/web_screenshots/Dashboard-page.png)
+### Dashboard Alert
+![Dashboard Alert](https://github.com/JullianMQ/lifeline/blob/master/Lifeline_web/web_screenshots/Dashboard-alert-modal.png)
+### Alert Inside of Contact's Page
+![Contact Page Alert](https://github.com/JullianMQ/lifeline/blob/master/Lifeline_web/web_screenshots/Contact-page-alert-modal.png)
+### Profile Page Editing
+![Profile Page Edit](https://github.com/JullianMQ/lifeline/blob/master/Lifeline_web/web_screenshots/Profile-page-edit-avatar.png)
+
+<div style="display: flex; ">
+  <img src="https://github.com/JullianMQ/lifeline/blob/master/LifeLine_App/app_screenshots/home_screen.jpg" width="280" height="600" alt="Dashboard Mobile">
+  <img src="https://github.com/JullianMQ/lifeline/blob/master/LifeLine_App/app_screenshots/qr_code.jpg" width="280" height="600" alt="QR Code Generation">
+  <img src="https://github.com/JullianMQ/lifeline/blob/master/LifeLine_App/app_screenshots/add_member_1.jpg" width="280" height="600" alt="Adding Members">
+  <img src="https://github.com/JullianMQ/lifeline/blob/master/LifeLine_App/app_screenshots/google_select.jpg" width="280" height="600" alt="Google Login Integration">  
+</div>
+
 ## Tech Stack
 
 ### Backend
@@ -103,7 +119,8 @@ Lifeline enables users to:
 
 - **Jullian Quiambao** - Backend architecture, API development, WebSocket implementation
 - **Chester Cruz** - Mobile app development, sensor integration, foreground services
-- **Frances Ces (cess2c)** - Web dashboard UI/UX, contact management, location history
+- **Frances Ces** - Web dashboard UI/UX, contact management, location history
+- **Renell Constantino** - Infrastructure and documentation lead
 
 ## Getting Started
 
